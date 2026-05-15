@@ -1,8 +1,8 @@
 // ── Sales Research API ─────────────────────────────────────────────────────
-// Base: https://sales-research-application-297743845367.europe-west1.run.app
+// Base: https://salesagent.aicoesandox-int.colt.net
 
 export const SALES_API_BASE =
-  'https://sales-research-application-297743845367.europe-west1.run.app/api/v1';
+  'https://salesagent.aicoesandox-int.colt.net/api/v1';
 
 // ── Session storage keys (isolated from the translation service) ────────────
 
