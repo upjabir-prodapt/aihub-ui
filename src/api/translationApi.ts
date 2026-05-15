@@ -2,7 +2,7 @@ import type { TranslateResponse, JobStatusResponse } from '../types/translation'
 
 const API_BASE =
   import.meta.env.VITE_API_BASE_URL ||
-  'https://translation.aicoesandox-int.colt.net/api/v1';
+  'https://192.168.1.6/api/v1';
 
 // ── Token helpers ──────────────────────────────────────────────────────────
 

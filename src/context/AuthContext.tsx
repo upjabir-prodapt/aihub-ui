@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://translation.aicoesandox-int.colt.net/api/v1';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://192.168.1.6/api/v1';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
