@@ -28,6 +28,10 @@ EXPOSE 8080
 RUN printf 'server {\n\
     listen 8080;\n\
     server_name localhost;\n\
+    location /api/metadata/id-token {\n\
+        proxy_pass http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/identity;\n\
+        proxy_set_header Metadata-Flavor Google;\n\
+    }\n\
     location / {\n\
         root /usr/share/nginx/html;\n\
         index index.html index.htm;\n\

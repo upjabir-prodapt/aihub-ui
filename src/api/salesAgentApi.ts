@@ -6,8 +6,8 @@ export const SALES_API_BASE =
 
 // ── Session storage keys (isolated from the translation service) ────────────
 
-const SALES_TOKEN_KEY  = 'sales_auth_token';
-const SALES_USER_KEY   = 'sales_auth_user';
+const SALES_TOKEN_KEY = 'sales_auth_token';
+const SALES_USER_KEY = 'sales_auth_user';
 const SALES_EXPIRY_KEY = 'sales_auth_expiry';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -46,14 +46,14 @@ export interface ResearchResultResponse {
 
 export function saveSalesSession(token: string, user: SalesAuthUser, expiresInSeconds = 1800) {
   const expiry = Date.now() + expiresInSeconds * 1000;
-  sessionStorage.setItem(SALES_TOKEN_KEY,  token);
-  sessionStorage.setItem(SALES_USER_KEY,   JSON.stringify(user));
+  sessionStorage.setItem(SALES_TOKEN_KEY, token);
+  sessionStorage.setItem(SALES_USER_KEY, JSON.stringify(user));
   sessionStorage.setItem(SALES_EXPIRY_KEY, String(expiry));
 }
 
 export function loadSalesSession(): { token: string; user: SalesAuthUser } | null {
-  const token    = sessionStorage.getItem(SALES_TOKEN_KEY);
-  const userRaw  = sessionStorage.getItem(SALES_USER_KEY);
+  const token = sessionStorage.getItem(SALES_TOKEN_KEY);
+  const userRaw = sessionStorage.getItem(SALES_USER_KEY);
   const expiryRaw = sessionStorage.getItem(SALES_EXPIRY_KEY);
 
   if (!token || !userRaw || !expiryRaw) return null;
@@ -80,7 +80,7 @@ export function clearSalesSession() {
 
 function salesAuthHeaders(token: string): Record<string, string> {
   return {
-    accept:        'application/json',
+    accept: 'application/json',
     'Content-Type': 'application/json',
     Authorization: `Bearer ${token}`,
   };
@@ -185,9 +185,9 @@ export async function downloadResearchFile(token: string, job_id: string): Promi
   const filename = match ? match[1].replace(/['"]/g, '') : `research-${job_id}.pdf`;
 
   const blob = await res.blob();
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href     = url;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
   a.download = filename;
   document.body.appendChild(a);
   a.click();

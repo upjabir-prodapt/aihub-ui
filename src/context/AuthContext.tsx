@@ -13,6 +13,7 @@ export interface AuthUser {
 interface AuthState {
   user: AuthUser | null;
   token: string | null;
+  googleIdToken: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
@@ -30,22 +31,25 @@ export function isColtEmail(email: string): boolean {
 // ── Storage helpers ────────────────────────────────────────────────────────
 
 const TOKEN_KEY = 'colt_auth_token';
+const GOOGLE_TOKEN_KEY = 'colt_google_id_token';
 const USER_KEY = 'colt_auth_user';
 const EXPIRY_KEY = 'colt_auth_expiry';
 
-function saveSession(token: string, user: AuthUser, expiresIn: number) {
+function saveSession(token: string, googleIdToken: string, user: AuthUser, expiresIn: number) {
   const expiry = Date.now() + expiresIn * 1000;
   sessionStorage.setItem(TOKEN_KEY, token);
+  sessionStorage.setItem(GOOGLE_TOKEN_KEY, googleIdToken);
   sessionStorage.setItem(USER_KEY, JSON.stringify(user));
   sessionStorage.setItem(EXPIRY_KEY, String(expiry));
 }
 
-function loadSession(): { token: string; user: AuthUser } | null {
+function loadSession(): { token: string; googleIdToken: string; user: AuthUser } | null {
   const token = sessionStorage.getItem(TOKEN_KEY);
+  const googleIdToken = sessionStorage.getItem(GOOGLE_TOKEN_KEY);
   const userRaw = sessionStorage.getItem(USER_KEY);
   const expiryRaw = sessionStorage.getItem(EXPIRY_KEY);
 
-  if (!token || !userRaw || !expiryRaw) return null;
+  if (!token || !googleIdToken || !userRaw || !expiryRaw) return null;
   if (Date.now() > parseInt(expiryRaw, 10)) {
     clearSession();
     return null;
@@ -53,7 +57,7 @@ function loadSession(): { token: string; user: AuthUser } | null {
 
   try {
     const user: AuthUser = JSON.parse(userRaw);
-    return { token, user };
+    return { token, googleIdToken, user };
   } catch {
     return null;
   }
@@ -61,6 +65,7 @@ function loadSession(): { token: string; user: AuthUser } | null {
 
 function clearSession() {
   sessionStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(GOOGLE_TOKEN_KEY);
   sessionStorage.removeItem(USER_KEY);
   sessionStorage.removeItem(EXPIRY_KEY);
 }
@@ -72,6 +77,7 @@ const AuthContext = createContext<AuthState | null>(null);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [googleIdToken, setGoogleIdToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -80,6 +86,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const session = loadSession();
     if (session) {
       setToken(session.token);
+      setGoogleIdToken(session.googleIdToken);
       setUser(session.user);
     }
   }, []);
@@ -108,9 +115,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(true);
 
     try {
+      // Step 1: Generate Google ID Token via Nginx Metadata Proxy
+      let fetchedGoogleIdToken = '';
+      try {
+        const metaRes = await fetch(`/api/metadata/id-token?audience=${encodeURIComponent(API_BASE)}`);
+        if (metaRes.ok) {
+          fetchedGoogleIdToken = await metaRes.text();
+        } else {
+          console.warn('Metadata endpoint returned status:', metaRes.status);
+          fetchedGoogleIdToken = 'mock_google_id_token_for_local_dev';
+        }
+      } catch (err) {
+        console.warn('Failed to reach metadata endpoint (likely local dev environment):', err);
+        fetchedGoogleIdToken = 'mock_google_id_token_for_local_dev';
+      }
+
+      // Step 2: Get YOUR JWT (/auth/token)
       const response = await fetch(`${API_BASE}/auth/token`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'accept': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json', 
+          'accept': 'application/json',
+          'Authorization': `Bearer ${fetchedGoogleIdToken}`
+        },
         body: JSON.stringify({ email: email.trim(), business_unit: business_unit.trim(), organization: organization.trim() }),
       });
 
@@ -123,8 +150,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const authUser: AuthUser = { email: email.trim(), business_unit: business_unit.trim(), organization: organization.trim() };
 
       setToken(data.access_token);
+      setGoogleIdToken(fetchedGoogleIdToken);
       setUser(authUser);
-      saveSession(data.access_token, authUser, data.expires_in ?? 3600);
+      saveSession(data.access_token, fetchedGoogleIdToken, authUser, data.expires_in ?? 3600);
     } catch (err: any) {
       setError(err.message || 'Login failed. Please try again.');
     } finally {
@@ -134,6 +162,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = useCallback(() => {
     setToken(null);
+    setGoogleIdToken(null);
     setUser(null);
     setError(null);
     clearSession();
@@ -145,6 +174,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <AuthContext.Provider value={{
       user,
       token,
+      googleIdToken,
       isAuthenticated: !!token,
       isLoading,
       error,

@@ -10,11 +10,17 @@ function getStoredToken(): string | null {
   return sessionStorage.getItem('colt_auth_token');
 }
 
+function getStoredGoogleIdToken(): string | null {
+  return sessionStorage.getItem('colt_google_id_token');
+}
+
 function authHeaders(extra: Record<string, string> = {}): Record<string, string> {
   const token = getStoredToken();
+  const googleIdToken = getStoredGoogleIdToken();
   return {
     accept: 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(googleIdToken ? { Authorization: `Bearer ${googleIdToken}` } : {}),
+    ...(token ? { 'x-app-auth': `Bearer ${token}` } : {}),
     ...extra,
   };
 }
