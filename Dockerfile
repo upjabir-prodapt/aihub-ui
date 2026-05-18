@@ -36,6 +36,10 @@ RUN printf 'server {\n\
         proxy_pass https://translation-api-service-297743845367.europe-west1.run.app/api/v1/;\n\
         proxy_ssl_server_name on;\n\
         proxy_set_header Host translation-api-service-297743845367.europe-west1.run.app;\n\
+        proxy_pass_request_headers on;\n\
+        proxy_set_header Authorization $http_authorization;\n\
+        proxy_set_header x-app-auth $http_x_app_auth;\n\
+        proxy_set_header X-Serverless-Authorization $http_authorization;\n\
     }\n\
     location / {\n\
         root /usr/share/nginx/html;\n\
