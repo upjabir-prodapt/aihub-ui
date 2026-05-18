@@ -32,6 +32,11 @@ RUN printf 'server {\n\
         proxy_pass http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/identity;\n\
         proxy_set_header Metadata-Flavor Google;\n\
     }\n\
+    location /api/v1/ {\n\
+        proxy_pass https://translation-api-service-297743845367.europe-west1.run.app/api/v1/;\n\
+        proxy_ssl_server_name on;\n\
+        proxy_set_header Host translation-api-service-297743845367.europe-west1.run.app;\n\
+    }\n\
     location / {\n\
         root /usr/share/nginx/html;\n\
         index index.html index.htm;\n\
