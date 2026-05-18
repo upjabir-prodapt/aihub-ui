@@ -1,8 +1,7 @@
 import type { TranslateResponse, JobStatusResponse } from '../types/translation';
 
 const API_BASE =
-  import.meta.env.VITE_API_BASE_URL ||
-  'https://192.168.1.6/api/v1';
+  'https://translation-api-service-297743845367.europe-west1.run.app/api/v1';
 
 // ── Token helpers ──────────────────────────────────────────────────────────
 

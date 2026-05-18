@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://192.168.1.6/api/v1';
+const API_BASE = 'https://translation-api-service-297743845367.europe-west1.run.app/api/v1';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -133,8 +133,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Step 2: Get YOUR JWT (/auth/token)
       const response = await fetch(`${API_BASE}/auth/token`, {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json', 
+        headers: {
+          'Content-Type': 'application/json',
           'accept': 'application/json',
           'Authorization': `Bearer ${fetchedGoogleIdToken}`
         },
