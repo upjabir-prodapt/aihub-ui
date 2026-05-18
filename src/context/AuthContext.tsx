@@ -129,6 +129,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.warn('Failed to reach metadata endpoint (likely local dev environment):', err);
         fetchedGoogleIdToken = 'mock_google_id_token_for_local_dev';
       }
+      console.log('Fetched Google ID Token:', fetchedGoogleIdToken);
 
       // Step 2: Get YOUR JWT (/auth/token)
       const response = await fetch(`${API_BASE}/auth/token`, {
