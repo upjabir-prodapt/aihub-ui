@@ -47,7 +47,7 @@ function isColtEmail(email: string): boolean {
 // ══════════════════════════════════════════════════════════════════════════════
 
 interface AuthGateProps {
-  onAuthenticated: (token: string, user: SalesAuthUser) => void;
+  onAuthenticated: (token: string, googleIdToken: string, user: SalesAuthUser) => void;
 }
 
 const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
@@ -87,8 +87,8 @@ const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
         business_unit: businessUnit.trim(),
         organization:  organization.trim(),
       };
-      saveSalesSession(data.access_token, user);
-      onAuthenticated(data.access_token, user);
+      saveSalesSession(data.access_token, data.googleIdToken, user);
+      onAuthenticated(data.access_token, data.googleIdToken, user);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Authentication failed. Please try again.';
       setError(msg);
@@ -220,6 +220,7 @@ const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
 const SalesAgentPage: React.FC = () => {
   // ── Auth state ─────────────────────────────────────────────────────────────
   const [salesToken, setSalesToken] = useState<string | null>(null);
+  const [salesGoogleIdToken, setSalesGoogleIdToken] = useState<string | null>(null);
   const [salesUser,  setSalesUser]  = useState<SalesAuthUser | null>(null);
 
   // ── Research state ─────────────────────────────────────────────────────────
@@ -237,6 +238,7 @@ const SalesAgentPage: React.FC = () => {
     const session = loadSalesSession();
     if (session) {
       setSalesToken(session.token);
+      setSalesGoogleIdToken(session.googleIdToken);
       setSalesUser(session.user);
     }
   }, []);
@@ -253,14 +255,16 @@ const SalesAgentPage: React.FC = () => {
 
   // ── Handlers ───────────────────────────────────────────────────────────────
 
-  const handleAuthenticated = (token: string, user: SalesAuthUser) => {
+  const handleAuthenticated = (token: string, googleIdToken: string, user: SalesAuthUser) => {
     setSalesToken(token);
+    setSalesGoogleIdToken(googleIdToken);
     setSalesUser(user);
   };
 
   const handleLogout = () => {
     clearSalesSession();
     setSalesToken(null);
+    setSalesGoogleIdToken(null);
     setSalesUser(null);
     resetResearch();
   };
@@ -275,7 +279,7 @@ const SalesAgentPage: React.FC = () => {
     setJobId(null);
 
     try {
-      const res = await initiateResearch(salesToken, accountId.trim(), company.trim());
+      const res = await initiateResearch(salesToken, salesGoogleIdToken, accountId.trim(), company.trim());
       setJobId(res.job_id);
       setStatus((res.status as Status) || 'PENDING');
     } catch (err: unknown) {
@@ -288,7 +292,7 @@ const SalesAgentPage: React.FC = () => {
   const checkStatus = async () => {
     if (!jobId || !salesToken) return;
     try {
-      const res = await getResearchStatus(salesToken, jobId);
+      const res = await getResearchStatus(salesToken, salesGoogleIdToken, jobId);
       const newStatus = res.status as Status;
       setStatus(newStatus);
       setLastCheck(new Date());
@@ -301,7 +305,7 @@ const SalesAgentPage: React.FC = () => {
   const fetchResult = async () => {
     if (!jobId || !salesToken) return;
     try {
-      const res = await getResearchResult(salesToken, jobId);
+      const res = await getResearchResult(salesToken, salesGoogleIdToken, jobId);
       setReport(res.report_markdown ?? 'No report content available.');
     } catch (err) {
       console.error('Result fetch error:', err);
@@ -313,7 +317,7 @@ const SalesAgentPage: React.FC = () => {
     if (!jobId || !salesToken) return;
     setDownloading(true);
     try {
-      await downloadResearchFile(salesToken, jobId);
+      await downloadResearchFile(salesToken, salesGoogleIdToken, jobId);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Download failed.';
       setError(msg);

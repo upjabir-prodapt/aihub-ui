@@ -4,9 +4,12 @@
 export const SALES_API_BASE =
   'https://192.168.1.7/api/v1';
 
+export const SALES_CLOUD_RUN_AUDIENCE = 'https://192.168.1.7';
+
 // ── Session storage keys (isolated from the translation service) ────────────
 
 const SALES_TOKEN_KEY = 'sales_auth_token';
+const SALES_GOOGLE_TOKEN_KEY = 'sales_google_id_token';
 const SALES_USER_KEY = 'sales_auth_user';
 const SALES_EXPIRY_KEY = 'sales_auth_expiry';
 
@@ -44,19 +47,21 @@ export interface ResearchResultResponse {
 
 // ── Session helpers ────────────────────────────────────────────────────────
 
-export function saveSalesSession(token: string, user: SalesAuthUser, expiresInSeconds = 1800) {
+export function saveSalesSession(token: string, googleIdToken: string, user: SalesAuthUser, expiresInSeconds = 1800) {
   const expiry = Date.now() + expiresInSeconds * 1000;
   sessionStorage.setItem(SALES_TOKEN_KEY, token);
+  sessionStorage.setItem(SALES_GOOGLE_TOKEN_KEY, googleIdToken);
   sessionStorage.setItem(SALES_USER_KEY, JSON.stringify(user));
   sessionStorage.setItem(SALES_EXPIRY_KEY, String(expiry));
 }
 
-export function loadSalesSession(): { token: string; user: SalesAuthUser } | null {
+export function loadSalesSession(): { token: string; googleIdToken: string; user: SalesAuthUser } | null {
   const token = sessionStorage.getItem(SALES_TOKEN_KEY);
+  const googleIdToken = sessionStorage.getItem(SALES_GOOGLE_TOKEN_KEY);
   const userRaw = sessionStorage.getItem(SALES_USER_KEY);
   const expiryRaw = sessionStorage.getItem(SALES_EXPIRY_KEY);
 
-  if (!token || !userRaw || !expiryRaw) return null;
+  if (!token || !googleIdToken || !userRaw || !expiryRaw) return null;
   if (Date.now() > parseInt(expiryRaw, 10)) {
     clearSalesSession();
     return null;
@@ -64,7 +69,7 @@ export function loadSalesSession(): { token: string; user: SalesAuthUser } | nul
 
   try {
     const user: SalesAuthUser = JSON.parse(userRaw);
-    return { token, user };
+    return { token, googleIdToken, user };
   } catch {
     return null;
   }
@@ -72,17 +77,20 @@ export function loadSalesSession(): { token: string; user: SalesAuthUser } | nul
 
 export function clearSalesSession() {
   sessionStorage.removeItem(SALES_TOKEN_KEY);
+  sessionStorage.removeItem(SALES_GOOGLE_TOKEN_KEY);
   sessionStorage.removeItem(SALES_USER_KEY);
   sessionStorage.removeItem(SALES_EXPIRY_KEY);
 }
 
 // ── Auth headers helper ────────────────────────────────────────────────────
 
-function salesAuthHeaders(token: string): Record<string, string> {
+function salesAuthHeaders(token: string, googleIdToken: string | null): Record<string, string> {
   return {
     accept: 'application/json',
     'Content-Type': 'application/json',
+    ...(googleIdToken ? { 'X-Serverless-Authorization': `Bearer ${googleIdToken}` } : {}),
     Authorization: `Bearer ${token}`,
+    'x-app-auth': `Bearer ${token}`,
   };
 }
 
@@ -93,10 +101,30 @@ export async function salesAuthenticate(
   email: string,
   business_unit: string,
   organization: string,
-): Promise<SalesTokenResponse> {
+): Promise<SalesTokenResponse & { googleIdToken: string }> {
+  // Step 1: Generate Google ID Token via Nginx Metadata Proxy
+  let fetchedGoogleIdToken = '';
+  try {
+    const metaRes = await fetch(`/api/metadata/id-token?audience=${encodeURIComponent(SALES_CLOUD_RUN_AUDIENCE)}`);
+    if (metaRes.ok) {
+      fetchedGoogleIdToken = await metaRes.text();
+    } else {
+      console.warn('Metadata endpoint returned status:', metaRes.status);
+      fetchedGoogleIdToken = 'mock_google_id_token_for_local_dev';
+    }
+  } catch (err) {
+    console.warn('Failed to reach metadata endpoint (likely local dev environment):', err);
+    fetchedGoogleIdToken = 'mock_google_id_token_for_local_dev';
+  }
+
+  // Step 2: Get YOUR JWT (/auth/token) using the Google ID Token for Authentication
   const res = await fetch(`${SALES_API_BASE}/auth/token`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', accept: 'application/json' },
+    headers: { 
+      'Content-Type': 'application/json', 
+      accept: 'application/json',
+      'Authorization': `Bearer ${fetchedGoogleIdToken}`
+    },
     body: JSON.stringify({ email, business_unit, organization }),
   });
 
@@ -105,18 +133,23 @@ export async function salesAuthenticate(
     throw new Error(err.detail || err.message || `HTTP ${res.status}`);
   }
 
-  return res.json();
+  const data = await res.json();
+  return {
+    ...data,
+    googleIdToken: fetchedGoogleIdToken,
+  };
 }
 
 /** POST /api/v1/research/initiate */
 export async function initiateResearch(
   token: string,
+  googleIdToken: string | null,
   account_id: string,
   company_name: string,
 ): Promise<InitiateResearchResponse> {
   const res = await fetch(`${SALES_API_BASE}/research/initiate`, {
     method: 'POST',
-    headers: salesAuthHeaders(token),
+    headers: salesAuthHeaders(token, googleIdToken),
     body: JSON.stringify({ account_id, company_name }),
   });
 
@@ -131,11 +164,17 @@ export async function initiateResearch(
 /** GET /api/v1/research/status/{job_id} */
 export async function getResearchStatus(
   token: string,
+  googleIdToken: string | null,
   job_id: string,
 ): Promise<ResearchStatusResponse> {
   const res = await fetch(`${SALES_API_BASE}/research/status/${job_id}`, {
     method: 'GET',
-    headers: { accept: 'application/json', Authorization: `Bearer ${token}` },
+    headers: {
+      accept: 'application/json',
+      ...(googleIdToken ? { 'X-Serverless-Authorization': `Bearer ${googleIdToken}` } : {}),
+      Authorization: `Bearer ${token}`,
+      'x-app-auth': `Bearer ${token}`,
+    },
   });
 
   if (!res.ok) {
@@ -149,11 +188,17 @@ export async function getResearchStatus(
 /** GET /api/v1/research/result/{job_id} */
 export async function getResearchResult(
   token: string,
+  googleIdToken: string | null,
   job_id: string,
 ): Promise<ResearchResultResponse> {
   const res = await fetch(`${SALES_API_BASE}/research/result/${job_id}`, {
     method: 'GET',
-    headers: { accept: 'application/json', Authorization: `Bearer ${token}` },
+    headers: {
+      accept: 'application/json',
+      ...(googleIdToken ? { 'X-Serverless-Authorization': `Bearer ${googleIdToken}` } : {}),
+      Authorization: `Bearer ${token}`,
+      'x-app-auth': `Bearer ${token}`,
+    },
   });
 
   if (!res.ok) {
@@ -168,10 +213,19 @@ export async function getResearchResult(
  * GET /api/v1/research/download/{job_id}
  * Triggers a direct binary file download in the browser.
  */
-export async function downloadResearchFile(token: string, job_id: string): Promise<void> {
+export async function downloadResearchFile(
+  token: string,
+  googleIdToken: string | null,
+  job_id: string,
+): Promise<void> {
   const res = await fetch(`${SALES_API_BASE}/research/download/${job_id}`, {
     method: 'GET',
-    headers: { accept: '*/*', Authorization: `Bearer ${token}` },
+    headers: {
+      accept: '*/*',
+      ...(googleIdToken ? { 'X-Serverless-Authorization': `Bearer ${googleIdToken}` } : {}),
+      Authorization: `Bearer ${token}`,
+      'x-app-auth': `Bearer ${token}`,
+    },
   });
 
   if (!res.ok) {
