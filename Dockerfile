@@ -38,6 +38,12 @@ RUN printf 'server {\n\
         proxy_set_header Host translation-api-service-297743845367.europe-west1.run.app;\n\
         proxy_pass_request_headers on;\n\
     }\n\
+    location /sales-api/ {\n\
+        proxy_pass https://sales-research-application-297743845367.europe-west1.run.app/;\n\
+        proxy_ssl_server_name on;\n\
+        proxy_set_header Host sales-research-application-297743845367.europe-west1.run.app;\n\
+        proxy_pass_request_headers on;\n\
+    }\n\
     location / {\n\
         root /usr/share/nginx/html;\n\
         index index.html index.htm;\n\
