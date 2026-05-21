@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 
-const API_BASE = '/api/v1';
+const API_BASE = 'https://translation-api-service-297743845367.europe-west1.run.app/api/v1';
 const CLOUD_RUN_AUDIENCE = 'https://translation-api-service-297743845367.europe-west1.run.app';
 
 // ── Types ──────────────────────────────────────────────────────────────────

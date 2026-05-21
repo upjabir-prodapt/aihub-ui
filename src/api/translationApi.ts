@@ -7,7 +7,7 @@ import type {
   JobStatus,
 } from '../types/translation';
 
-const API_BASE = '/api/v1';
+const API_BASE = 'https://translation-api-service-297743845367.europe-west1.run.app/api/v1';
 
 // ── Token helpers ──────────────────────────────────────────────────────────
 

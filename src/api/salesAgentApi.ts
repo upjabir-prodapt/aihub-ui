@@ -1,7 +1,7 @@
 // ── Sales Research API ─────────────────────────────────────────────────────
 // Base: https://192.168.1.7
 
-export const SALES_API_BASE = '/sales-api/api/v1';
+export const SALES_API_BASE = 'https://sales-research-application-297743845367.europe-west1.run.app/api/v1';
 
 export const SALES_CLOUD_RUN_AUDIENCE = 'https://sales-research-application-297743845367.europe-west1.run.app';
 
