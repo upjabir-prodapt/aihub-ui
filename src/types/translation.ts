@@ -1,31 +1,35 @@
+// ── Request ────────────────────────────────────────────────────────────────
+
 export interface TranslateRequest {
-  file: File | string;
-  text?: string;
-  target_lang: string;
-  source_lang?: string;
+  file: File;
+  /** Full name or ISO 639-1 code e.g. "French" or "fr" */
+  target_language: string;
   domain: string;
-  user_id: string;
-  business_unit: string;
-  organization: string;
-  enable_dlp: boolean;
-  enable_chunking: boolean;
-  priority: string;
+  source_language?: string;
+  enable_dlp?: boolean;
+  enable_chunking?: boolean;
+  /** "standard" | "high" */
+  priority?: string;
 }
+
+// ── Submit response ────────────────────────────────────────────────────────
 
 export interface TranslateResponse {
   job_id: string;
-  status: string;
+  status: string; // "queued"
   status_url: string;
 }
 
-export interface TranslationResult {
+// ── Result detail (GET /translate/{job_id}) ───────────────────────────────
+
+export interface TranslationResultDetail {
   translated_document?: {
-    content: string;
-    format: string;
-    filename: string;
-    download_url: string;
+    content: string | null;
+    format: string | null;
+    filename: string | null;
+    download_url: string | null;
   };
-  metadata: {
+  metadata?: {
     source_language: string;
     target_language: string;
     domain: string;
@@ -36,7 +40,7 @@ export interface TranslationResult {
     chunks_processed: number;
     retry_attempts: number;
   };
-  labels: {
+  labels?: {
     translation_intent: string;
     processing_time_seconds: number;
     token_count: number;
@@ -44,11 +48,47 @@ export interface TranslationResult {
   };
 }
 
+export interface JobDetailResponse {
+  job_id: string;
+  status: JobStatus;
+  submitted_at: string | null;
+  completed_at: string | null;
+  result?: TranslationResultDetail | null;
+  error_message?: string | null;
+}
+
+// ── Lightweight status (GET /jobs/{job_id}) ────────────────────────────────
+
+export type JobStatus = 'queued' | 'processing' | 'completed' | 'failed' | 'cancelled';
+
 export interface JobStatusResponse {
   job_id: string;
-  status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
-  submitted_at: string;
-  completed_at?: string;
-  result?: TranslationResult;
-  error_message?: string;
+  status: JobStatus;
+  progress: number;
+  current_stage: string | null;
+  user: string;
+  department: string;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
+  download_url: string | null;
+  error_message: string | null;
+}
+
+// ── Jobs list (GET /jobs) ──────────────────────────────────────────────────
+
+export interface JobsListResponse {
+  jobs: JobStatusResponse[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+// ── Download URL (GET /jobs/{job_id}/download) ─────────────────────────────
+
+export interface DownloadUrlResponse {
+  download_url: string;
+  expires_in: number;
+  filename: string;
+  file_size: number | null;
 }

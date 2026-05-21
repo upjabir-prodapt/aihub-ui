@@ -102,98 +102,112 @@ const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
   };
 
   return (
-    <div className="sales-auth-gate">
-      {/* Glow backdrop */}
-      <div className="auth-gate-glow" />
+    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Login">
+      <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
+        {/* Glow accent */}
+        <div className="modal-glow" />
 
-      <div className="auth-gate-inner">
-        {/* Badge */}
-        <div className="search-badge" style={{ marginBottom: '20px' }}>
-          RESEARCH INTELLIGENCE · SECURE ACCESS
-        </div>
-
-        {/* Icon + Title */}
-        <div className="auth-gate-icon-wrap">
-          <LogIn size={28} color="var(--colt-teal)" />
-        </div>
-        <h2 className="auth-gate-title">Sign in to Research Agent</h2>
-        <p className="auth-gate-sub">
-          Access is restricted to <strong>@colt.net</strong> accounts.
-        </p>
-
-        <form className="auth-gate-form" onSubmit={handleSubmit} noValidate>
-          {/* Email */}
-          <div className="ag-field">
-            <label className="ag-label" htmlFor="sales-email">
-              <User size={13} /> Colt Email <span className="required">*</span>
-            </label>
-            <input
-              ref={emailRef}
-              id="sales-email"
-              type="email"
-              className={`ag-input ${fieldErrors.email ? 'ag-input-error' : ''}`}
-              value={email}
-              onChange={(e) => { setEmail(e.target.value); clearField('email'); }}
-              placeholder="you@colt.net"
-              autoComplete="email"
-            />
-            {fieldErrors.email && <span className="ag-field-err">{fieldErrors.email}</span>}
-          </div>
-
-          {/* Business Unit */}
-          <div className="ag-field">
-            <label className="ag-label" htmlFor="sales-bu">
-              <Briefcase size={13} /> Business Unit <span className="required">*</span>
-            </label>
-            <input
-              id="sales-bu"
-              type="text"
-              className={`ag-input ${fieldErrors.businessUnit ? 'ag-input-error' : ''}`}
-              value={businessUnit}
-              onChange={(e) => { setBusinessUnit(e.target.value); clearField('businessUnit'); }}
-              placeholder="e.g. Marketing"
-            />
-            {fieldErrors.businessUnit && <span className="ag-field-err">{fieldErrors.businessUnit}</span>}
-          </div>
-
-          {/* Organization */}
-          <div className="ag-field">
-            <label className="ag-label" htmlFor="sales-org">
-              <Globe size={13} /> Organization <span className="required">*</span>
-            </label>
-            <input
-              id="sales-org"
-              type="text"
-              className={`ag-input ${fieldErrors.organization ? 'ag-input-error' : ''}`}
-              value={organization}
-              onChange={(e) => { setOrganization(e.target.value); clearField('organization'); }}
-              placeholder="e.g. Acme Global"
-            />
-            {fieldErrors.organization && <span className="ag-field-err">{fieldErrors.organization}</span>}
-          </div>
-
-          {/* Server error */}
-          {error && (
-            <div className="ag-error-banner" role="alert">
-              <AlertCircle size={14} />
-              {error}
+        {/* Header */}
+        <div className="modal-header">
+          <div className="modal-logo-row">
+            <div className="modal-logo-mark">
+              <div className="logo-chevron" />
             </div>
-          )}
+            <div>
+              <div className="modal-logo-company">Colt</div>
+              <div className="modal-logo-product">AI Hub</div>
+            </div>
+          </div>
+        </div>
 
-          <button
-            type="submit"
-            id="sales-auth-submit-btn"
-            className="translate-btn"
-            disabled={isLoading}
-            style={{ width: '100%', marginTop: '8px' }}
-          >
-            {isLoading ? (
-              <><span className="spinner" /> Signing in…</>
-            ) : (
-              <><LogIn size={16} style={{ marginRight: '8px' }} /> Sign In</>
+        <div className="modal-body">
+          <h2 className="modal-title">Sign in to Research Agent</h2>
+          <p className="modal-subtitle">Use your Colt credentials to access the Research Intelligence Service.</p>
+
+          <form onSubmit={handleSubmit} className="login-form" noValidate>
+            {/* Email */}
+            <div className="login-field">
+              <label className="login-label" htmlFor="sales-email">
+                Colt Email <span className="required">*</span>
+              </label>
+              <input
+                ref={emailRef}
+                id="sales-email"
+                type="email"
+                className={`login-input ${fieldErrors.email ? 'input-error' : ''}`}
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); clearField('email'); }}
+                placeholder="you@colt.net"
+                autoComplete="email"
+              />
+              {fieldErrors.email && <span className="field-error-msg">{fieldErrors.email}</span>}
+            </div>
+
+            {/* Business Unit */}
+            <div className="login-field">
+              <label className="login-label" htmlFor="sales-bu">
+                Business Unit <span className="required">*</span>
+              </label>
+              <input
+                id="sales-bu"
+                type="text"
+                className={`login-input ${fieldErrors.businessUnit ? 'input-error' : ''}`}
+                value={businessUnit}
+                onChange={(e) => { setBusinessUnit(e.target.value); clearField('businessUnit'); }}
+                placeholder="e.g. Marketing"
+              />
+              {fieldErrors.businessUnit && <span className="field-error-msg">{fieldErrors.businessUnit}</span>}
+            </div>
+
+            {/* Organization */}
+            <div className="login-field">
+              <label className="login-label" htmlFor="sales-org">
+                Organization <span className="required">*</span>
+              </label>
+              <input
+                id="sales-org"
+                type="text"
+                className={`login-input ${fieldErrors.organization ? 'input-error' : ''}`}
+                value={organization}
+                onChange={(e) => { setOrganization(e.target.value); clearField('organization'); }}
+                placeholder="e.g. Colt"
+              />
+              {fieldErrors.organization && <span className="field-error-msg">{fieldErrors.organization}</span>}
+            </div>
+
+            {/* Server error */}
+            {error && (
+              <div className="login-error-banner" role="alert">
+                <AlertCircle size={14} />
+                {error}
+              </div>
             )}
-          </button>
-        </form>
+
+            <button
+              type="submit"
+              id="sales-auth-submit-btn"
+              className="login-btn"
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <><span className="spinner" /> Signing in…</>
+              ) : (
+                <>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                    <polyline points="10 17 15 12 10 7" />
+                    <line x1="15" y1="12" x2="3" y2="12" />
+                  </svg>
+                  Sign In
+                </>
+              )}
+            </button>
+          </form>
+        </div>
+
+        <div className="modal-footer">
+          <span>Only <strong>@colt.net</strong> email addresses are permitted.</span>
+        </div>
       </div>
     </div>
   );
