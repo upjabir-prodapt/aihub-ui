@@ -1,13 +1,10 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { useTranslation } from '../hooks/useTranslation';
 import { useAuth } from '../context/AuthContext';
-import { translationApi } from '../api/translationApi';
-import type { JobStatusResponse } from '../types/translation';
 import '../styles/translation.css';
 
 // ─── Constants ────────────────────────────────────────────
-// Language codes sent as full names per API spec (case-insensitive accepted)
 const LANGUAGES = [
   { code: 'en', label: 'English' },
   { code: 'de', label: 'German' },
@@ -19,14 +16,7 @@ const LANGUAGES = [
 
 const SOURCE_LANGUAGES = [{ code: '', label: 'Auto Detect' }, ...LANGUAGES];
 
-// API domain values (lowercase per spec)
-const DOMAINS = [
-  { value: 'commercial', label: 'Commercial' },
-  { value: 'legal',      label: 'Legal' },
-  { value: 'finance',    label: 'Finance' },
-  { value: 'hr',         label: 'HR' },
-  { value: 'operations', label: 'Operations' },
-];
+const MAX_TEXT_LENGTH = 50000;
 
 // ─── Helpers ──────────────────────────────────────────────
 function formatBytes(bytes: number): string {
@@ -36,17 +26,7 @@ function formatBytes(bytes: number): string {
 }
 
 function getLangLabel(code: string): string {
-  return LANGUAGES.find((l) => l.code === code)?.label ?? code;
-}
-
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-}
-
-function statusColor(s: string): string {
-  if (s === 'completed') return 'var(--colt-teal)';
-  if (s === 'failed' || s === 'cancelled') return '#ef4444';
-  return 'var(--text-muted)';
+  return LANGUAGES.find((l) => l.code === code)?.label ?? code.toUpperCase();
 }
 
 // ─── Sub-components ───────────────────────────────────────
@@ -60,134 +40,6 @@ const SkeletonLoader: React.FC = () => (
   </div>
 );
 
-// ─── Jobs History Panel ────────────────────────────────────
-
-const JobsHistoryPanel: React.FC = () => {
-  const [jobs, setJobs]       = useState<JobStatusResponse[]>([]);
-  const [total, setTotal]     = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [offset, setOffset]   = useState(0);
-  const [cancelling, setCancelling] = useState<string | null>(null);
-  const LIMIT = 5;
-
-  const load = useCallback(async (off: number) => {
-    setLoading(true);
-    try {
-      const res = await translationApi.listJobs({ limit: LIMIT, offset: off });
-      setJobs(res.jobs);
-      setTotal(res.total);
-    } catch {
-      // silently ignore — history is non-critical
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { void load(0); }, [load]);
-
-  const handleCancel = async (jobId: string) => {
-    setCancelling(jobId);
-    try {
-      await translationApi.cancelJob(jobId, 'User cancelled from history');
-      void load(offset);
-    } catch {
-      // ignore
-    } finally {
-      setCancelling(null);
-    }
-  };
-
-  const handleDownload = async (jobId: string) => {
-    try {
-      const resp = await translationApi.getDownloadUrl(jobId);
-      window.open(resp.download_url, '_blank');
-    } catch {
-      // ignore
-    }
-  };
-
-  return (
-    <div className="jobs-history-panel">
-      <div className="jobs-history-header">
-        <span className="jobs-history-title">Recent Jobs</span>
-        <button
-          className="jobs-refresh-btn"
-          onClick={() => void load(offset)}
-          title="Refresh"
-          disabled={loading}
-        >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
-            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-          </svg>
-        </button>
-      </div>
-
-      {loading && jobs.length === 0 && (
-        <div className="jobs-loading">
-          <div className="skeleton" style={{ height: 52, borderRadius: 10, marginBottom: 6 }} />
-          <div className="skeleton" style={{ height: 52, borderRadius: 10, marginBottom: 6 }} />
-          <div className="skeleton" style={{ height: 52, borderRadius: 10 }} />
-        </div>
-      )}
-
-      {!loading && jobs.length === 0 && (
-        <div className="jobs-empty">No jobs yet</div>
-      )}
-
-      {jobs.map((job) => (
-        <div key={job.job_id} className="job-row">
-          <div className="job-row-left">
-            <span className="job-status-dot" style={{ background: statusColor(job.status) }} />
-            <div className="job-row-info">
-              <span className="job-id-label">{job.job_id.substring(0, 8)}…</span>
-              <span className="job-row-meta">
-                {job.status.toUpperCase()}
-                {job.created_at && ` · ${formatTime(job.created_at)}`}
-              </span>
-            </div>
-          </div>
-          <div className="job-row-actions">
-            {job.status === 'completed' && (
-              <button className="job-dl-btn" onClick={() => void handleDownload(job.job_id)} title="Download">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/>
-                </svg>
-              </button>
-            )}
-            {(job.status === 'queued' || job.status === 'processing') && (
-              <button
-                className="job-cancel-btn"
-                onClick={() => void handleCancel(job.job_id)}
-                disabled={cancelling === job.job_id}
-                title="Cancel"
-              >
-                {cancelling === job.job_id ? '…' : '✕'}
-              </button>
-            )}
-          </div>
-        </div>
-      ))}
-
-      {total > LIMIT && (
-        <div className="jobs-pagination">
-          <button
-            className="jobs-pg-btn"
-            disabled={offset === 0 || loading}
-            onClick={() => { const o = Math.max(0, offset - LIMIT); setOffset(o); void load(o); }}
-          >‹ Prev</button>
-          <span className="jobs-pg-info">{Math.floor(offset / LIMIT) + 1} / {Math.ceil(total / LIMIT)}</span>
-          <button
-            className="jobs-pg-btn"
-            disabled={offset + LIMIT >= total || loading}
-            onClick={() => { const o = offset + LIMIT; setOffset(o); void load(o); }}
-          >Next ›</button>
-        </div>
-      )}
-    </div>
-  );
-};
-
 // ─── Main Component ───────────────────────────────────────
 interface TranslationPageProps {
   onRequestLogin?: () => void;
@@ -196,27 +48,22 @@ interface TranslationPageProps {
 const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => {
   const { isAuthenticated, user } = useAuth();
   const [file, setFile] = useState<File | null>(null);
-
+  
+  // New fields from screenshot
   const [sourceLang, setSourceLang] = useState('');
   const [targetLang, setTargetLang] = useState('en');
-  const [domain, setDomain]         = useState('commercial');
-  const [enableDlp, setEnableDlp]   = useState(true);
+  const [domain, setDomain] = useState('IT');
+  // Pre-fill from auth user
+  const [userId, setUserId] = useState(() => user?.email?.split('@')[0] ?? '');
+  const [businessUnit, setBusinessUnit] = useState(() => user?.business_unit ?? '');
+  const [organization, setOrganization] = useState(() => user?.organization ?? '');
+  const [enableDlp, setEnableDlp] = useState(true);
   const [enableChunking, setEnableChunking] = useState(true);
-  const [priority, setPriority]     = useState('standard');
+  const [priority, setPriority] = useState('standard');
 
-  const {
-    status,
-    jobStatus,
-    jobDetail,
-    error,
-    startTranslation,
-    cancelJob,
-    getDownloadUrl,
-    reset,
-  } = useTranslation();
-
-  const [copied, setCopied]           = useState(false);
-  const [downloading, setDownloading] = useState(false);
+  const { status, jobData, error, startTranslation, reset } = useTranslation();
+  
+  const [copied, setCopied] = useState(false);
   const resultRef = useRef<HTMLDivElement>(null);
 
   // ── Dropzone ──
@@ -226,82 +73,90 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => 
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: {
+    accept: { 
+      'text/plain': ['.txt'], 
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
-      'application/pdf': ['.pdf'],
+      'application/pdf': ['.pdf']
     },
     maxFiles: 1,
     maxSize: 10 * 1024 * 1024,
+    noClick: false,
   });
 
+  // ── Clear ──
   const clearFile = () => setFile(null);
 
   // ── Translate ──
   const handleTranslate = async () => {
-    if (!isAuthenticated) { onRequestLogin?.(); return; }
+    // Gate behind authentication
+    if (!isAuthenticated) {
+      onRequestLogin?.();
+      return;
+    }
+    // Basic validation
     if (!file) return;
+    if (!userId || !businessUnit || !organization) {
+      alert('Please fill in all required fields: User ID, Business Unit, and Organization.');
+      return;
+    }
 
     const formData = new FormData();
-    formData.append('file', file);
-    // API field names: target_language / source_language (full names per spec)
-    formData.append('target_language', getLangLabel(targetLang));
-    if (sourceLang) formData.append('source_language', getLangLabel(sourceLang));
+    formData.append('target_lang', getLangLabel(targetLang));
+    formData.append('source_lang', sourceLang ? getLangLabel(sourceLang) : 'English');
     formData.append('domain', domain);
+    formData.append('user_id', userId);
+    formData.append('business_unit', businessUnit);
+    formData.append('organization', organization);
     formData.append('enable_dlp', String(enableDlp));
     formData.append('enable_chunking', String(enableChunking));
     formData.append('priority', priority);
 
-    startTranslation(formData);
+    if (file) {
+      formData.append('file', file);
+    }
 
+    startTranslation(formData);
+    
     setTimeout(() => {
-      resultRef.current?.scrollIntoView({ behavior: 'smooth' });
+      if (resultRef.current) {
+        resultRef.current.scrollIntoView({ behavior: 'smooth' });
+      }
     }, 500);
   };
 
   // ── Copy ──
   const handleCopy = async () => {
-    const content = jobDetail?.result?.translated_document?.content;
-    if (!content) return;
-    await navigator.clipboard.writeText(content);
+    const translatedText = jobData?.result?.translated_document?.content;
+    if (!translatedText) return;
+    await navigator.clipboard.writeText(translatedText);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   // ── Download ──
-  const handleDownload = async () => {
-    setDownloading(true);
-    try {
-      // Try fresh signed URL first (preferred)
-      const resp = await getDownloadUrl();
-      if (resp?.download_url) {
-        window.open(resp.download_url, '_blank');
-        return;
-      }
-      // Fallback: URL from detail response
-      const detailUrl = jobDetail?.result?.translated_document?.download_url;
-      if (detailUrl) { window.open(detailUrl, '_blank'); return; }
-      // Last resort: inline content
-      const content = jobDetail?.result?.translated_document?.content;
-      if (content) {
-        const blob = new Blob([content], { type: 'text/plain' });
-        const url  = URL.createObjectURL(blob);
-        const a    = document.createElement('a');
-        a.href     = url;
-        a.download = jobDetail?.result?.translated_document?.filename || `translated_${Date.now()}.txt`;
-        a.click();
-        URL.revokeObjectURL(url);
-      }
-    } catch {
-      // ignore
-    } finally {
-      setDownloading(false);
+  const handleDownload = () => {
+    const downloadUrl = jobData?.result?.translated_document?.download_url;
+    if (downloadUrl) {
+      window.open(downloadUrl, '_blank');
+    } else {
+      const translatedText = jobData?.result?.translated_document?.content;
+      if (!translatedText) return;
+      const blob = new Blob([translatedText], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = jobData?.result?.translated_document?.filename || `translated_${Date.now()}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
     }
   };
 
   const canTranslate = !!file;
-  const isLoading    = status === 'submitting' || status === 'polling';
+  const isLoading = status === 'submitting' || status === 'polling';
 
-  // ─── Auth gate ─────────────────────────────────────────
+  // ─── Render ────────────────────────────────────────────
+
+  // If not authenticated show a prompt overlay instead of the full page
   if (!isAuthenticated) {
     return (
       <div className="page-content">
@@ -327,7 +182,6 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => 
     );
   }
 
-  // ─── Render ────────────────────────────────────────────
   return (
     <div className="page-content">
       {/* Hero */}
@@ -343,15 +197,15 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => 
           <div>
             <h1 className="hero-title">AI Translation Service</h1>
             <p className="hero-subtitle">
-              Enterprise translation with automated DLP and anonymization.
-              Integrated with Colt's Security Policy for structure-preserving Word &amp; PDF conversion.
+              Enterprise translation with automated DLP and anonymization. 
+              Integrated with Colt's Security Policy for structure-preserving Word & PDF conversion.
             </p>
           </div>
         </div>
         <div className="hero-stats">
           <div className="stat-item">
             <div className="stat-value">6</div>
-            <div className="stat-label">Languages</div>
+            <div className="stat-label">Core Languages</div>
           </div>
           <div className="stat-divider" />
           <div className="stat-item">
@@ -366,17 +220,18 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => 
         </div>
       </div>
 
+
       {/* Workspace */}
       <div className="workspace">
 
         {/* ── Input Panel ── */}
         <div className="panel">
           <div className="panel-header">
-            <h2 className="panel-title">Input &amp; Configuration</h2>
+            <h2 className="panel-title">Input & Configuration</h2>
           </div>
 
           <div className="panel-body">
-            {/* File Upload */}
+            {/* File Upload Mode */}
             {!file ? (
               <div {...getRootProps()} className={`drop-zone ${isDragActive ? 'drag-over' : ''}`}>
                 <input {...getInputProps()} />
@@ -387,9 +242,14 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => 
                     <line x1="12" y1="3" x2="12" y2="15"/>
                   </svg>
                 </div>
-                <p className="drop-zone-title">{isDragActive ? 'Drop it here!' : 'Drop your file here'}</p>
-                <p className="drop-zone-sub">or <span className="drop-zone-link">browse to upload</span></p>
-                <p className="drop-zone-types">Supports .docx and .pdf · Max 10 MB</p>
+                <p className="drop-zone-title">
+                  {isDragActive ? 'Drop it here!' : 'Drop your file here'}
+                </p>
+                <p className="drop-zone-sub">
+                  or <span className="drop-zone-link">browse to upload</span>
+                </p>
+                <p className="drop-zone-types">Supports .txt, .docx and .pdf · Max 10 MB</p>
+
               </div>
             ) : (
               <div className="file-preview">
@@ -405,11 +265,56 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => 
                 </div>
                 <button className="file-remove-btn" onClick={clearFile} title="Remove file">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
                   </svg>
                 </button>
               </div>
             )}
+
+            {/* Additional Fields from Screenshot */}
+            <div className="form-grid">
+              <div className="form-field">
+                <label className="field-label">User ID <span className="required">*</span></label>
+                <input 
+                  type="text" 
+                  className="field-input" 
+                  value={userId} 
+                  onChange={(e) => setUserId(e.target.value)} 
+                  placeholder="e.g. jdoe123"
+                />
+              </div>
+              <div className="form-field">
+                <label className="field-label">Business Unit <span className="required">*</span></label>
+                <input 
+                  type="text" 
+                  className="field-input" 
+                  value={businessUnit} 
+                  onChange={(e) => setBusinessUnit(e.target.value)} 
+                  placeholder="e.g. Sales"
+                />
+              </div>
+              <div className="form-field">
+                <label className="field-label">Organization <span className="required">*</span></label>
+                <input 
+                  type="text" 
+                  className="field-input" 
+                  value={organization} 
+                  onChange={(e) => setOrganization(e.target.value)} 
+                  placeholder="e.g. Colt"
+                />
+              </div>
+              <div className="form-field">
+                <label className="field-label">Domain <span className="required">*</span></label>
+                <select className="field-select" value={domain} onChange={(e) => setDomain(e.target.value)}>
+                  <option value="IT">IT</option>
+                  <option value="HR">HR</option>
+                  <option value="Operations">Operations</option>
+                  <option value="Finance">Finance</option>
+                  <option value="Legal">Legal</option>
+                </select>
+              </div>
+            </div>
 
             {/* Language Config */}
             <div className="lang-config">
@@ -421,11 +326,14 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => 
                   ))}
                 </select>
               </div>
+
               <div className="lang-arrow">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/>
+                  <line x1="5" y1="12" x2="19" y2="12"/>
+                  <polyline points="12,5 19,12 12,19"/>
                 </svg>
               </div>
+
               <div className="lang-field">
                 <label className="lang-label">Target Language <span className="required">*</span></label>
                 <select className="lang-select" value={targetLang} onChange={(e) => setTargetLang(e.target.value)}>
@@ -436,16 +344,8 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => 
               </div>
             </div>
 
-            {/* Settings Grid */}
+            {/* Advanced Settings */}
             <div className="form-grid">
-              <div className="form-field">
-                <label className="field-label">Domain <span className="required">*</span></label>
-                <select className="field-select" value={domain} onChange={(e) => setDomain(e.target.value)}>
-                  {DOMAINS.map((d) => (
-                    <option key={d.value} value={d.value}>{d.label}</option>
-                  ))}
-                </select>
-              </div>
               <div className="form-field">
                 <label className="field-label">Enable DLP</label>
                 <select className="field-select" value={String(enableDlp)} onChange={(e) => setEnableDlp(e.target.value === 'true')}>
@@ -462,10 +362,12 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => 
               </div>
               <div className="form-field">
                 <label className="field-label">Priority</label>
-                <select className="field-select" value={priority} onChange={(e) => setPriority(e.target.value)}>
-                  <option value="standard">Standard</option>
-                  <option value="high">High</option>
-                </select>
+                <input 
+                  type="text" 
+                  className="field-input" 
+                  value={priority} 
+                  onChange={(e) => setPriority(e.target.value)} 
+                />
               </div>
             </div>
 
@@ -478,9 +380,7 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => 
               {isLoading ? (
                 <>
                   <span className="spinner" />
-                  {status === 'submitting'
-                    ? 'Submitting…'
-                    : `Processing · ${jobStatus?.current_stage ?? jobStatus?.status?.toUpperCase() ?? 'QUEUED'}`}
+                  {status === 'submitting' ? 'Submitting...' : 'Processing (Job ID: ' + jobData?.job_id?.substring(0, 8) + '...)'}
                 </>
               ) : (
                 <>
@@ -492,19 +392,6 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => 
                 </>
               )}
             </button>
-
-            {/* Cancel button during polling */}
-            {status === 'polling' && (
-              <button
-                className="cancel-job-btn"
-                onClick={() => cancelJob('User cancelled')}
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                </svg>
-                Cancel Job
-              </button>
-            )}
           </div>
         </div>
 
@@ -512,24 +399,16 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => 
         <div className="panel" ref={resultRef}>
           <div className="panel-header">
             <h2 className="panel-title">Output</h2>
-            {status === 'completed' && jobDetail?.result && (
+            {status === 'completed' && jobData?.result && (
               <div className="output-actions">
                 <button
                   className={`output-action-btn ${copied ? 'copied' : ''}`}
                   onClick={handleCopy}
-                  disabled={!jobDetail.result.translated_document?.content}
                 >
                   {copied ? 'Copied!' : 'Copy'}
                 </button>
-                <button
-                  className="output-action-btn"
-                  onClick={handleDownload}
-                  disabled={downloading}
-                >
-                  {downloading ? '…' : 'Download'}
-                </button>
-                <button className="output-action-btn" onClick={reset}>
-                  New
+                <button className="output-action-btn" onClick={handleDownload}>
+                  Download
                 </button>
               </div>
             )}
@@ -556,72 +435,47 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => 
             <div className="polling-container">
               <SkeletonLoader />
               <div className="polling-status">
-                <span className="pulse-dot" />
-                <span>
-                  {jobStatus?.current_stage
-                    ? <>Stage: <strong>{jobStatus.current_stage}</strong></>
-                    : <>Status: <strong>{jobStatus?.status?.toUpperCase() ?? 'QUEUED'}</strong></>}
-                </span>
-                {jobStatus?.progress != null && jobStatus.progress > 0 && (
-                  <span className="job-progress">{Math.round(jobStatus.progress * 100)}%</span>
-                )}
-                {jobStatus?.created_at && (
-                  <span className="job-time">Started: {formatTime(jobStatus.created_at)}</span>
+                <span className="pulse-dot"></span>
+                <span>Job Status: <strong>{jobData?.status || 'PENDING'}</strong></span>
+                {jobData?.submitted_at && (
+                  <span className="job-time">Started: {new Date(jobData.submitted_at).toLocaleTimeString()}</span>
                 )}
               </div>
-            </div>
-          )}
-
-          {/* Cancelled */}
-          {status === 'cancelled' && (
-            <div className="output-error">
-              <div className="error-icon" style={{ background: 'rgba(156,163,175,0.1)', borderColor: 'rgba(156,163,175,0.3)', color: '#9ca3af' }}>
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
-                </svg>
-              </div>
-              <p className="error-title" style={{ color: 'var(--text-secondary)' }}>Job Cancelled</p>
-              <button className="retry-btn" onClick={reset}>Start New Translation</button>
             </div>
           )}
 
           {/* Success */}
-          {status === 'completed' && jobDetail?.result && (
+          {status === 'completed' && jobData?.result && (
             <div>
               <div className="result-meta">
-                <span className="meta-chip">{jobDetail.result.metadata?.source_language ?? '—'}</span>
+                <span className="meta-chip">
+                  {jobData.result.metadata.source_language}
+                </span>
                 <span className="meta-arrow">→</span>
-                <span className="meta-chip teal">{jobDetail.result.metadata?.target_language ?? '—'}</span>
-                {jobDetail.result.metadata?.quality_score != null && (
-                  <span className="meta-chars">Score: {jobDetail.result.metadata.quality_score.toFixed(2)}</span>
-                )}
+                <span className="meta-chip teal">
+                  {jobData.result.metadata.target_language}
+                </span>
+                <span className="meta-chars">Score: {jobData.result.metadata.quality_score}</span>
               </div>
               <div className="result-text-container">
                 <p className="result-text">
-                  {jobDetail.result.translated_document?.content
-                    || 'Document translated successfully. Click Download to retrieve your file.'}
+                  {jobData.result.translated_document?.content || 'Document translated successfully. Use the download button to retrieve it.'}
                 </p>
               </div>
-              {jobDetail.result.labels && (
+              {jobData.result.labels && (
                 <div className="result-details">
                   <div className="detail-item">
-                    <span className="detail-label">Cost</span>
-                    <span className="detail-value">${jobDetail.result.labels.cost_usd.toFixed(4)}</span>
+                    <span className="detail-label">Cost:</span>
+                    <span className="detail-value">${jobData.result.labels.cost_usd.toFixed(4)}</span>
                   </div>
                   <div className="detail-item">
-                    <span className="detail-label">Tokens</span>
-                    <span className="detail-value">{jobDetail.result.labels.token_count.toLocaleString()}</span>
+                    <span className="detail-label">Tokens:</span>
+                    <span className="detail-value">{jobData.result.labels.token_count}</span>
                   </div>
                   <div className="detail-item">
-                    <span className="detail-label">Time</span>
-                    <span className="detail-value">{jobDetail.result.labels.processing_time_seconds}s</span>
+                    <span className="detail-label">Time:</span>
+                    <span className="detail-value">{jobData.result.labels.processing_time_seconds}s</span>
                   </div>
-                  {jobDetail.result.metadata?.chunks_processed != null && (
-                    <div className="detail-item">
-                      <span className="detail-label">Chunks</span>
-                      <span className="detail-value">{jobDetail.result.metadata.chunks_processed}</span>
-                    </div>
-                  )}
                 </div>
               )}
             </div>
@@ -645,10 +499,6 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => 
         </div>
 
       </div>
-
-      {/* ── Jobs History ── */}
-      <JobsHistoryPanel />
-
     </div>
   );
 };

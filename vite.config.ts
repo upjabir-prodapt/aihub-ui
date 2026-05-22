@@ -11,12 +11,6 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
-      '/sales-api': {
-        target: 'https://sales-research-application-297743845367.europe-west1.run.app',
-        changeOrigin: true,
-        secure: false,
-        rewrite: (path) => path.replace(/^\/sales-api/, ''),
-      },
     },
   },
 })

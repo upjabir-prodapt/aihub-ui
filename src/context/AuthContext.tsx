@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 
-const API_BASE = 'https://translation-api-service-297743845367.europe-west1.run.app/api/v1';
+const API_BASE = '/api/v1';
 const CLOUD_RUN_AUDIENCE = 'https://translation-api-service-297743845367.europe-west1.run.app';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -133,7 +133,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('Fetched Google ID Token:', fetchedGoogleIdToken);
 
       // Step 2: Get YOUR JWT (/auth/token)
-      const response = await fetch('/api/v1/auth/token', {
+      const response = await fetch(`${API_BASE}/auth/token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
