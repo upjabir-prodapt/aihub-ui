@@ -89,17 +89,17 @@ function getStoredSalesGoogleIdToken(): string | null {
 
 /**
  * Builds auth headers for all authenticated Sales Agent requests.
- * The app-level JWT goes in Authorization, and the Google ID token
- * (used for Cloud Run IAM) is sent as x-app-auth, which Nginx forwards
- * as X-Serverless-Authorization to the backend.
+ * The Google ID token (used for Cloud Run IAM) is sent in `Authorization`,
+ * which Nginx forwards as `X-Serverless-Authorization` to the backend.
+ * The app-level JWT goes in `x-app-auth`.
  */
 function salesAuthHeaders(token: string, extra: Record<string, string> = {}): Record<string, string> {
   const googleIdToken = getStoredSalesGoogleIdToken();
   return {
     accept: 'application/json',
     'Content-Type': 'application/json',
-    Authorization: `Bearer ${token}`,
-    ...(googleIdToken ? { 'x-app-auth': googleIdToken } : {}),
+    ...(googleIdToken ? { Authorization: `Bearer ${googleIdToken}` } : {}),
+    ...(token ? { 'x-app-auth': token } : {}),
     ...extra,
   };
 }
