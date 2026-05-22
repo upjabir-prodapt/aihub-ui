@@ -491,6 +491,21 @@
   background: rgba(74, 222, 128, 0.08);
 }
 
+.output-action-btn.primary {
+  background: var(--colt-teal);
+  border-color: var(--colt-teal);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.output-action-btn.primary:hover {
+  background: var(--colt-teal);
+  filter: brightness(1.1);
+  border-color: var(--colt-teal);
+  color: #ffffff;
+}
+
+
 /* Empty / loading / error states */
 .output-placeholder {
   padding: 60px 24px;

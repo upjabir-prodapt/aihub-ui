@@ -1,26 +1,25 @@
+// ── Submit Translation Job ─────────────────────────────────────────────────
 export interface TranslateRequest {
-  file: File | string;
-  text?: string;
-  target_lang: string;
-  source_lang?: string;
-  domain: string;
-  user_id: string;
-  business_unit: string;
-  organization: string;
-  enable_dlp: boolean;
-  enable_chunking: boolean;
-  priority: string;
+  file: File;
+  target_language: string;   // e.g. "en", "de", "es"
+  source_language?: string;  // Optional – auto-detected if omitted
+  domain: string;            // "commercial" | "legal" | "finance" | "hr" | "operations"
+  enable_dlp?: boolean;
+  enable_chunking?: boolean;
+  priority?: string;         // "standard" | "high"
 }
 
+// POST /api/v1/translate → 200
 export interface TranslateResponse {
   job_id: string;
   status: string;
   status_url: string;
 }
 
+// ── Job result payload ─────────────────────────────────────────────────────
 export interface TranslationResult {
   translated_document?: {
-    content: string;
+    content: string | null;
     format: string;
     filename: string;
     download_url: string;
@@ -44,11 +43,44 @@ export interface TranslationResult {
   };
 }
 
+// GET /api/v1/translate/{job_id} → 200
 export interface JobStatusResponse {
   job_id: string;
-  status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+  status: 'queued' | 'processing' | 'completed' | 'failed' | 'cancelled';
   submitted_at: string;
-  completed_at?: string;
-  result?: TranslationResult;
-  error_message?: string;
+  completed_at?: string | null;
+  result?: TranslationResult | null;
+  error_message?: string | null;
+}
+
+// GET /api/v1/jobs/{job_id} → 200  (legacy/alternative endpoint)
+export interface LegacyJobStatusResponse {
+  job_id: string;
+  status: string;
+  progress: number;
+  current_stage: string;
+  user: string;
+  department: string;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
+  download_url: string | null;
+  error_message: string | null;
+}
+
+// GET /api/v1/jobs/{job_id}/download → 200
+export interface DownloadUrlResponse {
+  download_url: string;
+  expires_in: number;
+  filename: string;
+  file_size: number;
+}
+
+// Standard error shape from the API
+export interface ApiError {
+  error: {
+    message: string;
+    code: string;
+    details?: Record<string, unknown>;
+  };
 }
