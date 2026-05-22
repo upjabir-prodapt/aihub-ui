@@ -133,7 +133,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('Fetched Google ID Token:', fetchedGoogleIdToken);
 
       // Step 2: Get YOUR JWT (/auth/token)
-      const response = await fetch(`${API_BASE}/auth/token`, {
+      const response = await fetch('/api/v1/auth/token', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

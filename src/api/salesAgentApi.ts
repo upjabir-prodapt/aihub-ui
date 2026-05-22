@@ -117,7 +117,7 @@ export async function salesAuthenticate(
   }
 
   // Step 2: Get YOUR JWT (/auth/token) using the Google ID Token for Authentication
-  const res = await fetch(`${SALES_API_BASE}/auth/token`, {
+  const res = await fetch('/sales-api/api/v1/auth/token', {
     method: 'POST',
     headers: { 
       'Content-Type': 'application/json', 
