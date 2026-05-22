@@ -29,6 +29,10 @@ import {
   clearSalesSession,
   type SalesAuthUser,
 } from '../api/salesAgentApi';
+import {
+  forceRefreshSalesGoogleIdToken,
+  SALES_GOOGLE_TOKEN_REFRESH_INTERVAL_MS,
+} from '../api/salesCloudRunAuth';
 import '../styles/translation.css';
 import '../styles/sales-agent.css';
 
@@ -87,7 +91,7 @@ const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
         business_unit: businessUnit.trim(),
         organization:  organization.trim(),
       };
-      saveSalesSession(data.access_token, user);
+      saveSalesSession(data.access_token, data.googleIdToken, user);
       onAuthenticated(data.access_token, user);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Authentication failed. Please try again.';
@@ -102,36 +106,34 @@ const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
   };
 
   return (
-    <div className="sales-auth-gate">
-      {/* Glow backdrop */}
-      <div className="auth-gate-glow" />
-
-      <div className="auth-gate-inner">
-        {/* Badge */}
-        <div className="search-badge" style={{ marginBottom: '20px' }}>
-          RESEARCH INTELLIGENCE · SECURE ACCESS
+    <div className="page-content">
+      <div className="auth-gate">
+        <div className="auth-gate-icon">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
         </div>
-
-        {/* Icon + Title */}
-        <div className="auth-gate-icon-wrap">
-          <LogIn size={28} color="var(--colt-teal)" />
-        </div>
-        <h2 className="auth-gate-title">Sign in to Research Agent</h2>
+        <h2 className="auth-gate-title">Research Intelligence Agent</h2>
         <p className="auth-gate-sub">
-          Access is restricted to <strong>@colt.net</strong> accounts.
+          Sign in with your Colt credentials to access the Sales Research Agent.
         </p>
 
-        <form className="auth-gate-form" onSubmit={handleSubmit} noValidate>
+        <form
+          style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '14px', textAlign: 'left', marginTop: '4px' }}
+          onSubmit={handleSubmit}
+          noValidate
+        >
           {/* Email */}
-          <div className="ag-field">
-            <label className="ag-label" htmlFor="sales-email">
-              <User size={13} /> Colt Email <span className="required">*</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+            <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }} htmlFor="sales-email">
+              Colt Email <span className="required">*</span>
             </label>
             <input
               ref={emailRef}
               id="sales-email"
               type="email"
-              className={`ag-input ${fieldErrors.email ? 'ag-input-error' : ''}`}
+              className={`ag-input${fieldErrors.email ? ' ag-input-error' : ''}`}
               value={email}
               onChange={(e) => { setEmail(e.target.value); clearField('email'); }}
               placeholder="you@colt.net"
@@ -141,14 +143,14 @@ const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
           </div>
 
           {/* Business Unit */}
-          <div className="ag-field">
-            <label className="ag-label" htmlFor="sales-bu">
-              <Briefcase size={13} /> Business Unit <span className="required">*</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+            <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }} htmlFor="sales-bu">
+              Business Unit <span className="required">*</span>
             </label>
             <input
               id="sales-bu"
               type="text"
-              className={`ag-input ${fieldErrors.businessUnit ? 'ag-input-error' : ''}`}
+              className={`ag-input${fieldErrors.businessUnit ? ' ag-input-error' : ''}`}
               value={businessUnit}
               onChange={(e) => { setBusinessUnit(e.target.value); clearField('businessUnit'); }}
               placeholder="e.g. Marketing"
@@ -157,14 +159,14 @@ const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
           </div>
 
           {/* Organization */}
-          <div className="ag-field">
-            <label className="ag-label" htmlFor="sales-org">
-              <Globe size={13} /> Organization <span className="required">*</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+            <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }} htmlFor="sales-org">
+              Organization <span className="required">*</span>
             </label>
             <input
               id="sales-org"
               type="text"
-              className={`ag-input ${fieldErrors.organization ? 'ag-input-error' : ''}`}
+              className={`ag-input${fieldErrors.organization ? ' ag-input-error' : ''}`}
               value={organization}
               onChange={(e) => { setOrganization(e.target.value); clearField('organization'); }}
               placeholder="e.g. Acme Global"
@@ -183,14 +185,20 @@ const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
           <button
             type="submit"
             id="sales-auth-submit-btn"
-            className="translate-btn"
+            className="auth-gate-btn"
             disabled={isLoading}
-            style={{ width: '100%', marginTop: '8px' }}
           >
             {isLoading ? (
               <><span className="spinner" /> Signing in…</>
             ) : (
-              <><LogIn size={16} style={{ marginRight: '8px' }} /> Sign In</>
+              <>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+                  <polyline points="10 17 15 12 10 7"/>
+                  <line x1="15" y1="12" x2="3" y2="12"/>
+                </svg>
+                Sign In with Colt
+              </>
             )}
           </button>
         </form>
@@ -227,6 +235,22 @@ const SalesAgentPage: React.FC = () => {
     }
   }, []);
 
+  // Keep Cloud Run invoker token fresh while sales session is active
+  useEffect(() => {
+    if (!salesToken) return;
+
+    const refresh = async () => {
+      try {
+        await forceRefreshSalesGoogleIdToken();
+      } catch (err) {
+        console.warn('Background Sales Google ID token refresh failed:', err);
+      }
+    };
+
+    const intervalId = window.setInterval(refresh, SALES_GOOGLE_TOKEN_REFRESH_INTERVAL_MS);
+    return () => window.clearInterval(intervalId);
+  }, [salesToken]);
+
   // ── Polling ────────────────────────────────────────────────────────────────
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | undefined;
@@ -261,7 +285,7 @@ const SalesAgentPage: React.FC = () => {
     setJobId(null);
 
     try {
-      const res = await initiateResearch(salesToken, accountId.trim(), company.trim());
+      const res = await initiateResearch(accountId.trim(), company.trim());
       setJobId(res.job_id);
       setStatus((res.status as Status) || 'PENDING');
     } catch (err: unknown) {
@@ -274,7 +298,7 @@ const SalesAgentPage: React.FC = () => {
   const checkStatus = async () => {
     if (!jobId || !salesToken) return;
     try {
-      const res = await getResearchStatus(salesToken, jobId);
+      const res = await getResearchStatus(jobId);
       const newStatus = res.status as Status;
       setStatus(newStatus);
       setLastCheck(new Date());
@@ -287,7 +311,7 @@ const SalesAgentPage: React.FC = () => {
   const fetchResult = async () => {
     if (!jobId || !salesToken) return;
     try {
-      const res = await getResearchResult(salesToken, jobId);
+      const res = await getResearchResult(jobId);
       setReport(res.report_markdown ?? 'No report content available.');
     } catch (err) {
       console.error('Result fetch error:', err);
@@ -299,7 +323,7 @@ const SalesAgentPage: React.FC = () => {
     if (!jobId || !salesToken) return;
     setDownloading(true);
     try {
-      await downloadResearchFile(salesToken, jobId);
+      await downloadResearchFile(jobId);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Download failed.';
       setError(msg);
@@ -359,9 +383,8 @@ const SalesAgentPage: React.FC = () => {
               <User size={13} />
               <span>{salesUser?.email}</span>
             </div>
-            <button className="session-logout-btn" onClick={handleLogout} title="Sign out">
+            <button className="session-logout-btn" onClick={handleLogout} title="Sign out" id="sales-logout-btn">
               <LogOut size={14} />
-              Sign out
             </button>
           </div>
         </div>

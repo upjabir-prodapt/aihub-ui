@@ -46,7 +46,6 @@ function AppShell() {
           activeTab={activeTab}
           theme={theme}
           onToggleTheme={toggleTheme}
-          onLoginClick={openLogin}
         />
         {renderPage()}
       </div>

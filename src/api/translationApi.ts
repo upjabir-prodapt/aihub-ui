@@ -1,4 +1,8 @@
-import type { TranslateResponse, JobStatusResponse } from '../types/translation';
+import type {
+  TranslateResponse,
+  JobStatusResponse,
+  DownloadUrlResponse,
+} from '../types/translation';
 import {
   ensureFreshGoogleIdToken,
   forceRefreshGoogleIdToken,
@@ -16,6 +20,10 @@ function getStoredToken(): string | null {
   return sessionStorage.getItem('colt_auth_token');
 }
 
+/**
+ * Authorization: Bearer <Google OIDC> — Cloud Run IAM (nginx → X-Serverless-Authorization).
+ * x-app-auth: Bearer <app JWT> — Translation FastAPI (security.py strips "Bearer " prefix).
+ */
 async function authHeaders(
   extra: Record<string, string> = {},
 ): Promise<Record<string, string>> {
@@ -49,19 +57,29 @@ async function fetchWithAuth(
   return response;
 }
 
+async function parseApiError(response: Response, fallback: string): Promise<string> {
+  try {
+    const body = await response.json();
+    if (body?.error?.message) return body.error.message;
+    if (body?.detail) return body.detail;
+    if (body?.message) return body.message;
+  } catch {
+    // ignore JSON parse failure
+  }
+  return `${fallback} (HTTP ${response.status})`;
+}
+
 // ── API ────────────────────────────────────────────────────────────────────
 
 export const translationApi = {
   async startTranslation(formData: FormData): Promise<TranslateResponse> {
     const response = await fetchWithAuth(`${API_BASE}/translate`, {
       method: 'POST',
-      // Content-Type omitted so browser sets multipart boundary automatically
       body: formData,
     });
 
     if (!response.ok) {
-      const err = await response.json().catch(() => ({ detail: 'Unknown error' }));
-      throw new Error(err.detail || err.message || `HTTP ${response.status}`);
+      throw new Error(await parseApiError(response, 'Failed to submit translation job'));
     }
 
     return response.json();
@@ -73,8 +91,33 @@ export const translationApi = {
     });
 
     if (!response.ok) {
-      const err = await response.json().catch(() => ({ detail: 'Unknown error' }));
-      throw new Error(err.detail || err.message || `HTTP ${response.status}`);
+      throw new Error(await parseApiError(response, 'Failed to fetch job status'));
+    }
+
+    return response.json();
+  },
+
+  async getDownloadUrl(jobId: string): Promise<DownloadUrlResponse> {
+    const response = await fetchWithAuth(`${API_BASE}/jobs/${jobId}/download`, {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      throw new Error(await parseApiError(response, 'Failed to get download URL'));
+    }
+
+    return response.json();
+  },
+
+  async cancelJob(jobId: string, reason?: string): Promise<{ message: string }> {
+    const response = await fetchWithAuth(`${API_BASE}/jobs/${jobId}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: reason ?? 'Cancelled by user' }),
+    });
+
+    if (!response.ok) {
+      throw new Error(await parseApiError(response, 'Failed to cancel job'));
     }
 
     return response.json();

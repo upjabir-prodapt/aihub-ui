@@ -12,10 +12,9 @@ interface TopbarProps {
   activeTab: string;
   theme: 'dark' | 'light';
   onToggleTheme: () => void;
-  onLoginClick: () => void;
 }
 
-const Topbar: React.FC<TopbarProps> = ({ activeTab, theme, onToggleTheme, onLoginClick }) => {
+const Topbar: React.FC<TopbarProps> = ({ activeTab, theme, onToggleTheme }) => {
   const { isAuthenticated, user, logout } = useAuth();
 
   const initials = user?.email
@@ -50,40 +49,15 @@ const Topbar: React.FC<TopbarProps> = ({ activeTab, theme, onToggleTheme, onLogi
           All Systems Operational
         </div>
 
-        {/* Auth button */}
-        {isAuthenticated && user ? (
+        {/* Auth button — only shown when authenticated */}
+        {isAuthenticated && user && (
           <div className="auth-user-pill" title={user.email}>
             <div className="auth-avatar">{initials}</div>
             <div className="auth-user-info">
               <span className="auth-user-email">{user.email.split('@')[0]}</span>
               <span className="auth-user-bu">{user.business_unit}</span>
             </div>
-            <button
-              className="auth-logout-btn"
-              onClick={logout}
-              title="Sign out"
-              id="topbar-logout-btn"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-                <polyline points="16 17 21 12 16 7"/>
-                <line x1="21" y1="12" x2="9" y2="12"/>
-              </svg>
-            </button>
           </div>
-        ) : (
-          <button
-            className="auth-login-btn"
-            onClick={onLoginClick}
-            id="topbar-login-btn"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
-              <polyline points="10 17 15 12 10 7"/>
-              <line x1="15" y1="12" x2="3" y2="12"/>
-            </svg>
-            Sign In
-          </button>
         )}
       </div>
     </header>

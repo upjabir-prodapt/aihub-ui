@@ -4,8 +4,18 @@ import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-/** Must match src/api/translationConfig.ts */
+/** Must match src/api/translationConfig.ts and salesConfig.ts */
 const TRANSLATION_API_ORIGIN = 'https://translation.aicoesandox-int.colt.net'
+const SALES_API_ORIGIN = 'https://salesagent.aicoesandox-int.colt.net'
+
+function proxyAuthHeaders(proxy: import('http-proxy')) {
+  proxy.on('proxyReq', (proxyReq, req) => {
+    const auth = req.headers.authorization
+    if (typeof auth === 'string') {
+      proxyReq.setHeader('X-Serverless-Authorization', auth)
+    }
+  })
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const COLT_INTERNAL_CA = path.resolve(__dirname, 'certs/colt-internal-ca.pem')
@@ -40,12 +50,21 @@ export default defineConfig({
         changeOrigin: true,
         ...translationProxyTls,
         configure: (proxy) => {
-          proxy.on('proxyReq', (proxyReq, req) => {
-            const auth = req.headers.authorization
-            if (typeof auth === 'string') {
-              proxyReq.setHeader('X-Serverless-Authorization', auth)
-            }
+          proxyAuthHeaders(proxy)
+          proxy.on('proxyReq', (proxyReq) => {
             proxyReq.setHeader('Host', 'translation.aicoesandox-int.colt.net')
+          })
+        },
+      },
+      '/api/sales/v1': {
+        target: SALES_API_ORIGIN,
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/sales/, '/api'),
+        ...translationProxyTls,
+        configure: (proxy) => {
+          proxyAuthHeaders(proxy)
+          proxy.on('proxyReq', (proxyReq) => {
+            proxyReq.setHeader('Host', 'salesagent.aicoesandox-int.colt.net')
           })
         },
       },

@@ -21,7 +21,7 @@ FROM nginx:alpine
 # Copy the built files from the builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Colt internal CA for TLS to translation.aicoesandox-int.colt.net
+# Colt internal CA for TLS to internal *.colt.net upstreams
 COPY certs/colt-internal-ca.pem /etc/nginx/certs/colt-internal-ca.pem
 COPY nginx/default.conf /etc/nginx/conf.d/default.conf
 

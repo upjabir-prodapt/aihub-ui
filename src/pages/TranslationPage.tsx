@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
+import { User, LogOut } from 'lucide-react';
 import { useTranslation } from '../hooks/useTranslation';
 import { useAuth } from '../context/AuthContext';
 import '../styles/translation.css';
@@ -16,7 +17,6 @@ const LANGUAGES = [
 
 const SOURCE_LANGUAGES = [{ code: '', label: 'Auto Detect' }, ...LANGUAGES];
 
-const MAX_TEXT_LENGTH = 50000;
 
 // ─── Helpers ──────────────────────────────────────────────
 function formatBytes(bytes: number): string {
@@ -25,9 +25,6 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function getLangLabel(code: string): string {
-  return LANGUAGES.find((l) => l.code === code)?.label ?? code.toUpperCase();
-}
 
 // ─── Sub-components ───────────────────────────────────────
 
@@ -46,22 +43,18 @@ interface TranslationPageProps {
 }
 
 const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, logout } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   
   // New fields from screenshot
   const [sourceLang, setSourceLang] = useState('');
   const [targetLang, setTargetLang] = useState('en');
-  const [domain, setDomain] = useState('IT');
-  // Pre-fill from auth user
-  const [userId, setUserId] = useState(() => user?.email?.split('@')[0] ?? '');
-  const [businessUnit, setBusinessUnit] = useState(() => user?.business_unit ?? '');
-  const [organization, setOrganization] = useState(() => user?.organization ?? '');
+  const [domain, setDomain] = useState('legal');
   const [enableDlp, setEnableDlp] = useState(true);
   const [enableChunking, setEnableChunking] = useState(true);
   const [priority, setPriority] = useState('standard');
 
-  const { status, jobData, error, startTranslation, reset } = useTranslation();
+  const { status, jobData, downloadInfo, error, startTranslation, reset } = useTranslation();
   
   const [copied, setCopied] = useState(false);
   const resultRef = useRef<HTMLDivElement>(null);
@@ -95,25 +88,16 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => 
     }
     // Basic validation
     if (!file) return;
-    if (!userId || !businessUnit || !organization) {
-      alert('Please fill in all required fields: User ID, Business Unit, and Organization.');
-      return;
-    }
 
     const formData = new FormData();
-    formData.append('target_lang', getLangLabel(targetLang));
-    formData.append('source_lang', sourceLang ? getLangLabel(sourceLang) : 'English');
+    // Use the language code directly — the API accepts both codes and names
+    formData.append('target_language', targetLang);
+    if (sourceLang) formData.append('source_language', sourceLang);
     formData.append('domain', domain);
-    formData.append('user_id', userId);
-    formData.append('business_unit', businessUnit);
-    formData.append('organization', organization);
     formData.append('enable_dlp', String(enableDlp));
     formData.append('enable_chunking', String(enableChunking));
     formData.append('priority', priority);
-
-    if (file) {
-      formData.append('file', file);
-    }
+    formData.append('file', file);
 
     startTranslation(formData);
     
@@ -134,18 +118,30 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => 
   };
 
   // ── Download ──
+  // Priority: 1) signed URL from /jobs/{id}/download endpoint  2) inline URL from job result
   const handleDownload = () => {
-    const downloadUrl = jobData?.result?.translated_document?.download_url;
-    if (downloadUrl) {
-      window.open(downloadUrl, '_blank');
+    const signedUrl = downloadInfo?.download_url
+      ?? jobData?.result?.translated_document?.download_url;
+    if (signedUrl) {
+      const filename =
+        downloadInfo?.filename ??
+        jobData?.result?.translated_document?.filename ??
+        `translated_${Date.now()}.pdf`;
+      const anchor = document.createElement('a');
+      anchor.href = signedUrl;
+      anchor.download = filename;
+      anchor.target = '_blank';
+      anchor.rel = 'noopener noreferrer';
+      anchor.click();
     } else {
+      // Fallback: download inline text content if present
       const translatedText = jobData?.result?.translated_document?.content;
       if (!translatedText) return;
       const blob = new Blob([translatedText], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = jobData?.result?.translated_document?.filename || `translated_${Date.now()}.txt`;
+      a.download = `translated_${Date.now()}.txt`;
       a.click();
       URL.revokeObjectURL(url);
     }
@@ -202,20 +198,32 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => 
             </p>
           </div>
         </div>
-        <div className="hero-stats">
-          <div className="stat-item">
-            <div className="stat-value">6</div>
-            <div className="stat-label">Core Languages</div>
+        <div className="hero-right">
+          <div className="hero-stats">
+            <div className="stat-item">
+              <div className="stat-value">6</div>
+              <div className="stat-label">Core Languages</div>
+            </div>
+            <div className="stat-divider" />
+            <div className="stat-item">
+              <div className="stat-value">DLP</div>
+              <div className="stat-label">Secure API</div>
+            </div>
+            <div className="stat-divider" />
+            <div className="stat-item">
+              <div className="stat-value">PDF/Word</div>
+              <div className="stat-label">Formats</div>
+            </div>
           </div>
-          <div className="stat-divider" />
-          <div className="stat-item">
-            <div className="stat-value">DLP</div>
-            <div className="stat-label">Secure API</div>
-          </div>
-          <div className="stat-divider" />
-          <div className="stat-item">
-            <div className="stat-value">PDF/Word</div>
-            <div className="stat-label">Formats</div>
+          {/* Session info + logout */}
+          <div className="sales-session-bar">
+            <div className="session-user">
+              <User size={13} />
+              <span>{user?.email}</span>
+            </div>
+            <button className="session-logout-btn" onClick={logout} title="Sign out" id="translation-logout-btn">
+              <LogOut size={14} />
+            </button>
           </div>
         </div>
       </div>
@@ -272,46 +280,16 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => 
               </div>
             )}
 
-            {/* Additional Fields from Screenshot */}
+            {/* Domain Field */}
             <div className="form-grid">
-              <div className="form-field">
-                <label className="field-label">User ID <span className="required">*</span></label>
-                <input 
-                  type="text" 
-                  className="field-input" 
-                  value={userId} 
-                  onChange={(e) => setUserId(e.target.value)} 
-                  placeholder="e.g. jdoe123"
-                />
-              </div>
-              <div className="form-field">
-                <label className="field-label">Business Unit <span className="required">*</span></label>
-                <input 
-                  type="text" 
-                  className="field-input" 
-                  value={businessUnit} 
-                  onChange={(e) => setBusinessUnit(e.target.value)} 
-                  placeholder="e.g. Sales"
-                />
-              </div>
-              <div className="form-field">
-                <label className="field-label">Organization <span className="required">*</span></label>
-                <input 
-                  type="text" 
-                  className="field-input" 
-                  value={organization} 
-                  onChange={(e) => setOrganization(e.target.value)} 
-                  placeholder="e.g. Colt"
-                />
-              </div>
               <div className="form-field">
                 <label className="field-label">Domain <span className="required">*</span></label>
                 <select className="field-select" value={domain} onChange={(e) => setDomain(e.target.value)}>
-                  <option value="IT">IT</option>
-                  <option value="HR">HR</option>
-                  <option value="Operations">Operations</option>
-                  <option value="Finance">Finance</option>
-                  <option value="Legal">Legal</option>
+                  <option value="commercial">Commercial</option>
+                  <option value="legal">Legal</option>
+                  <option value="finance">Finance</option>
+                  <option value="hr">HR</option>
+                  <option value="operations">Operations</option>
                 </select>
               </div>
             </div>
@@ -362,12 +340,10 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => 
               </div>
               <div className="form-field">
                 <label className="field-label">Priority</label>
-                <input 
-                  type="text" 
-                  className="field-input" 
-                  value={priority} 
-                  onChange={(e) => setPriority(e.target.value)} 
-                />
+                <select className="field-select" value={priority} onChange={(e) => setPriority(e.target.value)}>
+                  <option value="standard">Standard</option>
+                  <option value="high">High</option>
+                </select>
               </div>
             </div>
 
@@ -399,16 +375,23 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => 
         <div className="panel" ref={resultRef}>
           <div className="panel-header">
             <h2 className="panel-title">Output</h2>
-            {status === 'completed' && jobData?.result && (
+            {status === 'completed' && (downloadInfo || jobData?.result) && (
               <div className="output-actions">
-                <button
-                  className={`output-action-btn ${copied ? 'copied' : ''}`}
-                  onClick={handleCopy}
-                >
-                  {copied ? 'Copied!' : 'Copy'}
-                </button>
-                <button className="output-action-btn" onClick={handleDownload}>
-                  Download
+                {jobData?.result?.translated_document?.content && (
+                  <button
+                    className={`output-action-btn ${copied ? 'copied' : ''}`}
+                    onClick={handleCopy}
+                  >
+                    {copied ? 'Copied!' : 'Copy'}
+                  </button>
+                )}
+                <button className="output-action-btn primary" onClick={handleDownload} id="download-btn">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                  Download{downloadInfo?.filename ? ` · ${downloadInfo.filename}` : ''}
                 </button>
               </div>
             )}
@@ -436,7 +419,7 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => 
               <SkeletonLoader />
               <div className="polling-status">
                 <span className="pulse-dot"></span>
-                <span>Job Status: <strong>{jobData?.status || 'PENDING'}</strong></span>
+                <span>Job Status: <strong>{(jobData?.status ?? 'queued').toUpperCase()}</strong></span>
                 {jobData?.submitted_at && (
                   <span className="job-time">Started: {new Date(jobData.submitted_at).toLocaleTimeString()}</span>
                 )}
