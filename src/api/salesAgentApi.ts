@@ -3,9 +3,12 @@
 
 export const SALES_API_BASE = '/api/sales/v1';
 
+const CLOUD_RUN_AUDIENCE = 'https://salesagent-api-service-297743845367.europe-west1.run.app';
+
 // ── Session storage keys (isolated from the translation service) ────────────
 
 const SALES_TOKEN_KEY = 'sales_auth_token';
+const SALES_GOOGLE_TOKEN_KEY = 'sales_google_id_token';
 const SALES_USER_KEY = 'sales_auth_user';
 const SALES_EXPIRY_KEY = 'sales_auth_expiry';
 
@@ -43,15 +46,17 @@ export interface ResearchResultResponse {
 
 // ── Session helpers ────────────────────────────────────────────────────────
 
-export function saveSalesSession(token: string, user: SalesAuthUser, expiresInSeconds = 1800) {
+export function saveSalesSession(token: string, googleIdToken: string, user: SalesAuthUser, expiresInSeconds = 1800) {
   const expiry = Date.now() + expiresInSeconds * 1000;
   sessionStorage.setItem(SALES_TOKEN_KEY, token);
+  sessionStorage.setItem(SALES_GOOGLE_TOKEN_KEY, googleIdToken);
   sessionStorage.setItem(SALES_USER_KEY, JSON.stringify(user));
   sessionStorage.setItem(SALES_EXPIRY_KEY, String(expiry));
 }
 
-export function loadSalesSession(): { token: string; user: SalesAuthUser } | null {
+export function loadSalesSession(): { token: string; googleIdToken: string; user: SalesAuthUser } | null {
   const token = sessionStorage.getItem(SALES_TOKEN_KEY);
+  const googleIdToken = sessionStorage.getItem(SALES_GOOGLE_TOKEN_KEY) ?? '';
   const userRaw = sessionStorage.getItem(SALES_USER_KEY);
   const expiryRaw = sessionStorage.getItem(SALES_EXPIRY_KEY);
 
@@ -63,7 +68,7 @@ export function loadSalesSession(): { token: string; user: SalesAuthUser } | nul
 
   try {
     const user: SalesAuthUser = JSON.parse(userRaw);
-    return { token, user };
+    return { token, googleIdToken, user };
   } catch {
     return null;
   }
@@ -71,17 +76,31 @@ export function loadSalesSession(): { token: string; user: SalesAuthUser } | nul
 
 export function clearSalesSession() {
   sessionStorage.removeItem(SALES_TOKEN_KEY);
+  sessionStorage.removeItem(SALES_GOOGLE_TOKEN_KEY);
   sessionStorage.removeItem(SALES_USER_KEY);
   sessionStorage.removeItem(SALES_EXPIRY_KEY);
 }
 
 // ── Auth headers helper ────────────────────────────────────────────────────
 
-function salesAuthHeaders(token: string): Record<string, string> {
+function getStoredSalesGoogleIdToken(): string | null {
+  return sessionStorage.getItem('sales_google_id_token');
+}
+
+/**
+ * Builds auth headers for all authenticated Sales Agent requests.
+ * The app-level JWT goes in Authorization, and the Google ID token
+ * (used for Cloud Run IAM) is sent as x-app-auth, which Nginx forwards
+ * as X-Serverless-Authorization to the backend.
+ */
+function salesAuthHeaders(token: string, extra: Record<string, string> = {}): Record<string, string> {
+  const googleIdToken = getStoredSalesGoogleIdToken();
   return {
     accept: 'application/json',
     'Content-Type': 'application/json',
     Authorization: `Bearer ${token}`,
+    ...(googleIdToken ? { 'x-app-auth': googleIdToken } : {}),
+    ...extra,
   };
 }
 
@@ -92,10 +111,30 @@ export async function salesAuthenticate(
   email: string,
   business_unit: string,
   organization: string,
-): Promise<SalesTokenResponse> {
+): Promise<SalesTokenResponse & { googleIdToken: string }> {
+  // Step 1: Fetch Google ID token via Nginx metadata proxy
+  let googleIdToken = '';
+  try {
+    const metaRes = await fetch(`/api/metadata/id-token?audience=${encodeURIComponent(CLOUD_RUN_AUDIENCE)}`);
+    if (metaRes.ok) {
+      googleIdToken = await metaRes.text();
+    } else {
+      console.warn('Metadata endpoint returned status:', metaRes.status);
+      googleIdToken = 'mock_google_id_token_for_local_dev';
+    }
+  } catch (err) {
+    console.warn('Failed to reach metadata endpoint (likely local dev):', err);
+    googleIdToken = 'mock_google_id_token_for_local_dev';
+  }
+
+  // Step 2: Get Sales JWT
   const res = await fetch(`${SALES_API_BASE}/auth/token`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', accept: 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      accept: 'application/json',
+      Authorization: `Bearer ${googleIdToken}`,
+    },
     body: JSON.stringify({ email, business_unit, organization }),
   });
 
@@ -104,7 +143,8 @@ export async function salesAuthenticate(
     throw new Error(err.detail || err.message || `HTTP ${res.status}`);
   }
 
-  return res.json();
+  const data = await res.json();
+  return { ...data, googleIdToken };
 }
 
 /** POST /api/v1/research/initiate */

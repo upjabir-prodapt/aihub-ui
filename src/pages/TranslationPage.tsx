@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
+import { User, LogOut } from 'lucide-react';
 import { useTranslation } from '../hooks/useTranslation';
 import { useAuth } from '../context/AuthContext';
 import '../styles/translation.css';
@@ -42,7 +43,7 @@ interface TranslationPageProps {
 }
 
 const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user, logout } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   
   // New fields from screenshot
@@ -197,20 +198,32 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => 
             </p>
           </div>
         </div>
-        <div className="hero-stats">
-          <div className="stat-item">
-            <div className="stat-value">6</div>
-            <div className="stat-label">Core Languages</div>
+        <div className="hero-right">
+          <div className="hero-stats">
+            <div className="stat-item">
+              <div className="stat-value">6</div>
+              <div className="stat-label">Core Languages</div>
+            </div>
+            <div className="stat-divider" />
+            <div className="stat-item">
+              <div className="stat-value">DLP</div>
+              <div className="stat-label">Secure API</div>
+            </div>
+            <div className="stat-divider" />
+            <div className="stat-item">
+              <div className="stat-value">PDF/Word</div>
+              <div className="stat-label">Formats</div>
+            </div>
           </div>
-          <div className="stat-divider" />
-          <div className="stat-item">
-            <div className="stat-value">DLP</div>
-            <div className="stat-label">Secure API</div>
-          </div>
-          <div className="stat-divider" />
-          <div className="stat-item">
-            <div className="stat-value">PDF/Word</div>
-            <div className="stat-label">Formats</div>
+          {/* Session info + logout */}
+          <div className="sales-session-bar">
+            <div className="session-user">
+              <User size={13} />
+              <span>{user?.email}</span>
+            </div>
+            <button className="session-logout-btn" onClick={logout} title="Sign out" id="translation-logout-btn">
+              <LogOut size={14} />
+            </button>
           </div>
         </div>
       </div>
