@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import type { ClientRequest, IncomingMessage } from 'node:http'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
@@ -8,12 +9,21 @@ import react from '@vitejs/plugin-react'
 const TRANSLATION_API_ORIGIN = 'https://translation.aicoesandox-int.colt.net'
 const SALES_API_ORIGIN = 'https://salesagent.aicoesandox-int.colt.net'
 
-function proxyAuthHeaders(proxy: import('http-proxy')) {
+/** Minimal type for Vite's http-proxy instance (no @types/http-proxy required). */
+type DevProxyServer = {
+  on(
+    event: 'proxyReq',
+    listener: (proxyReq: ClientRequest, req: IncomingMessage) => void,
+  ): void
+}
+
+function proxyAuthHeaders(proxy: DevProxyServer, host: string) {
   proxy.on('proxyReq', (proxyReq, req) => {
     const auth = req.headers.authorization
     if (typeof auth === 'string') {
       proxyReq.setHeader('X-Serverless-Authorization', auth)
     }
+    proxyReq.setHeader('Host', host)
   })
 }
 
@@ -49,11 +59,8 @@ export default defineConfig({
         target: TRANSLATION_API_ORIGIN,
         changeOrigin: true,
         ...translationProxyTls,
-        configure: (proxy) => {
-          proxyAuthHeaders(proxy)
-          proxy.on('proxyReq', (proxyReq) => {
-            proxyReq.setHeader('Host', 'translation.aicoesandox-int.colt.net')
-          })
+        configure: (proxy: DevProxyServer) => {
+          proxyAuthHeaders(proxy, 'translation.aicoesandox-int.colt.net')
         },
       },
       '/api/sales/v1': {
@@ -61,11 +68,8 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/sales/, '/api'),
         ...translationProxyTls,
-        configure: (proxy) => {
-          proxyAuthHeaders(proxy)
-          proxy.on('proxyReq', (proxyReq) => {
-            proxyReq.setHeader('Host', 'salesagent.aicoesandox-int.colt.net')
-          })
+        configure: (proxy: DevProxyServer) => {
+          proxyAuthHeaders(proxy, 'salesagent.aicoesandox-int.colt.net')
         },
       },
     },
