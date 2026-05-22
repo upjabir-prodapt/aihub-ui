@@ -18,17 +18,17 @@ function getStoredGoogleIdToken(): string | null {
 
 /**
  * Builds the Authorization header set for all authenticated requests.
- * The app-level JWT is sent as `Authorization: Bearer <token>`.
- * The Google ID token (used for Cloud Run IAM) is carried in `x-app-auth`,
+ * The Google ID token (used for Cloud Run IAM) is sent in `Authorization`,
  * which Nginx forwards as `X-Serverless-Authorization` to the backend.
+ * The app-level JWT is carried in `x-app-auth`.
  */
 function authHeaders(extra: Record<string, string> = {}): Record<string, string> {
   const token = getStoredToken();
   const googleIdToken = getStoredGoogleIdToken();
   return {
     accept: 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...(googleIdToken ? { 'x-app-auth': googleIdToken } : {}),
+    ...(googleIdToken ? { Authorization: `Bearer ${googleIdToken}` } : {}),
+    ...(token ? { 'x-app-auth': token } : {}),
     ...extra,
   };
 }
