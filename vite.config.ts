@@ -1,15 +1,53 @@
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+
+/** Must match src/api/translationConfig.ts */
+const TRANSLATION_API_ORIGIN = 'https://translation.aicoesandox-int.colt.net'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const COLT_INTERNAL_CA = path.resolve(__dirname, 'certs/colt-internal-ca.pem')
+const tlsCa = fs.existsSync(COLT_INTERNAL_CA)
+  ? fs.readFileSync(COLT_INTERNAL_CA, 'utf8')
+  : undefined
+
+const translationProxyTls = tlsCa
+  ? { secure: true as const, ca: tlsCa }
+  : { secure: false as const }
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/api/v1': {
-        target: 'https://translation-api-service-297743845367.europe-west1.run.app',
-        changeOrigin: true,
+      // GCE VM / Cloud Run: service account identity token (audience = .run.app URL)
+      '/api/metadata/id-token': {
+        target: 'http://169.254.169.254',
+        changeOrigin: false,
         secure: false,
+        rewrite: (path) => {
+          const query = path.includes('?') ? path.slice(path.indexOf('?')) : ''
+          return `/computeMetadata/v1/instance/service-accounts/default/identity${query}`
+        },
+        headers: {
+          'Metadata-Flavor': 'Google',
+        },
+      },
+      '/api/v1': {
+        target: TRANSLATION_API_ORIGIN,
+        changeOrigin: true,
+        ...translationProxyTls,
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq, req) => {
+            const auth = req.headers.authorization
+            if (typeof auth === 'string') {
+              proxyReq.setHeader('X-Serverless-Authorization', auth)
+            }
+            proxyReq.setHeader('Host', 'translation.aicoesandox-int.colt.net')
+          })
+        },
       },
     },
   },

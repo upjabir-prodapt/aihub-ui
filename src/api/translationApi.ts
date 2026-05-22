@@ -1,6 +1,14 @@
 import type { TranslateResponse, JobStatusResponse } from '../types/translation';
+import {
+  ensureFreshGoogleIdToken,
+  forceRefreshGoogleIdToken,
+} from './cloudRunAuth';
+import { TRANSLATION_API_ORIGIN } from './translationConfig';
 
+/** Same-origin `/api/v1` — Vite (dev) or UI nginx (prod) proxies to Translation DNS. */
 const API_BASE = '/api/v1';
+
+export { TRANSLATION_API_ORIGIN };
 
 // ── Token helpers ──────────────────────────────────────────────────────────
 
@@ -8,13 +16,11 @@ function getStoredToken(): string | null {
   return sessionStorage.getItem('colt_auth_token');
 }
 
-function getStoredGoogleIdToken(): string | null {
-  return sessionStorage.getItem('colt_google_id_token');
-}
-
-function authHeaders(extra: Record<string, string> = {}): Record<string, string> {
+async function authHeaders(
+  extra: Record<string, string> = {},
+): Promise<Record<string, string>> {
   const token = getStoredToken();
-  const googleIdToken = getStoredGoogleIdToken();
+  const googleIdToken = await ensureFreshGoogleIdToken();
   return {
     accept: 'application/json',
     ...(googleIdToken ? { Authorization: `Bearer ${googleIdToken}` } : {}),
@@ -23,13 +29,33 @@ function authHeaders(extra: Record<string, string> = {}): Record<string, string>
   };
 }
 
+async function fetchWithAuth(
+  url: string,
+  init: RequestInit,
+): Promise<Response> {
+  let response = await fetch(url, {
+    ...init,
+    headers: { ...(await authHeaders()), ...init.headers },
+  });
+
+  if (response.status === 401 || response.status === 403) {
+    await forceRefreshGoogleIdToken();
+    response = await fetch(url, {
+      ...init,
+      headers: { ...(await authHeaders()), ...init.headers },
+    });
+  }
+
+  return response;
+}
+
 // ── API ────────────────────────────────────────────────────────────────────
 
 export const translationApi = {
   async startTranslation(formData: FormData): Promise<TranslateResponse> {
-    const response = await fetch(`${API_BASE}/translate`, {
+    const response = await fetchWithAuth(`${API_BASE}/translate`, {
       method: 'POST',
-      headers: authHeaders(), // Content-Type omitted so browser sets multipart boundary automatically
+      // Content-Type omitted so browser sets multipart boundary automatically
       body: formData,
     });
 
@@ -42,9 +68,8 @@ export const translationApi = {
   },
 
   async getJobStatus(jobId: string): Promise<JobStatusResponse> {
-    const response = await fetch(`${API_BASE}/translate/${jobId}`, {
+    const response = await fetchWithAuth(`${API_BASE}/translate/${jobId}`, {
       method: 'GET',
-      headers: authHeaders(),
     });
 
     if (!response.ok) {

@@ -1,7 +1,14 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-
+import {
+  fetchGoogleIdToken,
+  forceRefreshGoogleIdToken,
+  persistGoogleIdToken,
+} from '../api/cloudRunAuth';
+/** Same-origin; UI nginx / Vite proxy to Translation. */
 const API_BASE = '/api/v1';
-const CLOUD_RUN_AUDIENCE = 'https://translation-api-service-297743845367.europe-west1.run.app';
+
+/** Background refresh interval for Cloud Run invoker token while logged in. */
+const GOOGLE_TOKEN_REFRESH_INTERVAL_MS = 45 * 60 * 1000;
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -39,7 +46,7 @@ const EXPIRY_KEY = 'colt_auth_expiry';
 function saveSession(token: string, googleIdToken: string, user: AuthUser, expiresIn: number) {
   const expiry = Date.now() + expiresIn * 1000;
   sessionStorage.setItem(TOKEN_KEY, token);
-  sessionStorage.setItem(GOOGLE_TOKEN_KEY, googleIdToken);
+  persistGoogleIdToken(googleIdToken);
   sessionStorage.setItem(USER_KEY, JSON.stringify(user));
   sessionStorage.setItem(EXPIRY_KEY, String(expiry));
 }
@@ -92,6 +99,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
+  // Keep Cloud Run invoker token fresh while the user session is active
+  useEffect(() => {
+    if (!token) return;
+
+    const refresh = async () => {
+      try {
+        const fresh = await forceRefreshGoogleIdToken();
+        setGoogleIdToken(fresh);
+      } catch (err) {
+        console.warn('Background Google ID token refresh failed:', err);
+      }
+    };
+
+    const intervalId = window.setInterval(refresh, GOOGLE_TOKEN_REFRESH_INTERVAL_MS);
+    return () => window.clearInterval(intervalId);
+  }, [token]);
+
   const login = useCallback(async (email: string, business_unit: string, organization: string) => {
     setError(null);
 
@@ -116,21 +140,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(true);
 
     try {
-      // Step 1: Generate Google ID Token via Nginx Metadata Proxy
-      let fetchedGoogleIdToken = '';
-      try {
-        const metaRes = await fetch(`/api/metadata/id-token?audience=${encodeURIComponent(CLOUD_RUN_AUDIENCE)}`);
-        if (metaRes.ok) {
-          fetchedGoogleIdToken = await metaRes.text();
-        } else {
-          console.warn('Metadata endpoint returned status:', metaRes.status);
-          fetchedGoogleIdToken = 'mock_google_id_token_for_local_dev';
-        }
-      } catch (err) {
-        console.warn('Failed to reach metadata endpoint (likely local dev environment):', err);
-        fetchedGoogleIdToken = 'mock_google_id_token_for_local_dev';
-      }
-      console.log('Fetched Google ID Token:', fetchedGoogleIdToken);
+      // Step 1: Cloud Run invoker token (UI service account via metadata proxy)
+      const fetchedGoogleIdToken = await fetchGoogleIdToken();
+      persistGoogleIdToken(fetchedGoogleIdToken);
 
       // Step 2: Get YOUR JWT (/auth/token)
       const response = await fetch(`${API_BASE}/auth/token`, {
