@@ -1,8 +1,7 @@
 // ── Sales Research API ─────────────────────────────────────────────────────
-// Base: https://192.168.1.7
+// Routed through nginx proxy: /api/sales/v1/ → https://salesagent.aicoesandox-int.colt.net/api/v1/
 
-export const SALES_API_BASE =
-  'https://192.168.1.7/api/v1';
+export const SALES_API_BASE = '/api/sales/v1';
 
 // ── Session storage keys (isolated from the translation service) ────────────
 
