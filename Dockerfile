@@ -28,20 +28,27 @@ EXPOSE 8080
 RUN printf 'server {\n\
     listen 8080;\n\
     server_name localhost;\n\
+    resolver 8.8.8.8 8.8.4.4 valid=30s;\n\
+    resolver_timeout 5s;\n\
     location /api/metadata/id-token {\n\
         proxy_pass http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/identity;\n\
         proxy_set_header Metadata-Flavor Google;\n\
     }\n\
     location /api/v1/ {\n\
-        proxy_pass https://translation-api-service-297743845367.europe-west1.run.app/api/v1/;\n\
+        set $translation_backend https://translation-api-service-297743845367.europe-west1.run.app;\n\
+        proxy_pass $translation_backend;\n\
         proxy_ssl_server_name on;\n\
         proxy_set_header Host translation-api-service-297743845367.europe-west1.run.app;\n\
+        proxy_set_header X-Real-IP $remote_addr;\n\
         proxy_pass_request_headers on;\n\
     }\n\
     location /sales-api/ {\n\
-        proxy_pass https://sales-research-application-297743845367.europe-west1.run.app/;\n\
+        rewrite ^/sales-api(/.*)$ $1 break;\n\
+        set $sales_backend https://sales-research-application-297743845367.europe-west1.run.app;\n\
+        proxy_pass $sales_backend;\n\
         proxy_ssl_server_name on;\n\
         proxy_set_header Host sales-research-application-297743845367.europe-west1.run.app;\n\
+        proxy_set_header X-Real-IP $remote_addr;\n\
         proxy_pass_request_headers on;\n\
     }\n\
     location / {\n\
