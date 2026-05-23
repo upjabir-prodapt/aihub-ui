@@ -109,74 +109,73 @@ const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
     <div className="page-content">
       <div className="auth-gate">
         <div className="auth-gate-icon">
+          {/* Search / magnifying glass icon for Sales */}
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="11" cy="11" r="8"/>
             <line x1="21" y1="21" x2="16.65" y2="16.65"/>
           </svg>
         </div>
         <h2 className="auth-gate-title">Research Intelligence Agent</h2>
-        <p className="auth-gate-sub">
-          Sign in with your Colt credentials to access the Sales Research Agent.
-        </p>
+        <p className="auth-gate-sub">Sign in with your Colt credentials to access the Sales Research Agent.</p>
 
         <form
-          style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '14px', textAlign: 'left', marginTop: '4px' }}
+          className="auth-gate-form"
           onSubmit={handleSubmit}
           noValidate
         >
           {/* Email */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-            <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }} htmlFor="sales-email">
+          <div className="login-field">
+            <label className="login-label" htmlFor="sales-email">
               Colt Email <span className="required">*</span>
             </label>
             <input
               ref={emailRef}
               id="sales-email"
               type="email"
-              className={`ag-input${fieldErrors.email ? ' ag-input-error' : ''}`}
+              className={`login-input${fieldErrors.email ? ' input-error' : ''}`}
               value={email}
               onChange={(e) => { setEmail(e.target.value); clearField('email'); }}
               placeholder="you@colt.net"
               autoComplete="email"
             />
-            {fieldErrors.email && <span className="ag-field-err">{fieldErrors.email}</span>}
+            {fieldErrors.email && <span className="field-error-msg">{fieldErrors.email}</span>}
           </div>
 
           {/* Business Unit */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-            <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }} htmlFor="sales-bu">
+          <div className="login-field">
+            <label className="login-label" htmlFor="sales-bu">
               Business Unit <span className="required">*</span>
             </label>
             <input
               id="sales-bu"
               type="text"
-              className={`ag-input${fieldErrors.businessUnit ? ' ag-input-error' : ''}`}
+              className={`login-input${fieldErrors.businessUnit ? ' input-error' : ''}`}
               value={businessUnit}
               onChange={(e) => { setBusinessUnit(e.target.value); clearField('businessUnit'); }}
               placeholder="e.g. Marketing"
             />
-            {fieldErrors.businessUnit && <span className="ag-field-err">{fieldErrors.businessUnit}</span>}
+            {fieldErrors.businessUnit && <span className="field-error-msg">{fieldErrors.businessUnit}</span>}
           </div>
 
           {/* Organization */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-            <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }} htmlFor="sales-org">
+          <div className="login-field">
+            <label className="login-label" htmlFor="sales-org">
               Organization <span className="required">*</span>
             </label>
             <input
               id="sales-org"
               type="text"
-              className={`ag-input${fieldErrors.organization ? ' ag-input-error' : ''}`}
+              className={`login-input${fieldErrors.organization ? ' input-error' : ''}`}
               value={organization}
               onChange={(e) => { setOrganization(e.target.value); clearField('organization'); }}
               placeholder="e.g. Acme Global"
             />
-            {fieldErrors.organization && <span className="ag-field-err">{fieldErrors.organization}</span>}
+            {fieldErrors.organization && <span className="field-error-msg">{fieldErrors.organization}</span>}
           </div>
 
           {/* Server error */}
           {error && (
-            <div className="ag-error-banner" role="alert">
+            <div className="login-error-banner" role="alert">
               <AlertCircle size={14} />
               {error}
             </div>

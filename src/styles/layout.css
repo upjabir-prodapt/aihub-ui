@@ -734,7 +734,9 @@
 .auth-gate-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
+  width: 100%;
   padding: 12px 28px;
   border-radius: 12px;
   border: none;
@@ -753,6 +755,16 @@
   filter: brightness(1.08);
   box-shadow: 0 8px 32px rgba(0, 215, 189, 0.35);
   transform: translateY(-1px);
+}
+
+/* Form container inside auth gate (matches login-form layout) */
+.auth-gate-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  text-align: left;
+  margin-top: 4px;
 }
 
 /* Spinner utility (reused in login modal) */

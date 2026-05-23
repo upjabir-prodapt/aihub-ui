@@ -385,13 +385,12 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => 
                     {copied ? 'Copied!' : 'Copy'}
                   </button>
                 )}
-                <button className="output-action-btn primary" onClick={handleDownload} id="download-btn">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <button className="output-action-btn primary icon-only" onClick={handleDownload} id="download-btn" title={downloadInfo?.filename ? `Download · ${downloadInfo.filename}` : 'Download'}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                     <polyline points="7 10 12 15 17 10"/>
                     <line x1="12" y1="15" x2="12" y2="3"/>
                   </svg>
-                  Download{downloadInfo?.filename ? ` · ${downloadInfo.filename}` : ''}
                 </button>
               </div>
             )}
@@ -438,7 +437,7 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => 
                 <span className="meta-chip teal">
                   {jobData.result.metadata.target_language}
                 </span>
-                <span className="meta-chars">Score: {jobData.result.metadata.quality_score}</span>
+
               </div>
               <div className="result-text-container">
                 <p className="result-text">

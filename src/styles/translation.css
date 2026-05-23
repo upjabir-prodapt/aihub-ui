@@ -505,6 +505,12 @@
   color: #ffffff;
 }
 
+/* Icon-only compact variant */
+.output-action-btn.icon-only {
+  padding: 5px 8px;
+  min-width: unset;
+}
+
 
 /* Empty / loading / error states */
 .output-placeholder {
