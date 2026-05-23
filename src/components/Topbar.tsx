@@ -49,16 +49,7 @@ const Topbar: React.FC<TopbarProps> = ({ activeTab, theme, onToggleTheme }) => {
           All Systems Operational
         </div>
 
-        {/* Auth button — only shown when authenticated */}
-        {isAuthenticated && user && (
-          <div className="auth-user-pill" title={user.email}>
-            <div className="auth-avatar">{initials}</div>
-            <div className="auth-user-info">
-              <span className="auth-user-email">{user.email.split('@')[0]}</span>
-              <span className="auth-user-bu">{user.business_unit}</span>
-            </div>
-          </div>
-        )}
+        {/* Auth functionality is now handled by the page-specific session bars */}
       </div>
     </header>
   );

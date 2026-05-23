@@ -270,3 +270,111 @@
 
 .chat-input:focus { outline: none; }
 
+/* =========================================================
+   RESPONSIVE — CONTRACTS PAGE
+   ========================================================= */
+
+/* ── Tablet (≤1024px) ── */
+@media (max-width: 1024px) {
+  .analytics-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .review-layout {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .doc-viewer {
+    min-height: 300px;
+  }
+
+  .assistant-container {
+    max-width: 100%;
+    height: calc(100vh - 180px);
+  }
+}
+
+/* ── Mobile (≤768px) ── */
+@media (max-width: 768px) {
+  .sub-nav {
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 12px;
+    align-items: flex-start;
+  }
+
+  .sub-nav-tabs {
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+  .sub-nav-tabs::-webkit-scrollbar { display: none; }
+
+  .sub-nav-btn {
+    padding: 8px 12px;
+    font-size: 12px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .analytics-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+
+  .analytics-card { padding: 16px; }
+  .analytics-value { font-size: 22px; }
+
+  .repo-controls {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  /* Hide some table columns on mobile via overflow */
+  .repo-table-wrap {
+    overflow-x: auto;
+  }
+
+  .repo-table th, .repo-table td {
+    padding: 10px 12px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .review-layout {
+    grid-template-columns: 1fr;
+    height: auto;
+    gap: 14px;
+  }
+
+  .doc-viewer { min-height: 220px; }
+
+  .assistant-container {
+    height: auto;
+    min-height: 500px;
+    border-radius: 14px;
+  }
+
+  .chat-history { padding: 16px; gap: 14px; }
+
+  .chat-msg { max-width: 95%; }
+
+  .msg-bubble { padding: 12px 14px; font-size: 13px; }
+
+  .chat-input-wrap { padding: 14px; }
+}
+
+/* ── Small phones (≤480px) ── */
+@media (max-width: 480px) {
+  .analytics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .analytics-value { font-size: 20px; }
+
+  .sub-nav-btn { padding: 7px 10px; font-size: 11px; gap: 5px; }
+}
+
+

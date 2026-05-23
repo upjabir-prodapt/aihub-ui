@@ -15,7 +15,7 @@ const LANGUAGES = [
   { code: 'ja', label: 'Japanese' },
 ];
 
-const SOURCE_LANGUAGES = [{ code: '', label: 'Auto Detect' }, ...LANGUAGES];
+const SOURCE_LANGUAGES = LANGUAGES;
 
 
 // ─── Helpers ──────────────────────────────────────────────
@@ -47,8 +47,8 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => 
   const [file, setFile] = useState<File | null>(null);
   
   // New fields from screenshot
-  const [sourceLang, setSourceLang] = useState('');
-  const [targetLang, setTargetLang] = useState('en');
+  const [sourceLang, setSourceLang] = useState('en');
+  const [targetLang, setTargetLang] = useState('de');
   const [domain, setDomain] = useState('legal');
   const [enableDlp, setEnableDlp] = useState(true);
   const [enableChunking, setEnableChunking] = useState(true);

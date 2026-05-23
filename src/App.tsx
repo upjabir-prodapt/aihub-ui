@@ -30,14 +30,6 @@ function AppShell() {
     setLoginOpen(false);
   };
 
-  const renderPage = () => {
-    if (activeTab === 'translation') return <TranslationPage onRequestLogin={openLogin} />;
-    if (activeTab === 'contracts') return <ContractManagementPage />;
-    if (activeTab === 'sales') return <SalesAgentPage />;
-    if (activeTab === 'vertex-ai') return <VertexAIPage />;
-    return <TranslationPage onRequestLogin={openLogin} />;
-  };
-
   return (
     <div className="app-layout">
       <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
@@ -47,7 +39,18 @@ function AppShell() {
           theme={theme}
           onToggleTheme={toggleTheme}
         />
-        {renderPage()}
+        <div style={{ display: activeTab === 'translation' ? 'contents' : 'none' }}>
+          <TranslationPage onRequestLogin={openLogin} />
+        </div>
+        <div style={{ display: activeTab === 'contracts' ? 'contents' : 'none' }}>
+          <ContractManagementPage />
+        </div>
+        <div style={{ display: activeTab === 'sales' ? 'contents' : 'none' }}>
+          <SalesAgentPage />
+        </div>
+        <div style={{ display: activeTab === 'vertex-ai' ? 'contents' : 'none' }}>
+          <VertexAIPage />
+        </div>
       </div>
 
       {/* Login modal — non-blocking when opened from topbar */}

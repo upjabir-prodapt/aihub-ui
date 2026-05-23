@@ -559,3 +559,123 @@
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+/* =========================================================
+   RESPONSIVE — SALES AGENT PAGE
+   ========================================================= */
+
+/* ── Tablet (≤1024px) ── */
+@media (max-width: 1024px) {
+  .search-focus-wrap {
+    padding: 48px 20px;
+  }
+
+  .search-title { font-size: 36px; }
+  .search-sub { font-size: 16px; }
+
+  .report-body { padding: 24px; }
+
+  .report-toolbar {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+}
+
+/* ── Mobile (≤768px) ── */
+@media (max-width: 768px) {
+  .sales-agent-container {
+    gap: 16px;
+  }
+
+  .search-focus-wrap {
+    padding: 32px 12px;
+    justify-content: flex-start;
+  }
+
+  .search-hero-content {
+    margin-bottom: 28px;
+  }
+
+  .search-badge { font-size: 10px; margin-bottom: 16px; }
+  .search-title { font-size: 28px; letter-spacing: -0.5px; }
+  .search-sub { font-size: 14px; }
+
+  .research-search-area {
+    flex-wrap: wrap;
+    padding: 10px;
+    gap: 10px;
+    border-radius: 14px;
+  }
+
+  .search-area-icon { margin-left: 6px; }
+
+  .search-area-input {
+    font-size: 15px;
+    min-width: 0;
+    width: 100%;
+  }
+
+  /* Make the research button full-width on mobile */
+  .research-search-area .translate-btn {
+    width: 100% !important;
+    padding: 12px !important;
+    margin-top: 4px !important;
+  }
+
+  .research-capabilities {
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 28px;
+    justify-content: center;
+  }
+
+  .research-form-area {
+    max-width: 100%;
+  }
+
+  .status-tracker-card {
+    margin: 16px 0;
+    border-radius: 16px;
+  }
+
+  .tracker-header { padding: 16px; }
+  .tracker-title { font-size: 15px; }
+  .steps-container { padding: 20px 16px; gap: 18px; }
+
+  .report-view-container {
+    max-width: 100%;
+    border-radius: 14px;
+  }
+
+  .report-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 16px;
+  }
+
+  .report-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .report-body {
+    padding: 16px;
+    max-height: none; /* allow natural height on mobile */
+  }
+
+  .markdown-content { font-size: 13px; }
+  .markdown-content h1 { font-size: 20px; }
+  .markdown-content h2 { font-size: 17px; }
+  .markdown-content h3 { font-size: 15px; }
+}
+
+/* ── Small phones (≤480px) ── */
+@media (max-width: 480px) {
+  .search-title { font-size: 22px; }
+  .search-sub { font-size: 13px; }
+  .research-capabilities { gap: 8px; }
+  .cap-item { font-size: 11px; }
+  .step-label { font-size: 12px; }
+}
+

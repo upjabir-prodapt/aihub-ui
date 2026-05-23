@@ -131,3 +131,23 @@ button:focus-visible, a:focus-visible, select:focus-visible, textarea:focus-visi
   outline-offset: 2px;
 }
 button, a, select { cursor: pointer; }
+
+/* ===== RESPONSIVE HELPERS ===== */
+@media (max-width: 1024px) {
+  :root {
+    --sidebar-width: 220px;
+  }
+}
+
+@media (max-width: 768px) {
+  :root {
+    --sidebar-width: 0px;
+    --topbar-height: 56px;
+  }
+
+  /* Allow page body to scroll on mobile */
+  html, body, #root {
+    overflow: auto;
+  }
+}
+

@@ -211,3 +211,86 @@
   text-transform: uppercase;
   font-weight: 700;
 }
+
+/* =========================================================
+   RESPONSIVE — VERTEX AI PAGE
+   ========================================================= */
+
+/* ── Tablet (≤1024px) ── */
+@media (max-width: 1024px) {
+  .env-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .metrics-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .lifecycle-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .security-strip {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+}
+
+/* ── Mobile (≤768px) ── */
+@media (max-width: 768px) {
+  .env-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .env-card { padding: 18px; border-radius: 14px; }
+  .env-name { font-size: 17px; }
+
+  .lifecycle-section {
+    padding: 18px;
+    border-radius: 14px;
+  }
+
+  .lifecycle-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .lifecycle-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .metrics-row {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .metric-card { padding: 12px; border-radius: 10px; }
+  .metric-val { font-size: 16px; }
+
+  .security-strip {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 14px 16px;
+    border-radius: 12px;
+  }
+}
+
+/* ── Small phones (≤480px) ── */
+@media (max-width: 480px) {
+  .metrics-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .env-card-footer {
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-start;
+  }
+}
+

@@ -769,3 +769,165 @@
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+/* =========================================================
+   RESPONSIVE LAYOUT
+   ========================================================= */
+
+/* ── Tablet (≤1024px) ── */
+@media (max-width: 1024px) {
+  .sidebar {
+    width: var(--sidebar-width);
+    min-width: var(--sidebar-width);
+  }
+
+  .sidebar-logo {
+    padding: 18px 14px 14px;
+  }
+
+  .logo-company { font-size: 14px; }
+
+  .nav-item {
+    padding: 9px 8px;
+    font-size: 12px;
+  }
+
+  .topbar {
+    padding: 0 16px;
+  }
+
+  .status-pill {
+    display: none; /* hide on tablet to save space */
+  }
+
+  .page-content {
+    padding: 20px 18px;
+  }
+}
+
+/* ── Mobile (≤768px) ── */
+@media (max-width: 768px) {
+  /* Hide the sidebar entirely — replace with bottom nav */
+  .sidebar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100% !important;
+    min-width: unset !important;
+    height: auto;
+    flex-direction: row;
+    border-right: none;
+    border-top: 1px solid var(--border-subtle);
+    z-index: 100;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Hide sidebar top accent line on mobile */
+  .sidebar::after { display: none; }
+
+  .sidebar-logo {
+    display: none; /* hide logo on mobile – it's in the topbar-ish area */
+  }
+
+  .sidebar-nav {
+    flex-direction: row;
+    gap: 0;
+    padding: 6px 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex: 1;
+    justify-content: space-around;
+    scrollbar-width: none;
+  }
+  .sidebar-nav::-webkit-scrollbar { display: none; }
+
+  .nav-section-label { display: none; }
+
+  .nav-item {
+    flex-direction: column;
+    align-items: center;
+    padding: 6px 10px;
+    gap: 3px;
+    min-width: 56px;
+    font-size: 10px;
+    border-radius: 10px;
+    flex-shrink: 0;
+  }
+
+  /* The active bar on the left doesn't make sense at the bottom */
+  .nav-item.active::before { display: none; }
+
+  .nav-label { font-size: 10px; line-height: 1.2; text-align: center; }
+
+  .nav-badge { display: none; }
+
+  .sidebar-footer { display: none; }
+
+  /* Main content takes full width above the bottom nav */
+  .app-layout {
+    flex-direction: column;
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  .main-content {
+    flex: 1;
+    min-height: 0;
+    /* leave room for the fixed bottom nav (≈60px + safe area) */
+    padding-bottom: calc(60px + env(safe-area-inset-bottom));
+    overflow: hidden;
+  }
+
+  /* Topbar mobile adjustments */
+  .topbar {
+    padding: 0 12px;
+    gap: 8px;
+  }
+
+  .topbar-right {
+    gap: 8px;
+  }
+
+  .breadcrumb { font-size: 12px; gap: 5px; }
+
+  .status-pill { display: none; }
+
+  .page-content {
+    padding: 14px 14px;
+    overflow-y: auto;
+    height: 100%;
+  }
+}
+
+/* ── Small phones (≤480px) ── */
+@media (max-width: 480px) {
+  .nav-item {
+    min-width: 44px;
+    padding: 5px 6px;
+  }
+
+  .nav-label { font-size: 9px; }
+
+  .topbar { padding: 0 10px; }
+
+  .breadcrumb-root { display: none; }
+  .breadcrumb-sep  { display: none; }
+
+  .page-content { padding: 10px 10px; }
+
+  .theme-toggle {
+    width: 32px;
+    height: 32px;
+  }
+}
+
+/* Auth modal — full-screen on mobile */
+@media (max-width: 480px) {
+  .modal-backdrop { padding: 0; align-items: flex-end; }
+  .modal-panel {
+    max-width: 100%;
+    border-radius: 20px 20px 0 0;
+  }
+}
+
