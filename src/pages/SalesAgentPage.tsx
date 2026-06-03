@@ -4,7 +4,7 @@ import {
   Search, 
   RefreshCw, 
   CheckCircle2,
-  AlertCircle, 
+  AlertCircle,
   FileText, 
   ShieldCheck,
   Zap,
@@ -12,10 +12,8 @@ import {
   PieChart,
   ArrowRight,
   Download,
-  LogIn,
   LogOut,
   User,
-  Briefcase,
   Hash,
 } from 'lucide-react';
 import {
@@ -106,101 +104,114 @@ const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
   };
 
   return (
-    <div className="page-content">
-      <div className="auth-gate">
-        <div className="auth-gate-icon">
-          {/* Search / magnifying glass icon for Sales */}
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="11" cy="11" r="8"/>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-          </svg>
-        </div>
-        <h2 className="auth-gate-title">Research Intelligence Agent</h2>
-        <p className="auth-gate-sub">Sign in with your Colt credentials to access the Sales Research Agent.</p>
+    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Sales Agent Login">
+      <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
+        {/* Glow accent */}
+        <div className="modal-glow" />
 
-        <form
-          className="auth-gate-form"
-          onSubmit={handleSubmit}
-          noValidate
-        >
-          {/* Email */}
-          <div className="login-field">
-            <label className="login-label" htmlFor="sales-email">
-              Colt Email <span className="required">*</span>
-            </label>
-            <input
-              ref={emailRef}
-              id="sales-email"
-              type="email"
-              className={`login-input${fieldErrors.email ? ' input-error' : ''}`}
-              value={email}
-              onChange={(e) => { setEmail(e.target.value); clearField('email'); }}
-              placeholder="you@colt.net"
-              autoComplete="email"
-            />
-            {fieldErrors.email && <span className="field-error-msg">{fieldErrors.email}</span>}
-          </div>
-
-          {/* Business Unit */}
-          <div className="login-field">
-            <label className="login-label" htmlFor="sales-bu">
-              Business Unit <span className="required">*</span>
-            </label>
-            <input
-              id="sales-bu"
-              type="text"
-              className={`login-input${fieldErrors.businessUnit ? ' input-error' : ''}`}
-              value={businessUnit}
-              onChange={(e) => { setBusinessUnit(e.target.value); clearField('businessUnit'); }}
-              placeholder="e.g. Marketing"
-            />
-            {fieldErrors.businessUnit && <span className="field-error-msg">{fieldErrors.businessUnit}</span>}
-          </div>
-
-          {/* Organization */}
-          <div className="login-field">
-            <label className="login-label" htmlFor="sales-org">
-              Organization <span className="required">*</span>
-            </label>
-            <input
-              id="sales-org"
-              type="text"
-              className={`login-input${fieldErrors.organization ? ' input-error' : ''}`}
-              value={organization}
-              onChange={(e) => { setOrganization(e.target.value); clearField('organization'); }}
-              placeholder="e.g. Acme Global"
-            />
-            {fieldErrors.organization && <span className="field-error-msg">{fieldErrors.organization}</span>}
-          </div>
-
-          {/* Server error */}
-          {error && (
-            <div className="login-error-banner" role="alert">
-              <AlertCircle size={14} />
-              {error}
+        {/* Header */}
+        <div className="modal-header">
+          <div className="modal-logo-row">
+            <div className="modal-logo-mark">
+              <div className="logo-chevron" />
             </div>
-          )}
+            <div>
+              <div className="modal-logo-company">Colt</div>
+              <div className="modal-logo-product">AI Hub</div>
+            </div>
+          </div>
+        </div>
 
-          <button
-            type="submit"
-            id="sales-auth-submit-btn"
-            className="auth-gate-btn"
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <><span className="spinner" /> Signing in…</>
-            ) : (
-              <>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
-                  <polyline points="10 17 15 12 10 7"/>
-                  <line x1="15" y1="12" x2="3" y2="12"/>
+        <div className="modal-body">
+          <h2 className="modal-title">Sign in to continue</h2>
+          <p className="modal-subtitle">Use your Colt credentials to access the Sales Research Agent.</p>
+
+          <form onSubmit={handleSubmit} className="login-form" noValidate>
+            {/* Email */}
+            <div className="login-field">
+              <label className="login-label" htmlFor="sales-email">
+                Colt Email <span className="required">*</span>
+              </label>
+              <input
+                ref={emailRef}
+                id="sales-email"
+                type="email"
+                className={`login-input${fieldErrors.email ? ' input-error' : ''}`}
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); clearField('email'); }}
+                placeholder="you@colt.net"
+                autoComplete="email"
+              />
+              {fieldErrors.email && <span className="field-error-msg">{fieldErrors.email}</span>}
+            </div>
+
+            {/* Business Unit */}
+            <div className="login-field">
+              <label className="login-label" htmlFor="sales-bu">
+                Business Unit <span className="required">*</span>
+              </label>
+              <input
+                id="sales-bu"
+                type="text"
+                className={`login-input${fieldErrors.businessUnit ? ' input-error' : ''}`}
+                value={businessUnit}
+                onChange={(e) => { setBusinessUnit(e.target.value); clearField('businessUnit'); }}
+                placeholder="e.g. Marketing"
+              />
+              {fieldErrors.businessUnit && <span className="field-error-msg">{fieldErrors.businessUnit}</span>}
+            </div>
+
+            {/* Organization */}
+            <div className="login-field">
+              <label className="login-label" htmlFor="sales-org">
+                Organization <span className="required">*</span>
+              </label>
+              <input
+                id="sales-org"
+                type="text"
+                className={`login-input${fieldErrors.organization ? ' input-error' : ''}`}
+                value={organization}
+                onChange={(e) => { setOrganization(e.target.value); clearField('organization'); }}
+                placeholder="e.g. Acme Global"
+              />
+              {fieldErrors.organization && <span className="field-error-msg">{fieldErrors.organization}</span>}
+            </div>
+
+            {/* Server error */}
+            {error && (
+              <div className="login-error-banner" role="alert">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
                 </svg>
-                Sign In with Colt
-              </>
+                {error}
+              </div>
             )}
-          </button>
-        </form>
+
+            <button
+              type="submit"
+              id="sales-auth-submit-btn"
+              className="login-btn"
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <><span className="spinner" /> Signing in…</>
+              ) : (
+                <>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                    <polyline points="10 17 15 12 10 7" />
+                    <line x1="15" y1="12" x2="3" y2="12" />
+                  </svg>
+                  Sign In with Colt
+                </>
+              )}
+            </button>
+          </form>
+        </div>
+
+        <div className="modal-footer">
+          <span>Only <strong>@colt.net</strong> email addresses are permitted.</span>
+        </div>
       </div>
     </div>
   );
@@ -343,11 +354,7 @@ const SalesAgentPage: React.FC = () => {
 
   // ── Auth gate ──────────────────────────────────────────────────────────────
   if (!salesToken) {
-    return (
-      <div className="sales-agent-container">
-        <AuthGate onAuthenticated={handleAuthenticated} />
-      </div>
-    );
+    return <AuthGate onAuthenticated={handleAuthenticated} />;
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
