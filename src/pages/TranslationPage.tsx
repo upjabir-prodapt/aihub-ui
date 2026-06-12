@@ -54,7 +54,7 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => 
   const [enableChunking, setEnableChunking] = useState(true);
   const [priority, setPriority] = useState('standard');
 
-  const { status, jobData, downloadInfo, error, startTranslation, reset } = useTranslation();
+  const { status, jobData, downloadInfo, error, startTranslation, retryOrReset, reset, getValidDownloadUrl } = useTranslation();
   
   const [copied, setCopied] = useState(false);
   const resultRef = useRef<HTMLDivElement>(null);
@@ -77,7 +77,11 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => 
   });
 
   // ── Clear ──
-  const clearFile = () => setFile(null);
+  // Bug 7: Also reset translation state so stale output is not shown for a new file
+  const clearFile = () => {
+    setFile(null);
+    reset();
+  };
 
   // ── Translate ──
   const handleTranslate = async () => {
@@ -89,18 +93,29 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => 
     // Basic validation
     if (!file) return;
 
-    const formData = new FormData();
-    // Use the language code directly — the API accepts both codes and names
-    formData.append('target_language', targetLang);
-    if (sourceLang) formData.append('source_language', sourceLang);
-    formData.append('domain', domain);
-    formData.append('enable_dlp', String(enableDlp));
-    formData.append('enable_chunking', String(enableChunking));
-    formData.append('priority', priority);
-    formData.append('file', file);
+    // Bug 6: Prevent same source and target language submission
+    if (sourceLang === targetLang) {
+      alert('Source and target languages must be different.');
+      return;
+    }
 
-    startTranslation(formData);
-    
+    // Bug 2: Pass a factory so each retry attempt builds fresh FormData
+    // with an unconsumed file stream (same FormData cannot be re-sent).
+    const buildFormData = () => {
+      const fd = new FormData();
+      fd.append('target_language', targetLang);
+      if (sourceLang) fd.append('source_language', sourceLang);
+      fd.append('domain', domain);
+      fd.append('enable_dlp', String(enableDlp));
+      fd.append('enable_chunking', String(enableChunking));
+      fd.append('priority', priority);
+      fd.append('file', file);
+      return fd;
+    };
+
+    // Bug 3: Await the async call so unhandled rejections don't go silent
+    await startTranslation(buildFormData);
+
     setTimeout(() => {
       if (resultRef.current) {
         resultRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -118,10 +133,12 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => 
   };
 
   // ── Download ──
-  // Priority: 1) signed URL from /jobs/{id}/download endpoint  2) inline URL from job result
-  const handleDownload = () => {
-    const signedUrl = downloadInfo?.download_url
+  // Bug 5: getValidDownloadUrl auto-refreshes the signed URL if expired.
+  const handleDownload = async () => {
+    // Try the (potentially refreshed) signed URL first
+    const signedUrl = await getValidDownloadUrl()
       ?? jobData?.result?.translated_document?.download_url;
+
     if (signedUrl) {
       const filename =
         downloadInfo?.filename ??
@@ -136,7 +153,10 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => 
     } else {
       // Fallback: download inline text content if present
       const translatedText = jobData?.result?.translated_document?.content;
-      if (!translatedText) return;
+      if (!translatedText) {
+        console.warn('No download URL or inline content available.');
+        return;
+      }
       const blob = new Blob([translatedText], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -147,7 +167,8 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => 
     }
   };
 
-  const canTranslate = !!file;
+  // Bug 6: Also disallow same source/target language
+  const canTranslate = !!file && sourceLang !== targetLang;
   const isLoading = status === 'submitting' || status === 'polling';
 
   // ─── Render ────────────────────────────────────────────
@@ -280,18 +301,16 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => 
               </div>
             )}
 
-            {/* Domain Field */}
-            <div className="form-grid">
-              <div className="form-field">
-                <label className="field-label">Domain <span className="required">*</span></label>
-                <select className="field-select" value={domain} onChange={(e) => setDomain(e.target.value)}>
-                  <option value="commercial">Commercial</option>
-                  <option value="legal">Legal</option>
-                  <option value="finance">Finance</option>
-                  <option value="hr">HR</option>
-                  <option value="operations">Operations</option>
-                </select>
-              </div>
+            {/* Bug 8: Domain field — single field, no grid wrapper */}
+            <div className="form-field">
+              <label className="field-label">Domain <span className="required">*</span></label>
+              <select className="field-select" value={domain} onChange={(e) => setDomain(e.target.value)}>
+                <option value="commercial">Commercial</option>
+                <option value="legal">Legal</option>
+                <option value="finance">Finance</option>
+                <option value="hr">HR</option>
+                <option value="operations">Operations</option>
+              </select>
             </div>
 
             {/* Language Config */}
@@ -475,7 +494,16 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => 
               </div>
               <p className="error-title">Translation Failed</p>
               <p className="error-message">{error}</p>
-              <button className="retry-btn" onClick={reset}>Try Again</button>
+              <div className="error-actions">
+                <button className="retry-btn" onClick={retryOrReset} id="retry-btn">
+                  {jobData?.job_id ? 'Resume Checking Status' : 'Try Again'}
+                </button>
+                {jobData?.job_id && (
+                  <button className="retry-btn secondary" onClick={reset} id="reset-btn">
+                    Start Over
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </div>

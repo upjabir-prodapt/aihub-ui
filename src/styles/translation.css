@@ -657,8 +657,15 @@
   font-family: 'JetBrains Mono', monospace;
 }
 
-.retry-btn {
+.error-actions {
+  display: flex;
+  gap: 8px;
   margin-top: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.retry-btn {
   padding: 8px 20px;
   border-radius: 8px;
   background: transparent;
@@ -673,6 +680,19 @@
   border-color: var(--colt-teal);
   color: var(--colt-teal);
   background: var(--colt-teal-light);
+}
+
+.retry-btn.secondary {
+  opacity: 0.6;
+  font-size: 12px;
+  padding: 8px 14px;
+}
+
+.retry-btn.secondary:hover {
+  opacity: 1;
+  border-color: var(--border-strong);
+  color: var(--text-secondary);
+  background: var(--bg-hover);
 }
 
 /* New Form Styles */
