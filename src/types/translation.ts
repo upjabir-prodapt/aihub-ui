@@ -84,3 +84,19 @@ export interface ApiError {
     details?: Record<string, unknown>;
   };
 }
+
+// POST /api/v1/reviews/{job_id} → 201
+export interface ReviewRequest {
+  rating: number;   // 1–5
+  comment?: string; // max 2000 chars
+}
+
+export interface ReviewResponse {
+  review_id: string;
+  job_id: string;
+  rating: number;
+  comment: string | null;
+  reviewer_email: string;
+  created_at: string;
+  updated_at: string;
+}
