@@ -3,6 +3,6 @@ export const SALES_API_ORIGIN = 'https://salesagent.aicoesandox-int.colt.net';
 
 /** Canonical Cloud Run URL; required as metadata token audience for invoker IAM. */
 export const SALES_CLOUD_RUN_IAM_AUDIENCE =
-  'https://salesagent-api-service-297743845367.europe-west1.run.app';
+  'https://sales-research-application-297743845367.europe-west1.run.app';
 
 export const SALES_API_BASE = '/api/sales/v1';

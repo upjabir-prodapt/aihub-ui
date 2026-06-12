@@ -141,4 +141,3 @@ stages:
                   --timeout=600 \
                   --memory=1Gi \
                   --cpu=1 \
-                  --allow-unauthenticated
