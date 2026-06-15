@@ -4,9 +4,7 @@ import Sidebar from './components/Sidebar';
 import Topbar from './components/Topbar';
 import LoginModal from './components/LoginModal';
 import TranslationPage from './pages/TranslationPage';
-import ContractManagementPage from './pages/ContractManagementPage';
 import SalesAgentPage from './pages/SalesAgentPage';
-import VertexAIPage from './pages/VertexAIPage';
 import './styles/layout.css';
 
 // ── Inner shell (has access to AuthContext) ──────────────────────────────
@@ -42,14 +40,8 @@ function AppShell() {
         <div style={{ display: activeTab === 'translation' ? 'contents' : 'none' }}>
           <TranslationPage onRequestLogin={openLogin} />
         </div>
-        <div style={{ display: activeTab === 'contracts' ? 'contents' : 'none' }}>
-          <ContractManagementPage />
-        </div>
         <div style={{ display: activeTab === 'sales' ? 'contents' : 'none' }}>
           <SalesAgentPage />
-        </div>
-        <div style={{ display: activeTab === 'vertex-ai' ? 'contents' : 'none' }}>
-          <VertexAIPage />
         </div>
       </div>
 

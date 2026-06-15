@@ -106,6 +106,8 @@
   grid-template-columns: 1fr 1fr;
   gap: 20px;
   align-items: start;
+  height: 100%;
+  min-height: 0;
 }
 
 /* ===== PANEL ===== */
@@ -118,6 +120,8 @@
   overflow: hidden;
   box-shadow: var(--shadow-sm);
   transition: box-shadow var(--transition-mid);
+  min-height: 0;
+  height: 100%;
 }
 
 .panel:hover {
@@ -182,6 +186,9 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .drop-zone {
@@ -605,7 +612,8 @@
 .result-text-container {
   padding: 20px;
   overflow-y: auto;
-  max-height: 420px;
+  flex: 1;
+  min-height: 0;
 }
 
 .result-text {
@@ -876,9 +884,19 @@
   .workspace {
     grid-template-columns: 1fr;
     gap: 14px;
+    height: auto;
   }
 
-  .panel-body { padding: 14px; gap: 12px; }
+  .panel {
+    height: auto;
+    max-height: 60vh;
+  }
+
+  .panel-body {
+    padding: 14px;
+    gap: 12px;
+    max-height: 50vh;
+  }
 
   .drop-zone { padding: 28px 16px; }
 

@@ -32,6 +32,7 @@ const NAV_ITEMS: SidebarItem[] = [
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10,9 9,9 8,9"/>
       </svg>
     ),
+    disabled: true,
   },
   {
     id: 'sales',
@@ -50,6 +51,7 @@ const NAV_ITEMS: SidebarItem[] = [
         <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
       </svg>
     ),
+    disabled: true,
   },
 ];
 
@@ -80,10 +82,11 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
             className={`nav-item ${activeTab === item.id ? 'active' : ''} ${item.disabled ? 'disabled' : ''}`}
             onClick={() => !item.disabled && onTabChange(item.id)}
             aria-disabled={item.disabled}
-            title={item.label}
+            title={item.disabled ? 'Coming soon' : item.label}
           >
             <span className="nav-icon">{item.icon}</span>
             <span className="nav-label">{item.label}</span>
+            {item.disabled && <span style={{ marginLeft: 'auto', fontSize: '10px', opacity: 0.6 }}>Soon</span>}
           </button>
         ))}
       </nav>
