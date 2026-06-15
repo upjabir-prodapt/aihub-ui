@@ -2,6 +2,8 @@ import type {
   TranslateResponse,
   JobStatusResponse,
   DownloadUrlResponse,
+  ReviewRequest,
+  ReviewResponse,
 } from '../types/translation';
 import {
   ensureFreshGoogleIdToken,
@@ -118,6 +120,20 @@ export const translationApi = {
 
     if (!response.ok) {
       throw new Error(await parseApiError(response, 'Failed to cancel job'));
+    }
+
+    return response.json();
+  },
+
+  async submitReview(jobId: string, review: ReviewRequest): Promise<ReviewResponse> {
+    const response = await fetchWithAuth(`${API_BASE}/reviews/${jobId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(review),
+    });
+
+    if (!response.ok) {
+      throw new Error(await parseApiError(response, 'Failed to submit review'));
     }
 
     return response.json();

@@ -3,6 +3,7 @@ import { useDropzone } from 'react-dropzone';
 import { User, LogOut } from 'lucide-react';
 import { useTranslation } from '../hooks/useTranslation';
 import { useAuth } from '../context/AuthContext';
+import ReviewModal from '../components/ReviewModal';
 import '../styles/translation.css';
 
 // ─── Constants ────────────────────────────────────────────
@@ -54,9 +55,12 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => 
   const [enableChunking, setEnableChunking] = useState(true);
   const [priority, setPriority] = useState('standard');
 
-  const { status, jobData, downloadInfo, error, startTranslation, reset } = useTranslation();
-  
+  const { status, jobData, downloadInfo, error, startTranslation, retryOrReset, reset, getValidDownloadUrl } = useTranslation();
+
   const [copied, setCopied] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [toast, setToast] = useState<{ ok: boolean; message: string } | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const resultRef = useRef<HTMLDivElement>(null);
 
   // ── Dropzone ──
@@ -77,7 +81,11 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => 
   });
 
   // ── Clear ──
-  const clearFile = () => setFile(null);
+  // Bug 7: Also reset translation state so stale output is not shown for a new file
+  const clearFile = () => {
+    setFile(null);
+    reset();
+  };
 
   // ── Translate ──
   const handleTranslate = async () => {
@@ -89,18 +97,29 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => 
     // Basic validation
     if (!file) return;
 
-    const formData = new FormData();
-    // Use the language code directly — the API accepts both codes and names
-    formData.append('target_language', targetLang);
-    if (sourceLang) formData.append('source_language', sourceLang);
-    formData.append('domain', domain);
-    formData.append('enable_dlp', String(enableDlp));
-    formData.append('enable_chunking', String(enableChunking));
-    formData.append('priority', priority);
-    formData.append('file', file);
+    // Bug 6: Prevent same source and target language submission
+    if (sourceLang === targetLang) {
+      alert('Source and target languages must be different.');
+      return;
+    }
 
-    startTranslation(formData);
-    
+    // Bug 2: Pass a factory so each retry attempt builds fresh FormData
+    // with an unconsumed file stream (same FormData cannot be re-sent).
+    const buildFormData = () => {
+      const fd = new FormData();
+      fd.append('target_language', targetLang);
+      if (sourceLang) fd.append('source_language', sourceLang);
+      fd.append('domain', domain);
+      fd.append('enable_dlp', String(enableDlp));
+      fd.append('enable_chunking', String(enableChunking));
+      fd.append('priority', priority);
+      fd.append('file', file);
+      return fd;
+    };
+
+    // Bug 3: Await the async call so unhandled rejections don't go silent
+    await startTranslation(buildFormData);
+
     setTimeout(() => {
       if (resultRef.current) {
         resultRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -118,10 +137,12 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => 
   };
 
   // ── Download ──
-  // Priority: 1) signed URL from /jobs/{id}/download endpoint  2) inline URL from job result
-  const handleDownload = () => {
-    const signedUrl = downloadInfo?.download_url
+  // Bug 5: getValidDownloadUrl auto-refreshes the signed URL if expired.
+  const handleDownload = async () => {
+    // Try the (potentially refreshed) signed URL first
+    const signedUrl = await getValidDownloadUrl()
       ?? jobData?.result?.translated_document?.download_url;
+
     if (signedUrl) {
       const filename =
         downloadInfo?.filename ??
@@ -136,7 +157,10 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => 
     } else {
       // Fallback: download inline text content if present
       const translatedText = jobData?.result?.translated_document?.content;
-      if (!translatedText) return;
+      if (!translatedText) {
+        console.warn('No download URL or inline content available.');
+        return;
+      }
       const blob = new Blob([translatedText], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -147,7 +171,15 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => 
     }
   };
 
-  const canTranslate = !!file;
+  // ── Review toast ──
+  const handleReviewSubmitted = (ok: boolean, message: string) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast({ ok, message });
+    toastTimer.current = setTimeout(() => setToast(null), 4500);
+  };
+
+  // Bug 6: Also disallow same source/target language
+  const canTranslate = !!file && sourceLang !== targetLang;
   const isLoading = status === 'submitting' || status === 'polling';
 
   // ─── Render ────────────────────────────────────────────
@@ -280,18 +312,16 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => 
               </div>
             )}
 
-            {/* Domain Field */}
-            <div className="form-grid">
-              <div className="form-field">
-                <label className="field-label">Domain <span className="required">*</span></label>
-                <select className="field-select" value={domain} onChange={(e) => setDomain(e.target.value)}>
-                  <option value="commercial">Commercial</option>
-                  <option value="legal">Legal</option>
-                  <option value="finance">Finance</option>
-                  <option value="hr">HR</option>
-                  <option value="operations">Operations</option>
-                </select>
-              </div>
+            {/* Bug 8: Domain field — single field, no grid wrapper */}
+            <div className="form-field">
+              <label className="field-label">Domain <span className="required">*</span></label>
+              <select className="field-select" value={domain} onChange={(e) => setDomain(e.target.value)}>
+                <option value="commercial">Commercial</option>
+                <option value="legal">Legal</option>
+                <option value="finance">Finance</option>
+                <option value="hr">HR</option>
+                <option value="operations">Operations</option>
+              </select>
             </div>
 
             {/* Language Config */}
@@ -392,6 +422,17 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => 
                     <line x1="12" y1="15" x2="12" y2="3"/>
                   </svg>
                 </button>
+                <button
+                  className="output-action-btn"
+                  onClick={() => setReviewOpen(true)}
+                  id="rate-btn"
+                  title="Rate this translation"
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                  </svg>
+                  Rate
+                </button>
               </div>
             )}
           </div>
@@ -475,12 +516,56 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => 
               </div>
               <p className="error-title">Translation Failed</p>
               <p className="error-message">{error}</p>
-              <button className="retry-btn" onClick={reset}>Try Again</button>
+              <div className="error-actions">
+                <button className="retry-btn" onClick={retryOrReset} id="retry-btn">
+                  {jobData?.job_id ? 'Resume Checking Status' : 'Try Again'}
+                </button>
+                {jobData?.job_id && (
+                  <button className="retry-btn secondary" onClick={reset} id="reset-btn">
+                    Start Over
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </div>
 
       </div>
+
+      {jobData?.job_id && (
+        <ReviewModal
+          isOpen={reviewOpen}
+          jobId={jobData.job_id}
+          onClose={() => setReviewOpen(false)}
+          onSubmitted={handleReviewSubmitted}
+        />
+      )}
+
+      {/* Review result toast */}
+      {toast && (
+        <div className={`review-toast ${toast.ok ? 'review-toast--success' : 'review-toast--error'}`} role="status" aria-live="polite">
+          <div className="review-toast-icon">
+            {toast.ok ? (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+            )}
+          </div>
+          <span className="review-toast-message">{toast.message}</span>
+          <button className="review-toast-close" onClick={() => setToast(null)} aria-label="Dismiss">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+      )}
     </div>
   );
 };

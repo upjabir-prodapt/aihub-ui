@@ -5,6 +5,8 @@
   flex-direction: column;
   gap: 24px;
   height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* Search Focus Mode */
@@ -221,6 +223,10 @@
   overflow: hidden;
   max-width: 1000px;
   margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
 }
 
 .report-toolbar {
@@ -250,7 +256,8 @@
 
 .report-body {
   padding: 40px;
-  max-height: 700px;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }
 
@@ -585,11 +592,14 @@
 @media (max-width: 768px) {
   .sales-agent-container {
     gap: 16px;
+    overflow-y: auto;
   }
 
   .search-focus-wrap {
     padding: 32px 12px;
     justify-content: flex-start;
+    flex: initial;
+    min-height: auto;
   }
 
   .search-hero-content {
@@ -645,6 +655,7 @@
   .report-view-container {
     max-width: 100%;
     border-radius: 14px;
+    max-height: 70vh;
   }
 
   .report-toolbar {
@@ -652,6 +663,7 @@
     align-items: flex-start;
     gap: 12px;
     padding: 14px 16px;
+    flex-shrink: 0;
   }
 
   .report-actions {
@@ -661,7 +673,8 @@
 
   .report-body {
     padding: 16px;
-    max-height: none; /* allow natural height on mobile */
+    flex: 1;
+    min-height: 0;
   }
 
   .markdown-content { font-size: 13px; }
