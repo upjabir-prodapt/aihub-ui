@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth, loadAttributionPrefs } from '../context/AuthContext';
+import { useAuth } from '../context/useAuth';
+import { loadAttributionPrefs } from '../context/authStorage';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -8,38 +9,29 @@ interface LoginModalProps {
   blocking?: boolean;
 }
 
-const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, blocking = false }) => {
+const LoginModalPanel: React.FC<LoginModalProps> = ({ onClose, blocking = false }) => {
   const { login, isLoading, error, clearError, isAuthenticated, iapEmail } = useAuth();
-
   const prefs = loadAttributionPrefs();
   const [businessUnit, setBusinessUnit] = useState(prefs.business_unit);
   const [organization, setOrganization] = useState(prefs.organization);
 
   useEffect(() => {
-    if (isOpen) {
-      clearError();
-      const saved = loadAttributionPrefs();
-      setBusinessUnit(saved.business_unit);
-      setOrganization(saved.organization);
-    }
-  }, [isOpen, clearError]);
+    clearError();
+  }, [clearError]);
 
   useEffect(() => {
-    if (isAuthenticated && isOpen && onClose) {
+    if (isAuthenticated && onClose) {
       onClose();
     }
-  }, [isAuthenticated, isOpen, onClose]);
+  }, [isAuthenticated, onClose]);
 
   useEffect(() => {
-    if (!isOpen) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !blocking && onClose) onClose();
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [isOpen, blocking, onClose]);
-
-  if (!isOpen) return null;
+  }, [blocking, onClose]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -156,6 +148,11 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, blocking = fal
       </div>
     </div>
   );
+};
+
+const LoginModal: React.FC<LoginModalProps> = ({ isOpen, ...props }) => {
+  if (!isOpen) return null;
+  return <LoginModalPanel {...props} isOpen />;
 };
 
 export default LoginModal;

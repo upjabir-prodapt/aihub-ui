@@ -1,115 +1,39 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   fetchGoogleIdToken,
   forceRefreshGoogleIdToken,
   persistGoogleIdToken,
 } from '../api/cloudRunAuth';
+import {
+  type AuthUser,
+  clearSession,
+  loadSession,
+  saveSession,
+} from './authStorage';
+import { AuthContext } from './authContext';
+
+export type { AuthUser, AuthState } from './authTypes';
+
 /** Same-origin; UI nginx / Vite proxy to Translation. */
 const API_BASE = '/api/v1';
 
 /** Background refresh interval for Cloud Run invoker token while logged in. */
 const GOOGLE_TOKEN_REFRESH_INTERVAL_MS = 45 * 60 * 1000;
 
-// ── Types ──────────────────────────────────────────────────────────────────
-
-export interface AuthUser {
-  email: string;
-  business_unit: string;
-  organization: string;
+function readInitialSession() {
+  return loadSession();
 }
-
-interface AuthState {
-  user: AuthUser | null;
-  token: string | null;
-  googleIdToken: string | null;
-  iapEmail: string | null;
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  error: string | null;
-  login: (business_unit: string, organization: string) => Promise<void>;
-  logout: () => void;
-  clearError: () => void;
-}
-
-// ── Storage helpers ────────────────────────────────────────────────────────
-
-const TOKEN_KEY = 'colt_auth_token';
-const GOOGLE_TOKEN_KEY = 'colt_google_id_token';
-const USER_KEY = 'colt_auth_user';
-const EXPIRY_KEY = 'colt_auth_expiry';
-const BU_PREF_KEY = 'colt_auth_bu';
-const ORG_PREF_KEY = 'colt_auth_org';
-
-export function loadAttributionPrefs(): { business_unit: string; organization: string } {
-  return {
-    business_unit: localStorage.getItem(BU_PREF_KEY) ?? 'SBU',
-    organization: localStorage.getItem(ORG_PREF_KEY) ?? 'Colt',
-  };
-}
-
-function saveAttributionPrefs(business_unit: string, organization: string) {
-  localStorage.setItem(BU_PREF_KEY, business_unit);
-  localStorage.setItem(ORG_PREF_KEY, organization);
-}
-
-function saveSession(token: string, googleIdToken: string, user: AuthUser, expiresIn: number) {
-  const expiry = Date.now() + expiresIn * 1000;
-  sessionStorage.setItem(TOKEN_KEY, token);
-  persistGoogleIdToken(googleIdToken);
-  sessionStorage.setItem(USER_KEY, JSON.stringify(user));
-  sessionStorage.setItem(EXPIRY_KEY, String(expiry));
-  saveAttributionPrefs(user.business_unit, user.organization);
-}
-
-function loadSession(): { token: string; googleIdToken: string; user: AuthUser } | null {
-  const token = sessionStorage.getItem(TOKEN_KEY);
-  const googleIdToken = sessionStorage.getItem(GOOGLE_TOKEN_KEY);
-  const userRaw = sessionStorage.getItem(USER_KEY);
-  const expiryRaw = sessionStorage.getItem(EXPIRY_KEY);
-
-  if (!token || !googleIdToken || !userRaw || !expiryRaw) return null;
-  if (Date.now() > parseInt(expiryRaw, 10)) {
-    clearSession();
-    return null;
-  }
-
-  try {
-    const user: AuthUser = JSON.parse(userRaw);
-    return { token, googleIdToken, user };
-  } catch {
-    return null;
-  }
-}
-
-function clearSession() {
-  sessionStorage.removeItem(TOKEN_KEY);
-  sessionStorage.removeItem(GOOGLE_TOKEN_KEY);
-  sessionStorage.removeItem(USER_KEY);
-  sessionStorage.removeItem(EXPIRY_KEY);
-}
-
-// ── Context ────────────────────────────────────────────────────────────────
-
-const AuthContext = createContext<AuthState | null>(null);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [googleIdToken, setGoogleIdToken] = useState<string | null>(null);
-  const [iapEmail, setIapEmail] = useState<string | null>(null);
+  const initialSession = readInitialSession();
+  const [user, setUser] = useState<AuthUser | null>(initialSession?.user ?? null);
+  const [token, setToken] = useState<string | null>(initialSession?.token ?? null);
+  const [googleIdToken, setGoogleIdToken] = useState<string | null>(initialSession?.googleIdToken ?? null);
+  const [iapEmail, setIapEmail] = useState<string | null>(initialSession?.user?.email ?? null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Restore session and fetch verified IAP identity on mount
   useEffect(() => {
-    const session = loadSession();
-    if (session) {
-      setToken(session.token);
-      setGoogleIdToken(session.googleIdToken);
-      setUser(session.user);
-      setIapEmail(session.user.email);
-    }
-
     fetch(`${API_BASE}/auth/whoami`, { credentials: 'include' })
       .then(async (res) => {
         if (!res.ok) return null;
@@ -123,7 +47,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
   }, []);
 
-  // Keep Cloud Run invoker token fresh while the user session is active
   useEffect(() => {
     if (!token) return;
 
@@ -223,9 +146,3 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     </AuthContext.Provider>
   );
 };
-
-export function useAuth(): AuthState {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
-  return ctx;
-}

@@ -7,19 +7,12 @@ import {
   Layers, 
   GitBranch, 
   Lock, 
-  Eye, 
   BarChart3, 
   Terminal,
-  Settings,
-  AlertCircle,
-  ExternalLink,
-  ChevronRight,
   Database,
   Search,
-  Cpu,
   RefreshCw,
   Server,
-  Zap
 } from 'lucide-react';
 import '../styles/vertex-ai.css';
 
