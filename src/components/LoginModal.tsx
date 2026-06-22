@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useAuth } from '../context/AuthContext';
+import React, { useState, useEffect } from 'react';
+import { useAuth, loadAttributionPrefs } from '../context/AuthContext';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -9,32 +9,27 @@ interface LoginModalProps {
 }
 
 const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, blocking = false }) => {
-  const { login, isLoading, error, clearError, isAuthenticated } = useAuth();
+  const { login, isLoading, error, clearError, isAuthenticated, iapEmail } = useAuth();
 
-  const [email, setEmail] = useState('');
-  const [businessUnit, setBusinessUnit] = useState('SBU');
-  const [organization, setOrganization] = useState('Colt');
-  const [fieldErrors, setFieldErrors] = useState<{ email?: string }>({});
+  const prefs = loadAttributionPrefs();
+  const [businessUnit, setBusinessUnit] = useState(prefs.business_unit);
+  const [organization, setOrganization] = useState(prefs.organization);
 
-  const emailRef = useRef<HTMLInputElement>(null);
-
-  // Focus email field when modal opens
   useEffect(() => {
     if (isOpen) {
       clearError();
-      setFieldErrors({});
-      setTimeout(() => emailRef.current?.focus(), 80);
+      const saved = loadAttributionPrefs();
+      setBusinessUnit(saved.business_unit);
+      setOrganization(saved.organization);
     }
   }, [isOpen, clearError]);
 
-  // Auto-close on successful auth
   useEffect(() => {
     if (isAuthenticated && isOpen && onClose) {
       onClose();
     }
   }, [isAuthenticated, isOpen, onClose]);
 
-  // Trap Escape key
   useEffect(() => {
     if (!isOpen) return;
     const handler = (e: KeyboardEvent) => {
@@ -46,21 +41,9 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, blocking = fal
 
   if (!isOpen) return null;
 
-  const validateEmail = (val: string) => {
-    if (!val.trim()) return 'Email is required.';
-    if (!/^[^\s@]+@colt\.net$/i.test(val.trim())) return 'Only @colt.net email addresses are allowed.';
-    return '';
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const emailErr = validateEmail(email);
-    if (emailErr) {
-      setFieldErrors({ email: emailErr });
-      return;
-    }
-    setFieldErrors({});
-    await login(email, businessUnit, organization);
+    await login(businessUnit, organization);
   };
 
   const handleBackdrop = () => {
@@ -70,10 +53,8 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, blocking = fal
   return (
     <div className="modal-backdrop" onClick={handleBackdrop} role="dialog" aria-modal="true" aria-label="Login">
       <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
-        {/* Glow accent */}
         <div className="modal-glow" />
 
-        {/* Header */}
         <div className="modal-header">
           <div className="modal-logo-row">
             <div className="modal-logo-mark">
@@ -95,33 +76,18 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, blocking = fal
 
         <div className="modal-body">
           <h2 className="modal-title">Sign in to continue</h2>
-          <p className="modal-subtitle">Use your Colt credentials to access the AI Translation Service.</p>
+          <p className="modal-subtitle">Your identity is verified via Entra SSO. Provide cost attribution details below.</p>
+
+          {iapEmail && (
+            <div className="login-field">
+              <label className="login-label">Signed in as</label>
+              <div className="login-input" style={{ opacity: 0.85, cursor: 'default' }} aria-readonly="true">
+                {iapEmail}
+              </div>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="login-form" noValidate>
-            {/* Email */}
-            <div className="login-field">
-              <label className="login-label" htmlFor="auth-email">
-                Colt Email <span className="required">*</span>
-              </label>
-              <input
-                ref={emailRef}
-                id="auth-email"
-                type="email"
-                className={`login-input ${fieldErrors.email ? 'input-error' : ''}`}
-                value={email}
-                onChange={(e) => {
-                  setEmail(e.target.value);
-                  if (fieldErrors.email) setFieldErrors({});
-                }}
-                placeholder="you@colt.net"
-                autoComplete="email"
-              />
-              {fieldErrors.email && (
-                <span className="field-error-msg">{fieldErrors.email}</span>
-              )}
-            </div>
-
-            {/* Business Unit */}
             <div className="login-field">
               <label className="login-label" htmlFor="auth-bu">
                 Business Unit <span className="required">*</span>
@@ -136,7 +102,6 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, blocking = fal
               />
             </div>
 
-            {/* Organization */}
             <div className="login-field">
               <label className="login-label" htmlFor="auth-org">
                 Organization <span className="required">*</span>
@@ -151,7 +116,6 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, blocking = fal
               />
             </div>
 
-            {/* API / server error */}
             {error && (
               <div className="login-error-banner" role="alert">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -164,7 +128,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, blocking = fal
             <button
               type="submit"
               className="login-btn"
-              disabled={isLoading}
+              disabled={isLoading || !iapEmail}
               id="auth-submit-btn"
             >
               {isLoading ? (
@@ -179,7 +143,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, blocking = fal
                     <polyline points="10 17 15 12 10 7" />
                     <line x1="15" y1="12" x2="3" y2="12" />
                   </svg>
-                  Sign In
+                  Continue
                 </>
               )}
             </button>
@@ -187,7 +151,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, blocking = fal
         </div>
 
         <div className="modal-footer">
-          <span>Only <strong>@colt.net</strong> email addresses are permitted.</span>
+          <span>Identity verified via <strong>Entra ID</strong> and GCP IAP.</span>
         </div>
       </div>
     </div>

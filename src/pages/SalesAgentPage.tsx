@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { 
   Search, 
@@ -25,6 +25,7 @@ import {
   saveSalesSession,
   loadSalesSession,
   clearSalesSession,
+  loadSalesAttributionPrefs,
   type SalesAuthUser,
 } from '../api/salesAgentApi';
 import {
@@ -40,36 +41,25 @@ type Status = 'IDLE' | 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
 
 // ── Validation ─────────────────────────────────────────────────────────────
 
-function isColtEmail(email: string): boolean {
-  return /^[^\s@]+@colt\.net$/i.test(email.trim());
-}
-
 // ══════════════════════════════════════════════════════════════════════════════
 // Auth Gate Component
 // ══════════════════════════════════════════════════════════════════════════════
 
 interface AuthGateProps {
+  verifiedEmail: string | null;
   onAuthenticated: (token: string, user: SalesAuthUser) => void;
 }
 
-const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
-  const [email,        setEmail]        = useState('');
-  const [businessUnit, setBusinessUnit] = useState('');
-  const [organization, setOrganization] = useState('');
+const AuthGate: React.FC<AuthGateProps> = ({ verifiedEmail, onAuthenticated }) => {
+  const prefs = loadSalesAttributionPrefs();
+  const [businessUnit, setBusinessUnit] = useState(prefs.business_unit);
+  const [organization, setOrganization] = useState(prefs.organization);
   const [isLoading,    setIsLoading]    = useState(false);
   const [error,        setError]        = useState<string | null>(null);
   const [fieldErrors,  setFieldErrors]  = useState<Record<string, string>>({});
 
-  const emailRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    emailRef.current?.focus();
-  }, []);
-
   const validate = (): boolean => {
     const errs: Record<string, string> = {};
-    if (!email.trim())       errs.email        = 'Email is required.';
-    else if (!isColtEmail(email)) errs.email   = 'Only @colt.net email addresses are allowed.';
     if (!businessUnit.trim()) errs.businessUnit = 'Business Unit is required.';
     if (!organization.trim()) errs.organization = 'Organization is required.';
     setFieldErrors(errs);
@@ -83,9 +73,9 @@ const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
     setIsLoading(true);
 
     try {
-      const data = await salesAuthenticate(email.trim(), businessUnit.trim(), organization.trim());
+      const data = await salesAuthenticate(businessUnit.trim(), organization.trim());
       const user: SalesAuthUser = {
-        email:         email.trim(),
+        email:         data.email,
         business_unit: businessUnit.trim(),
         organization:  organization.trim(),
       };
@@ -124,27 +114,18 @@ const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
 
         <div className="modal-body">
           <h2 className="modal-title">Sign in to continue</h2>
-          <p className="modal-subtitle">Use your Colt credentials to access the Sales Research Agent.</p>
+          <p className="modal-subtitle">Your identity is verified via Entra SSO. Provide cost attribution details below.</p>
+
+          {verifiedEmail && (
+            <div className="login-field">
+              <label className="login-label">Signed in as</label>
+              <div className="login-input" style={{ opacity: 0.85, cursor: 'default' }} aria-readonly="true">
+                {verifiedEmail}
+              </div>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="login-form" noValidate>
-            {/* Email */}
-            <div className="login-field">
-              <label className="login-label" htmlFor="sales-email">
-                Colt Email <span className="required">*</span>
-              </label>
-              <input
-                ref={emailRef}
-                id="sales-email"
-                type="email"
-                className={`login-input${fieldErrors.email ? ' input-error' : ''}`}
-                value={email}
-                onChange={(e) => { setEmail(e.target.value); clearField('email'); }}
-                placeholder="you@colt.net"
-                autoComplete="email"
-              />
-              {fieldErrors.email && <span className="field-error-msg">{fieldErrors.email}</span>}
-            </div>
-
             {/* Business Unit */}
             <div className="login-field">
               <label className="login-label" htmlFor="sales-bu">
@@ -191,7 +172,7 @@ const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
               type="submit"
               id="sales-auth-submit-btn"
               className="login-btn"
-              disabled={isLoading}
+              disabled={isLoading || !verifiedEmail}
             >
               {isLoading ? (
                 <><span className="spinner" /> Signing in…</>
@@ -210,7 +191,7 @@ const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
         </div>
 
         <div className="modal-footer">
-          <span>Only <strong>@colt.net</strong> email addresses are permitted.</span>
+          <span>Identity verified via <strong>Entra ID</strong> and GCP IAP.</span>
         </div>
       </div>
     </div>
@@ -221,7 +202,7 @@ const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
 // Main Sales Agent Page
 // ══════════════════════════════════════════════════════════════════════════════
 
-const SalesAgentPage: React.FC = () => {
+const SalesAgentPage: React.FC<{ verifiedEmail?: string | null }> = ({ verifiedEmail = null }) => {
   // ── Auth state ─────────────────────────────────────────────────────────────
   const [salesToken, setSalesToken] = useState<string | null>(null);
   const [salesUser,  setSalesUser]  = useState<SalesAuthUser | null>(null);
@@ -354,7 +335,7 @@ const SalesAgentPage: React.FC = () => {
 
   // ── Auth gate ──────────────────────────────────────────────────────────────
   if (!salesToken) {
-    return <AuthGate onAuthenticated={handleAuthenticated} />;
+    return <AuthGate verifiedEmail={verifiedEmail} onAuthenticated={handleAuthenticated} />;
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────

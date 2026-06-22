@@ -17,6 +17,7 @@ export interface SalesAuthUser {
 export interface SalesTokenResponse {
   access_token: string;
   token_type: string;
+  email: string;
 }
 
 export interface InitiateResearchResponse {
@@ -43,6 +44,20 @@ export interface ResearchResultResponse {
 const SALES_TOKEN_KEY = 'sales_auth_token';
 const SALES_USER_KEY = 'sales_auth_user';
 const SALES_EXPIRY_KEY = 'sales_auth_expiry';
+const SALES_BU_PREF_KEY = 'sales_auth_bu';
+const SALES_ORG_PREF_KEY = 'sales_auth_org';
+
+export function loadSalesAttributionPrefs(): { business_unit: string; organization: string } {
+  return {
+    business_unit: localStorage.getItem(SALES_BU_PREF_KEY) ?? '',
+    organization: localStorage.getItem(SALES_ORG_PREF_KEY) ?? '',
+  };
+}
+
+function saveSalesAttributionPrefs(business_unit: string, organization: string) {
+  localStorage.setItem(SALES_BU_PREF_KEY, business_unit);
+  localStorage.setItem(SALES_ORG_PREF_KEY, organization);
+}
 
 export function saveSalesSession(
   token: string,
@@ -55,6 +70,7 @@ export function saveSalesSession(
   persistSalesGoogleIdToken(googleIdToken);
   sessionStorage.setItem(SALES_USER_KEY, JSON.stringify(user));
   sessionStorage.setItem(SALES_EXPIRY_KEY, String(expiry));
+  saveSalesAttributionPrefs(user.business_unit, user.organization);
 }
 
 export function loadSalesSession(): { token: string; googleIdToken: string; user: SalesAuthUser } | null {
@@ -137,9 +153,15 @@ async function parseSalesApiError(response: Response, fallback: string): Promise
 
 // ── API ────────────────────────────────────────────────────────────────────
 
+/** GET /api/sales/v1/auth/whoami — IAP entitlement probe */
+export async function fetchSalesWhoami(): Promise<{ email: string } | null> {
+  const res = await fetch(`${SALES_API_BASE}/auth/whoami`, { credentials: 'include' });
+  if (!res.ok) return null;
+  return res.json();
+}
+
 /** POST /api/sales/v1/auth/token */
 export async function salesAuthenticate(
-  email: string,
   business_unit: string,
   organization: string,
 ): Promise<SalesTokenResponse & { googleIdToken: string }> {
@@ -153,7 +175,7 @@ export async function salesAuthenticate(
       accept: 'application/json',
       Authorization: `Bearer ${googleIdToken}`,
     },
-    body: JSON.stringify({ email, business_unit, organization }),
+    body: JSON.stringify({ business_unit, organization }),
   });
 
   if (!res.ok) {

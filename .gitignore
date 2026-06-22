@@ -14,9 +14,10 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# Environment files
+# Environment files (keep .env.example committed)
 .env
 .env.*
+!.env.example
 
 # System files
 .DS_Store
@@ -31,6 +32,9 @@ Thumbs.db
 
 # Certificates and local server config
 certs/
+
+# Generated at build time from nginx/default.conf.template
+nginx/default.conf
 
 # Temporary files
 *.tmp

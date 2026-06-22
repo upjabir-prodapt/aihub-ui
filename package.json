@@ -6,6 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:sandbox": "tsc -b && vite build --mode sandbox",
+    "build:dev": "tsc -b && vite build --mode development",
+    "build:prod": "tsc -b && vite build --mode production",
+    "generate:nginx": "node scripts/generate-nginx-config.mjs",
     "lint": "eslint .",
     "preview": "vite preview"
   },

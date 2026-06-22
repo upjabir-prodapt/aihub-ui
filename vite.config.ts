@@ -2,12 +2,8 @@ import fs from 'node:fs'
 import type { ClientRequest, IncomingMessage } from 'node:http'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
-
-/** Must match src/api/translationConfig.ts and salesConfig.ts */
-const TRANSLATION_API_ORIGIN = 'https://translation.aicoesandox-int.colt.net'
-const SALES_API_ORIGIN = 'https://salesagent.aicoesandox-int.colt.net'
 
 /** Minimal type for Vite's http-proxy instance (no @types/http-proxy required). */
 type DevProxyServer = {
@@ -17,61 +13,90 @@ type DevProxyServer = {
   ): void
 }
 
-function proxyAuthHeaders(proxy: DevProxyServer, host: string) {
+function proxyAuthHeaders(proxy: DevProxyServer, host: string, isDev: boolean) {
   proxy.on('proxyReq', (proxyReq, req) => {
     const auth = req.headers.authorization
     if (typeof auth === 'string') {
       proxyReq.setHeader('X-Serverless-Authorization', auth)
     }
+    const iapJwt = req.headers['x-goog-iap-jwt-assertion']
+    if (typeof iapJwt === 'string') {
+      proxyReq.setHeader('X-Goog-IAP-JWT-Assertion', iapJwt)
+    }
+    const iapEmail = req.headers['x-goog-authenticated-user-email']
+    if (typeof iapEmail === 'string') {
+      proxyReq.setHeader('X-Goog-Authenticated-User-Email', iapEmail)
+    }
+    if (isDev && typeof iapJwt !== 'string') {
+      proxyReq.setHeader('X-Dev-IAP-User-Email', 'dev@colt.net')
+    }
     proxyReq.setHeader('Host', host)
   })
 }
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const COLT_INTERNAL_CA = path.resolve(__dirname, 'certs/colt-internal-ca.pem')
-const tlsCa = fs.existsSync(COLT_INTERNAL_CA)
-  ? fs.readFileSync(COLT_INTERNAL_CA, 'utf8')
-  : undefined
+function hostFromOrigin(origin: string): string {
+  return new URL(origin).host
+}
 
-const translationProxyTls = tlsCa
-  ? { secure: true as const, ca: tlsCa }
-  : { secure: false as const }
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // https://vite.dev/config/
-export default defineConfig({
-  plugins: [react()],
-  server: {
-    proxy: {
-      // GCE VM / Cloud Run: service account identity token (audience = .run.app URL)
-      '/api/metadata/id-token': {
-        target: 'http://169.254.169.254',
-        changeOrigin: false,
-        secure: false,
-        rewrite: (path) => {
-          const query = path.includes('?') ? path.slice(path.indexOf('?')) : ''
-          return `/computeMetadata/v1/instance/service-accounts/default/identity${query}`
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, __dirname, '')
+  const translationApiOrigin = env.VITE_TRANSLATION_API_ORIGIN
+  const salesApiOrigin = env.VITE_SALES_API_ORIGIN
+  const tlsCaFile = env.VITE_TLS_CA_FILE || 'certs/colt-internal-ca.pem'
+  const coltInternalCa = path.resolve(__dirname, tlsCaFile)
+  const tlsCa = fs.existsSync(coltInternalCa)
+    ? fs.readFileSync(coltInternalCa, 'utf8')
+    : undefined
+
+  const translationProxyTls = tlsCa
+    ? { secure: true as const, ca: tlsCa }
+    : { secure: false as const }
+
+  if (!translationApiOrigin || !salesApiOrigin) {
+    throw new Error(
+      'Missing VITE_TRANSLATION_API_ORIGIN or VITE_SALES_API_ORIGIN. ' +
+        'Copy .env.example to .env.development or set env vars before build.',
+    )
+  }
+
+  return {
+    plugins: [react()],
+    server: {
+      proxy: {
+        // GCE VM / Cloud Run: service account identity token (audience = .run.app URL)
+        '/api/metadata/id-token': {
+          target: 'http://169.254.169.254',
+          changeOrigin: false,
+          secure: false,
+          rewrite: (path) => {
+            const query = path.includes('?') ? path.slice(path.indexOf('?')) : ''
+            return `/computeMetadata/v1/instance/service-accounts/default/identity${query}`
+          },
+          headers: {
+            'Metadata-Flavor': 'Google',
+          },
         },
-        headers: {
-          'Metadata-Flavor': 'Google',
+        '/api/v1': {
+          target: translationApiOrigin,
+          changeOrigin: true,
+          ...translationProxyTls,
+          configure: (proxy: DevProxyServer) => {
+            proxyAuthHeaders(proxy, hostFromOrigin(translationApiOrigin), mode === 'development')
+          },
         },
-      },
-      '/api/v1': {
-        target: TRANSLATION_API_ORIGIN,
-        changeOrigin: true,
-        ...translationProxyTls,
-        configure: (proxy: DevProxyServer) => {
-          proxyAuthHeaders(proxy, 'translation.aicoesandox-int.colt.net')
-        },
-      },
-      '/api/sales/v1': {
-        target: SALES_API_ORIGIN,
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/sales/, '/api'),
-        ...translationProxyTls,
-        configure: (proxy: DevProxyServer) => {
-          proxyAuthHeaders(proxy, 'salesagent.aicoesandox-int.colt.net')
+        '/api/sales/v1': {
+          target: salesApiOrigin,
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api\/sales/, '/api'),
+          ...translationProxyTls,
+          configure: (proxy: DevProxyServer) => {
+            proxyAuthHeaders(proxy, hostFromOrigin(salesApiOrigin), mode === 'development')
+          },
         },
       },
     },
-  },
+  }
 })

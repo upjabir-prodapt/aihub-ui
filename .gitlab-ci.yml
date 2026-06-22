@@ -1,0 +1,318 @@
+include:
+  - template: Security/SAST.gitlab-ci.yml
+  - template: Security/Secret-Detection.gitlab-ci.yml
+
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH == "sandbox"
+    - if: $CI_COMMIT_BRANCH == "dev"
+    - if: $CI_COMMIT_BRANCH == "prod"
+
+stages:
+  - lint
+  - build
+  - deploy
+  - promote
+
+variables:
+  IMAGE_TAG: "$CI_PIPELINE_IID"
+  # Group CI/CD variables: HTTP_PROXY, HTTPS_PROXY, GITLAB_PUSH_TOKEN
+  # WIF: WORKLOAD_IDENTITY_PROJECT_NUMBER, WORKLOAD_IDENTITY_POOL,
+  #      WORKLOAD_IDENTITY_PROVIDER, SERVICE_ACCOUNT, GCP_PROJECT_ID
+  # Per-environment: GCP_REGION, ARTIFACT_REPO, IMAGE_NAME, CLOUD_RUN_SERVICE,
+  #                  CLOUD_RUN_NETWORK, CLOUD_RUN_SUBNET, CLOUD_RUN_SA
+  # Vite build-time (per env): VITE_TRANSLATION_API_ORIGIN, VITE_SALES_API_ORIGIN,
+  #   VITE_TRANSLATION_CLOUD_RUN_URL, VITE_SALES_CLOUD_RUN_URL, VITE_CONTRACTS_API_BASE,
+  #   VITE_GCP_PROJECT_ID, VITE_GCP_PROJECT_NUMBER, VITE_GCP_REGION, VITE_TLS_CA_FILE
+  # See GITLAB_CI_VARIABLES.md
+  GCLOUD_USER_INSTALL_DIR: "${CI_PROJECT_DIR}/.tools/google-cloud-sdk"
+  GCLOUD_ARCHIVE_URL: "https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz"
+  CLOUDSDK_CONFIG: "${CI_PROJECT_DIR}/.cache/gcloud-config"
+  CLOUDSDK_CORE_DISABLE_PROMPTS: "1"
+  DOCKER_CONFIG: "${CI_PROJECT_DIR}/.cache/docker"
+  CI_WORK_TMP: "${CI_PROJECT_DIR}/.ci-work"
+  NPM_CONFIG_CACHE: "${CI_PROJECT_DIR}/.cache/npm"
+
+".shell_runner":
+  tags:
+    - Shell1
+
+".proxy":
+  before_script:
+    - |
+      export http_proxy="$HTTP_PROXY"
+      export https_proxy="${HTTPS_PROXY:-$HTTP_PROXY}"
+      export HTTP_PROXY="$HTTP_PROXY"
+      export HTTPS_PROXY="${HTTPS_PROXY:-$HTTP_PROXY}"
+      echo "Proxy configured (HTTP_PROXY=$HTTP_PROXY)"
+
+".ensure_gcloud":
+  before_script:
+    - !reference [".proxy", before_script]
+    - |
+      set -e
+      export CLOUDSDK_CONFIG="${CLOUDSDK_CONFIG:-${CI_PROJECT_DIR}/.cache/gcloud-config}"
+      export CLOUDSDK_CORE_DISABLE_PROMPTS="${CLOUDSDK_CORE_DISABLE_PROMPTS:-1}"
+      export TMPDIR="${CI_WORK_TMP:-${CI_PROJECT_DIR}/.ci-work}"
+      mkdir -p "$CLOUDSDK_CONFIG" "$TMPDIR"
+
+      if ! command -v gcloud >/dev/null 2>&1; then
+        for candidate in /usr/bin/gcloud /usr/local/bin/gcloud /opt/google-cloud-sdk/bin/gcloud; do
+          if [ -x "$candidate" ]; then
+            export PATH="$(dirname "$candidate"):$PATH"
+            break
+          fi
+        done
+      fi
+
+      if ! command -v gcloud >/dev/null 2>&1; then
+        if [ -x "${GCLOUD_USER_INSTALL_DIR}/bin/gcloud" ]; then
+          export PATH="${GCLOUD_USER_INSTALL_DIR}/bin:$PATH"
+        else
+          echo "Installing gcloud to ${GCLOUD_USER_INSTALL_DIR}..."
+          tmp="$(mktemp -d)"
+          curl -fsSL "$GCLOUD_ARCHIVE_URL" -o "${tmp}/google-cloud-cli.tar.gz"
+          tar -xzf "${tmp}/google-cloud-cli.tar.gz" -C "$tmp"
+          mkdir -p "$(dirname "$GCLOUD_USER_INSTALL_DIR")"
+          mv "${tmp}/google-cloud-sdk" "$GCLOUD_USER_INSTALL_DIR"
+          rm -rf "$tmp"
+          export PATH="${GCLOUD_USER_INSTALL_DIR}/bin:$PATH"
+        fi
+      fi
+
+      gcloud --version
+      echo "OK - gcloud ready"
+
+".gcp_wif":
+  extends: ".ensure_gcloud"
+  environment:
+    name: "$CI_COMMIT_BRANCH"
+  id_tokens:
+    WORKLOAD_IDENTITY_TOKEN:
+      aud: https://iam.googleapis.com
+  before_script:
+    - !reference [".ensure_gcloud", before_script]
+    - echo "$WORKLOAD_IDENTITY_TOKEN" > workload_identity.jwt
+    - |
+      printf '%s\n' "{
+        \"type\": \"external_account\",
+        \"audience\": \"//iam.googleapis.com/projects/${WORKLOAD_IDENTITY_PROJECT_NUMBER}/locations/global/workloadIdentityPools/${WORKLOAD_IDENTITY_POOL}/providers/${WORKLOAD_IDENTITY_PROVIDER}\",
+        \"subject_token_type\": \"urn:ietf:params:oauth:token-type:jwt\",
+        \"token_url\": \"https://sts.googleapis.com/v1/token\",
+        \"credential_source\": { \"file\": \"workload_identity.jwt\" },
+        \"service_account_impersonation_url\": \"https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${SERVICE_ACCOUNT}:generateAccessToken\"
+      }" > credentials.json
+    - gcloud auth login --cred-file=credentials.json --quiet
+    - gcloud config set project "$GCP_PROJECT_ID"
+  after_script:
+    - rm -rf workload_identity.jwt credentials.json 2>/dev/null || true
+
+sast:
+  stage: lint
+".sast-analyzer":
+  tags:
+    - Sast
+    - secret-detection
+    - container
+    - codequality
+
+eslint:
+  stage: lint
+  extends:
+    - ".proxy"
+    - ".shell_runner"
+  cache:
+    key: npm-$CI_COMMIT_REF_SLUG
+    paths:
+      - node_modules/
+      - .cache/npm/
+  script:
+    - |
+      export NPM_CONFIG_CACHE="${NPM_CONFIG_CACHE:-${CI_PROJECT_DIR}/.cache/npm}"
+      mkdir -p "$NPM_CONFIG_CACHE"
+      npm ci
+      npm run lint
+  rules:
+    - if: $CI_COMMIT_BRANCH == "sandbox"
+    - if: $CI_COMMIT_BRANCH == "dev"
+    - if: $CI_COMMIT_BRANCH == "prod"
+
+env-scope-check:
+  extends:
+    - ".proxy"
+    - ".shell_runner"
+  stage: lint
+  environment:
+    name: "$CI_COMMIT_BRANCH"
+  when: manual
+  allow_failure: true
+  script:
+    - |
+      required_vars="WORKLOAD_IDENTITY_PROJECT_NUMBER WORKLOAD_IDENTITY_POOL WORKLOAD_IDENTITY_PROVIDER \
+        SERVICE_ACCOUNT GCP_PROJECT_ID GCP_REGION ARTIFACT_REPO IMAGE_NAME \
+        CLOUD_RUN_NETWORK CLOUD_RUN_SUBNET CLOUD_RUN_SA CLOUD_RUN_SERVICE \
+        VITE_TRANSLATION_API_ORIGIN VITE_SALES_API_ORIGIN \
+        VITE_TRANSLATION_CLOUD_RUN_URL VITE_SALES_CLOUD_RUN_URL \
+        VITE_CONTRACTS_API_BASE VITE_GCP_PROJECT_ID VITE_GCP_PROJECT_NUMBER VITE_GCP_REGION VITE_TLS_CA_FILE"
+      missing=0
+      for var in $required_vars; do
+        if [ -n "$(printenv "$var")" ]; then
+          echo "OK - $var is set"
+        else
+          echo "MISSING - $var is not set for environment ${CI_COMMIT_BRANCH}"
+          missing=1
+        fi
+      done
+      if [ "$missing" -eq 1 ]; then
+        exit 1
+      fi
+      echo "All required environment-scoped variables are available."
+  rules:
+    - if: $CI_COMMIT_BRANCH == "sandbox"
+    - if: $CI_COMMIT_BRANCH == "dev"
+    - if: $CI_COMMIT_BRANCH == "prod"
+
+build-and-push:
+  stage: build
+  extends:
+    - ".gcp_wif"
+    - ".shell_runner"
+  needs:
+    - job: eslint
+      artifacts: false
+  when: manual
+  script:
+    - |
+      export DOCKER_CONFIG="${DOCKER_CONFIG:-${CI_PROJECT_DIR}/.cache/docker}"
+      mkdir -p "$DOCKER_CONFIG"
+
+      case "$CI_COMMIT_BRANCH" in
+        sandbox) BUILD_MODE="sandbox" ;;
+        dev)     BUILD_MODE="development" ;;
+        prod)    BUILD_MODE="production" ;;
+        *)       echo "Unsupported branch: $CI_COMMIT_BRANCH"; exit 1 ;;
+      esac
+
+      IMAGE_URI="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REPO}/${IMAGE_NAME}:${IMAGE_TAG}"
+      gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin \
+        "https://${GCP_REGION}-docker.pkg.dev"
+
+      PROXY_ARGS=""
+      if [ -n "${HTTP_PROXY:-}" ]; then
+        PROXY_ARGS="--build-arg HTTP_PROXY=${HTTP_PROXY} --build-arg HTTPS_PROXY=${HTTPS_PROXY:-$HTTP_PROXY}"
+        if [ -n "${NO_PROXY:-}" ]; then
+          PROXY_ARGS="${PROXY_ARGS} --build-arg NO_PROXY=${NO_PROXY}"
+        fi
+      fi
+
+      # shellcheck disable=SC2086
+      docker build $PROXY_ARGS \
+        --build-arg BUILD_MODE="${BUILD_MODE}" \
+        --build-arg VITE_TRANSLATION_API_ORIGIN="${VITE_TRANSLATION_API_ORIGIN}" \
+        --build-arg VITE_SALES_API_ORIGIN="${VITE_SALES_API_ORIGIN}" \
+        --build-arg VITE_TRANSLATION_CLOUD_RUN_URL="${VITE_TRANSLATION_CLOUD_RUN_URL}" \
+        --build-arg VITE_SALES_CLOUD_RUN_URL="${VITE_SALES_CLOUD_RUN_URL}" \
+        --build-arg VITE_CONTRACTS_API_BASE="${VITE_CONTRACTS_API_BASE}" \
+        --build-arg VITE_GCP_PROJECT_ID="${VITE_GCP_PROJECT_ID}" \
+        --build-arg VITE_GCP_PROJECT_NUMBER="${VITE_GCP_PROJECT_NUMBER}" \
+        --build-arg VITE_GCP_REGION="${VITE_GCP_REGION}" \
+        --build-arg VITE_TLS_CA_FILE="${VITE_TLS_CA_FILE:-certs/colt-internal-ca.pem}" \
+        -t "$IMAGE_URI" .
+
+      docker push "$IMAGE_URI"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "sandbox"
+    - if: $CI_COMMIT_BRANCH == "dev"
+    - if: $CI_COMMIT_BRANCH == "prod"
+
+deploy-cloud-run:
+  stage: deploy
+  extends:
+    - ".gcp_wif"
+    - ".shell_runner"
+  needs:
+    - build-and-push
+  environment:
+    name: "$CI_COMMIT_BRANCH"
+  when: manual
+  script:
+    - |
+      IMAGE_URI="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REPO}/${IMAGE_NAME}:${IMAGE_TAG}"
+      gcloud run deploy "$CLOUD_RUN_SERVICE" \
+        --quiet \
+        --update-labels="app=ai-hub-ui,env=${CI_COMMIT_BRANCH},managed-by=gitlab-ci,git-sha=${CI_COMMIT_SHORT_SHA},pipeline=${CI_PIPELINE_IID}" \
+        --image "$IMAGE_URI" \
+        --platform=managed \
+        --region="$GCP_REGION" \
+        --project="$GCP_PROJECT_ID" \
+        --network="$CLOUD_RUN_NETWORK" \
+        --subnet="$CLOUD_RUN_SUBNET" \
+        --service-account="$CLOUD_RUN_SA" \
+        --port=8080 \
+        --timeout=600 \
+        --memory=1Gi \
+        --cpu=1
+  rules:
+    - if: $CI_COMMIT_BRANCH == "sandbox"
+    - if: $CI_COMMIT_BRANCH == "dev"
+    - if: $CI_COMMIT_BRANCH == "prod"
+
+promote-sandbox-to-dev:
+  extends:
+    - ".proxy"
+    - ".shell_runner"
+  stage: promote
+  variables:
+    GIT_DEPTH: "0"
+  when: manual
+  script:
+    - |
+      : "${GITLAB_PUSH_TOKEN:?Set masked+protected variable GITLAB_PUSH_TOKEN (scope: write_repository)}"
+      git fetch origin sandbox dev
+      SANDBOX_SHA="$(git rev-parse origin/sandbox)"
+      DEV_SHA="$(git rev-parse origin/dev)"
+      PUSH_URL="https://oauth2:${GITLAB_PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
+      if [ "$DEV_SHA" = "$SANDBOX_SHA" ]; then
+        echo "dev already matches sandbox (${SANDBOX_SHA}); nothing to promote."
+        exit 0
+      fi
+      if git merge-base --is-ancestor "$DEV_SHA" "$SANDBOX_SHA" 2>/dev/null; then
+        git push "$PUSH_URL" "${SANDBOX_SHA}:refs/heads/dev"
+      elif ! git merge-base "$DEV_SHA" "$SANDBOX_SHA" >/dev/null 2>&1; then
+        git push --force "$PUSH_URL" "${SANDBOX_SHA}:refs/heads/dev"
+      else
+        echo "Cannot fast-forward dev from sandbox; resolve manually."
+        exit 1
+      fi
+  rules:
+    - if: $CI_COMMIT_BRANCH == "sandbox"
+
+promote-dev-to-prod:
+  extends:
+    - ".proxy"
+    - ".shell_runner"
+  stage: promote
+  variables:
+    GIT_DEPTH: "0"
+  when: manual
+  script:
+    - |
+      : "${GITLAB_PUSH_TOKEN:?Set masked+protected variable GITLAB_PUSH_TOKEN (scope: write_repository)}"
+      git fetch origin dev prod
+      DEV_SHA="$(git rev-parse origin/dev)"
+      PROD_SHA="$(git rev-parse origin/prod)"
+      PUSH_URL="https://oauth2:${GITLAB_PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
+      if [ "$PROD_SHA" = "$DEV_SHA" ]; then
+        echo "prod already matches dev (${DEV_SHA}); nothing to promote."
+        exit 0
+      fi
+      if git merge-base --is-ancestor "$PROD_SHA" "$DEV_SHA" 2>/dev/null; then
+        git push "$PUSH_URL" "${DEV_SHA}:refs/heads/prod"
+      elif ! git merge-base "$PROD_SHA" "$DEV_SHA" >/dev/null 2>&1; then
+        git push --force "$PUSH_URL" "${DEV_SHA}:refs/heads/prod"
+      else
+        echo "Cannot fast-forward prod from dev; resolve manually."
+        exit 1
+      fi
+  rules:
+    - if: $CI_COMMIT_BRANCH == "dev"

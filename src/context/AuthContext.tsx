@@ -22,18 +22,13 @@ interface AuthState {
   user: AuthUser | null;
   token: string | null;
   googleIdToken: string | null;
+  iapEmail: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
-  login: (email: string, business_unit: string, organization: string) => Promise<void>;
+  login: (business_unit: string, organization: string) => Promise<void>;
   logout: () => void;
   clearError: () => void;
-}
-
-// ── Validation ─────────────────────────────────────────────────────────────
-
-export function isColtEmail(email: string): boolean {
-  return /^[^\s@]+@colt\.net$/i.test(email.trim());
 }
 
 // ── Storage helpers ────────────────────────────────────────────────────────
@@ -42,6 +37,20 @@ const TOKEN_KEY = 'colt_auth_token';
 const GOOGLE_TOKEN_KEY = 'colt_google_id_token';
 const USER_KEY = 'colt_auth_user';
 const EXPIRY_KEY = 'colt_auth_expiry';
+const BU_PREF_KEY = 'colt_auth_bu';
+const ORG_PREF_KEY = 'colt_auth_org';
+
+export function loadAttributionPrefs(): { business_unit: string; organization: string } {
+  return {
+    business_unit: localStorage.getItem(BU_PREF_KEY) ?? 'SBU',
+    organization: localStorage.getItem(ORG_PREF_KEY) ?? 'Colt',
+  };
+}
+
+function saveAttributionPrefs(business_unit: string, organization: string) {
+  localStorage.setItem(BU_PREF_KEY, business_unit);
+  localStorage.setItem(ORG_PREF_KEY, organization);
+}
 
 function saveSession(token: string, googleIdToken: string, user: AuthUser, expiresIn: number) {
   const expiry = Date.now() + expiresIn * 1000;
@@ -49,6 +58,7 @@ function saveSession(token: string, googleIdToken: string, user: AuthUser, expir
   persistGoogleIdToken(googleIdToken);
   sessionStorage.setItem(USER_KEY, JSON.stringify(user));
   sessionStorage.setItem(EXPIRY_KEY, String(expiry));
+  saveAttributionPrefs(user.business_unit, user.organization);
 }
 
 function loadSession(): { token: string; googleIdToken: string; user: AuthUser } | null {
@@ -86,17 +96,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [googleIdToken, setGoogleIdToken] = useState<string | null>(null);
+  const [iapEmail, setIapEmail] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Restore session on mount
+  // Restore session and fetch verified IAP identity on mount
   useEffect(() => {
     const session = loadSession();
     if (session) {
       setToken(session.token);
       setGoogleIdToken(session.googleIdToken);
       setUser(session.user);
+      setIapEmail(session.user.email);
     }
+
+    fetch(`${API_BASE}/auth/whoami`, { credentials: 'include' })
+      .then(async (res) => {
+        if (!res.ok) return null;
+        return res.json() as Promise<{ email: string }>;
+      })
+      .then((data) => {
+        if (data?.email) setIapEmail(data.email);
+      })
+      .catch(() => {
+        // IAP identity unavailable (e.g. local dev without header)
+      });
   }, []);
 
   // Keep Cloud Run invoker token fresh while the user session is active
@@ -116,18 +140,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => window.clearInterval(intervalId);
   }, [token]);
 
-  const login = useCallback(async (email: string, business_unit: string, organization: string) => {
+  const login = useCallback(async (business_unit: string, organization: string) => {
     setError(null);
 
-    // Validate Colt email
-    if (!email.trim()) {
-      setError('Email is required.');
-      return;
-    }
-    if (!isColtEmail(email)) {
-      setError('Only Colt email addresses (@colt.net) are allowed.');
-      return;
-    }
     if (!business_unit.trim()) {
       setError('Business Unit is required.');
       return;
@@ -140,19 +155,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(true);
 
     try {
-      // Step 1: Cloud Run invoker token (UI service account via metadata proxy)
       const fetchedGoogleIdToken = await fetchGoogleIdToken();
       persistGoogleIdToken(fetchedGoogleIdToken);
 
-      // Step 2: Get YOUR JWT (/auth/token)
       const response = await fetch(`${API_BASE}/auth/token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'accept': 'application/json',
-          'Authorization': `Bearer ${fetchedGoogleIdToken}`
+          accept: 'application/json',
+          Authorization: `Bearer ${fetchedGoogleIdToken}`,
         },
-        body: JSON.stringify({ email: email.trim(), business_unit: business_unit.trim(), organization: organization.trim() }),
+        body: JSON.stringify({
+          business_unit: business_unit.trim(),
+          organization: organization.trim(),
+        }),
       });
 
       if (!response.ok) {
@@ -161,14 +177,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       const data = await response.json();
-      const authUser: AuthUser = { email: email.trim(), business_unit: business_unit.trim(), organization: organization.trim() };
+      const authUser: AuthUser = {
+        email: data.email,
+        business_unit: business_unit.trim(),
+        organization: organization.trim(),
+      };
 
       setToken(data.access_token);
       setGoogleIdToken(fetchedGoogleIdToken);
       setUser(authUser);
+      setIapEmail(data.email);
       saveSession(data.access_token, fetchedGoogleIdToken, authUser, data.expires_in ?? 3600);
-    } catch (err: any) {
-      setError(err.message || 'Login failed. Please try again.');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Login failed. Please try again.';
+      setError(message);
     } finally {
       setIsLoading(false);
     }
@@ -189,6 +211,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       user,
       token,
       googleIdToken,
+      iapEmail,
       isAuthenticated: !!token,
       isLoading,
       error,

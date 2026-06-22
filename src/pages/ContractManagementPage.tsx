@@ -19,9 +19,10 @@ import {
   User,
   Bot
 } from 'lucide-react';
+import { config } from '../config';
 import '../styles/contracts.css';
 
-const API_BASE = 'http://localhost:5010/api';
+const API_BASE = config.contracts.apiBase;
 
 type TabType = 'dashboard' | 'repository' | 'upload' | 'review' | 'assistant';
 

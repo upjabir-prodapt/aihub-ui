@@ -9,27 +9,31 @@ server {
     }
 
     location /api/v1/ {
-        proxy_pass https://translation.aicoesandox-int.colt.net/api/v1/;
+        proxy_pass ${VITE_TRANSLATION_API_ORIGIN}/api/v1/;
         proxy_ssl_server_name on;
         proxy_ssl_trusted_certificate /etc/nginx/certs/colt-internal-ca.pem;
         proxy_ssl_verify on;
-        proxy_set_header Host translation.aicoesandox-int.colt.net;
+        proxy_set_header Host ${TRANSLATION_API_HOST};
         proxy_pass_request_headers on;
         proxy_set_header Authorization $http_authorization;
         proxy_set_header x-app-auth $http_x_app_auth;
         proxy_set_header X-Serverless-Authorization $http_authorization;
+        proxy_set_header X-Goog-IAP-JWT-Assertion $http_x_goog_iap_jwt_assertion;
+        proxy_set_header X-Goog-Authenticated-User-Email $http_x_goog_authenticated_user_email;
     }
 
     location /api/sales/v1/ {
-        proxy_pass https://salesagent.aicoesandox-int.colt.net/api/v1/;
+        proxy_pass ${VITE_SALES_API_ORIGIN}/api/v1/;
         proxy_ssl_server_name on;
         proxy_ssl_trusted_certificate /etc/nginx/certs/colt-internal-ca.pem;
         proxy_ssl_verify on;
-        proxy_set_header Host salesagent.aicoesandox-int.colt.net;
+        proxy_set_header Host ${SALES_API_HOST};
         proxy_pass_request_headers on;
         proxy_set_header Authorization $http_authorization;
         proxy_set_header x-app-auth $http_x_app_auth;
         proxy_set_header X-Serverless-Authorization $http_authorization;
+        proxy_set_header X-Goog-IAP-JWT-Assertion $http_x_goog_iap_jwt_assertion;
+        proxy_set_header X-Goog-Authenticated-User-Email $http_x_goog_authenticated_user_email;
     }
 
     location / {

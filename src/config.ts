@@ -1,6 +1,7 @@
 /**
  * Centralized configuration loaded from environment variables.
- * Use .env.local for development, .env.production for builds.
+ * Local: .env.development (vite dev) or .env.local overrides.
+ * CI/Docker: .env.[mode] written from build args before `vite build --mode <mode>`.
  */
 
 function getEnvVar(key: string): string {
@@ -21,6 +22,9 @@ export const config = {
     apiOrigin: getEnvVar('VITE_SALES_API_ORIGIN'),
     apiBase: '/api/sales/v1',
     cloudRunUrl: getEnvVar('VITE_SALES_CLOUD_RUN_URL'),
+  },
+  contracts: {
+    apiBase: getEnvVar('VITE_CONTRACTS_API_BASE'),
   },
   gcp: {
     projectId: getEnvVar('VITE_GCP_PROJECT_ID'),
