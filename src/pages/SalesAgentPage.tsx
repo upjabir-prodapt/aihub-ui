@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { 
   Search, 
@@ -203,9 +203,9 @@ const AuthGate: React.FC<AuthGateProps> = ({ verifiedEmail, onAuthenticated }) =
 // ══════════════════════════════════════════════════════════════════════════════
 
 const SalesAgentPage: React.FC<{ verifiedEmail?: string | null }> = ({ verifiedEmail = null }) => {
-  // ── Auth state ─────────────────────────────────────────────────────────────
-  const [salesToken, setSalesToken] = useState<string | null>(null);
-  const [salesUser,  setSalesUser]  = useState<SalesAuthUser | null>(null);
+  const initialSalesSession = loadSalesSession();
+  const [salesToken, setSalesToken] = useState<string | null>(initialSalesSession?.token ?? null);
+  const [salesUser,  setSalesUser]  = useState<SalesAuthUser | null>(initialSalesSession?.user ?? null);
 
   // ── Research state ─────────────────────────────────────────────────────────
   const [company,    setCompany]    = useState('');
@@ -217,14 +217,29 @@ const SalesAgentPage: React.FC<{ verifiedEmail?: string | null }> = ({ verifiedE
   const [lastCheck,  setLastCheck]  = useState<Date | null>(null);
   const [downloading, setDownloading] = useState(false);
 
-  // ── Restore sales session on mount ─────────────────────────────────────────
-  useEffect(() => {
-    const session = loadSalesSession();
-    if (session) {
-      setSalesToken(session.token);
-      setSalesUser(session.user);
+  const fetchResult = useCallback(async () => {
+    if (!jobId || !salesToken) return;
+    try {
+      const res = await getResearchResult(jobId);
+      setReport(res.report_markdown ?? 'No report content available.');
+    } catch (err) {
+      console.error('Result fetch error:', err);
+      setError('Failed to fetch research results.');
     }
-  }, []);
+  }, [jobId, salesToken]);
+
+  const checkStatus = useCallback(async () => {
+    if (!jobId || !salesToken) return;
+    try {
+      const res = await getResearchStatus(jobId);
+      const newStatus = res.status as Status;
+      setStatus(newStatus);
+      setLastCheck(new Date());
+      if (newStatus === 'COMPLETED') void fetchResult();
+    } catch (err) {
+      console.error('Status check error:', err);
+    }
+  }, [jobId, salesToken, fetchResult]);
 
   // Keep Cloud Run invoker token fresh while sales session is active
   useEffect(() => {
@@ -242,15 +257,13 @@ const SalesAgentPage: React.FC<{ verifiedEmail?: string | null }> = ({ verifiedE
     return () => window.clearInterval(intervalId);
   }, [salesToken]);
 
-  // ── Polling ────────────────────────────────────────────────────────────────
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | undefined;
     if ((status === 'PENDING' || status === 'PROCESSING') && jobId && salesToken) {
       interval = setInterval(() => void checkStatus(), 5000);
     }
     return () => { if (interval) clearInterval(interval); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, jobId, salesToken]);
+  }, [status, jobId, salesToken, checkStatus]);
 
   // ── Handlers ───────────────────────────────────────────────────────────────
 
@@ -283,30 +296,6 @@ const SalesAgentPage: React.FC<{ verifiedEmail?: string | null }> = ({ verifiedE
       const msg = err instanceof Error ? err.message : 'Failed to start research.';
       setError(msg);
       setStatus('FAILED');
-    }
-  };
-
-  const checkStatus = async () => {
-    if (!jobId || !salesToken) return;
-    try {
-      const res = await getResearchStatus(jobId);
-      const newStatus = res.status as Status;
-      setStatus(newStatus);
-      setLastCheck(new Date());
-      if (newStatus === 'COMPLETED') void fetchResult();
-    } catch (err) {
-      console.error('Status check error:', err);
-    }
-  };
-
-  const fetchResult = async () => {
-    if (!jobId || !salesToken) return;
-    try {
-      const res = await getResearchResult(jobId);
-      setReport(res.report_markdown ?? 'No report content available.');
-    } catch (err) {
-      console.error('Result fetch error:', err);
-      setError('Failed to fetch research results.');
     }
   };
 

@@ -42,19 +42,22 @@ const RATING_CLASSES: Record<number, string> = {
 };
 
 const ReviewModal: React.FC<ReviewModalProps> = ({ isOpen, jobId, onClose, onSubmitted }) => {
+  if (!isOpen) return null;
+  return (
+    <ReviewModalPanel
+      key={jobId}
+      jobId={jobId}
+      onClose={onClose}
+      onSubmitted={onSubmitted}
+    />
+  );
+};
+
+const ReviewModalPanel: React.FC<Omit<ReviewModalProps, 'isOpen'>> = ({ jobId, onClose, onSubmitted }) => {
   const [rating, setRating] = useState(0);
   const [hovered, setHovered] = useState(0);
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (isOpen) {
-      setRating(0);
-      setHovered(0);
-      setComment('');
-      setSubmitting(false);
-    }
-  }, [isOpen, jobId]);
 
   const handleEscape = useCallback(
     (e: KeyboardEvent) => {
@@ -64,10 +67,9 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ isOpen, jobId, onClose, onSub
   );
 
   useEffect(() => {
-    if (!isOpen) return;
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
-  }, [isOpen, handleEscape]);
+  }, [handleEscape]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,8 +89,6 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ isOpen, jobId, onClose, onSub
       onSubmitted(false, msg);
     }
   };
-
-  if (!isOpen) return null;
 
   const displayRating = hovered || rating;
 

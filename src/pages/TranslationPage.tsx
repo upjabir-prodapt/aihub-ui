@@ -2,7 +2,7 @@ import React, { useState, useCallback, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { User, LogOut } from 'lucide-react';
 import { useTranslation } from '../hooks/useTranslation';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/useAuth';
 import ReviewModal from '../components/ReviewModal';
 import '../styles/translation.css';
 

@@ -1,5 +1,4 @@
 import React from 'react';
-import { useAuth } from '../context/AuthContext';
 
 const TAB_LABELS: Record<string, string> = {
   translation: 'Translation',
@@ -15,12 +14,6 @@ interface TopbarProps {
 }
 
 const Topbar: React.FC<TopbarProps> = ({ activeTab, theme, onToggleTheme }) => {
-  const { isAuthenticated, user, logout } = useAuth();
-
-  const initials = user?.email
-    ? user.email.split('@')[0].slice(0, 2).toUpperCase()
-    : '??';
-
   return (
     <header className="topbar">
       <div className="breadcrumb">

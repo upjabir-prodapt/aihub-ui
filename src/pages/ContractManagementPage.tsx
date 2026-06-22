@@ -9,9 +9,7 @@ import {
   FileSearch,
   TrendingUp,
   AlertTriangle,
-  CheckCircle2,
   Clock,
-  ArrowUpRight,
   Filter,
   Download,
   MoreVertical,
@@ -26,9 +24,14 @@ const API_BASE = config.contracts.apiBase;
 
 type TabType = 'dashboard' | 'repository' | 'upload' | 'review' | 'assistant';
 
+interface ContractDocument {
+  docx: string;
+  stored_at: string;
+}
+
 const ContractManagementPage: React.FC = () => {
   const [activeSubTab, setActiveSubTab] = useState<TabType>('dashboard');
-  const [docs, setDocs] = useState<any[]>([]);
+  const [docs, setDocs] = useState<ContractDocument[]>([]);
   const [selectedDocKey, setSelectedDocKey] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState([
     { role: 'bot', text: 'Hello! I am your Colt AI Assistant. You can ask me questions about your contracts, such as "What are the termination clauses in the MSA?" or "Summarize the obligations for Counterparty X".' }
@@ -36,17 +39,21 @@ const ContractManagementPage: React.FC = () => {
   const [inputText, setInputText] = useState('');
 
   useEffect(() => {
-    fetchDocs();
-  }, []);
+    let cancelled = false;
 
-  const fetchDocs = async () => {
-    try {
-      const res = await axios.get(`${API_BASE}/documents`);
-      setDocs(res.data);
-    } catch (err) {
-      console.error('Fetch docs error:', err);
-    }
-  };
+    (async () => {
+      try {
+        const res = await axios.get<ContractDocument[]>(`${API_BASE}/documents`);
+        if (!cancelled) setDocs(res.data);
+      } catch (err) {
+        console.error('Fetch docs error:', err);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const renderDashboard = () => (
     <div className="analytics-content">
