@@ -109,12 +109,24 @@ variables:
 
 sast:
   stage: lint
+
 ".sast-analyzer":
   tags:
     - Sast
     - secret-detection
     - container
     - codequality
+
+".secret-analyzer":
+  stage: lint
+  tags:
+    - Sast
+    - secret-detection
+    - container
+    - codequality
+
+secret_detection:
+  stage: lint
 
 eslint:
   stage: lint
@@ -203,6 +215,16 @@ build-and-push:
         if [ -n "${NO_PROXY:-}" ]; then
           PROXY_ARGS="${PROXY_ARGS} --build-arg NO_PROXY=${NO_PROXY}"
         fi
+      fi
+
+      TLS_CA_PATH="${VITE_TLS_CA_FILE:-certs/colt-internal-ca.pem}"
+      mkdir -p "$(dirname "$TLS_CA_PATH")"
+      if [ -n "${COLT_INTERNAL_CA_PEM:-}" ] && [ -f "$COLT_INTERNAL_CA_PEM" ]; then
+        cp "$COLT_INTERNAL_CA_PEM" "$TLS_CA_PATH"
+        echo "OK - Colt internal CA copied from COLT_INTERNAL_CA_PEM to ${TLS_CA_PATH}"
+      elif [ ! -f "$TLS_CA_PATH" ]; then
+        echo "ERROR - Missing ${TLS_CA_PATH}. Set GitLab File variable COLT_INTERNAL_CA_PEM or commit the cert for local builds."
+        exit 1
       fi
 
       # shellcheck disable=SC2086
