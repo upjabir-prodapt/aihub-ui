@@ -9,6 +9,7 @@ workflow:
     - if: $CI_COMMIT_BRANCH == "prod"
 
 stages:
+  - sync
   - lint
   - build
   - deploy
@@ -16,7 +17,7 @@ stages:
 
 variables:
   IMAGE_TAG: "$CI_PIPELINE_IID"
-  # Group CI/CD variables: HTTP_PROXY, HTTPS_PROXY, GITLAB_PUSH_TOKEN
+  # Group CI/CD variables: HTTP_PROXY, HTTPS_PROXY, AZURE_PAT (Azure DevOps Code Read), GITLAB_PUSH_TOKEN
   # WIF: WORKLOAD_IDENTITY_PROJECT_NUMBER, WORKLOAD_IDENTITY_POOL,
   #      WORKLOAD_IDENTITY_PROVIDER, SERVICE_ACCOUNT, GCP_PROJECT_ID
   # Per-environment: GCP_REGION, ARTIFACT_REPO, IMAGE_NAME, CLOUD_RUN_SERVICE,
@@ -32,6 +33,7 @@ variables:
   DOCKER_CONFIG: "${CI_PROJECT_DIR}/.cache/docker"
   CI_WORK_TMP: "${CI_PROJECT_DIR}/.ci-work"
   NPM_CONFIG_CACHE: "${CI_PROJECT_DIR}/.cache/npm"
+  NODE_VERSION: "20"
 
 ".shell_runner":
   tags:
@@ -45,6 +47,38 @@ variables:
       export HTTP_PROXY="$HTTP_PROXY"
       export HTTPS_PROXY="${HTTPS_PROXY:-$HTTP_PROXY}"
       echo "Proxy configured (HTTP_PROXY=$HTTP_PROXY)"
+
+".ensure_node":
+  before_script:
+    - !reference [".proxy", before_script]
+    - |
+      set -e
+      NODE_VERSION="${NODE_VERSION:-20}"
+      # Shell runners often set npm prefix globally; nvm refuses to switch until it is cleared.
+      npm config delete prefix 2>/dev/null || true
+      unset NPM_CONFIG_PREFIX
+
+      export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+      for nvm_candidate in "$NVM_DIR/nvm.sh" /usr/local/nvm/nvm.sh /opt/nvm/nvm.sh; do
+        if [ -s "$nvm_candidate" ]; then
+          NVM_DIR="$(dirname "$nvm_candidate")"
+          break
+        fi
+      done
+
+      if [ -s "${NVM_DIR}/nvm.sh" ]; then
+        # shellcheck disable=SC1091
+        . "${NVM_DIR}/nvm.sh"
+        nvm install "$NODE_VERSION"
+        nvm use "$NODE_VERSION"
+      else
+        node_major="$(node -p 'parseInt(process.versions.node.split(".")[0], 10)' 2>/dev/null || echo 0)"
+        if [ "$node_major" -lt 20 ]; then
+          echo "ERROR - Node >=20 required (found $(node -v 2>/dev/null || echo none)). Install nvm on the shell runner."
+          exit 1
+        fi
+      fi
+      echo "OK - node $(node -v), npm $(npm -v)"
 
 ".ensure_gcloud":
   before_script:
@@ -107,6 +141,55 @@ variables:
   after_script:
     - rm -rf workload_identity.jwt credentials.json 2>/dev/null || true
 
+# Pull Azure gitlab-sync-branch into GitLab sandbox (manual). The push triggers a new pipeline
+# that runs lint → build → deploy; use promote-* jobs for sandbox → dev → prod.
+sync-from-azure:
+  extends:
+    - ".proxy"
+    - ".shell_runner"
+  stage: sync
+  variables:
+    GIT_DEPTH: "0"
+  before_script:
+    - !reference [".proxy", before_script]
+  when: manual
+  script:
+    - |
+      : "${AZURE_PAT:?Set masked+protected variable AZURE_PAT (Azure DevOps Code Read)}"
+      : "${GITLAB_PUSH_TOKEN:?Set masked+protected variable GITLAB_PUSH_TOKEN (scope: write_repository)}"
+
+      AZURE_URL="https://ColtProgrammeOffice:${AZURE_PAT}@dev.azure.com/ColtProgrammeOffice/Google%20Vertex/_git/AI-Hub-UI"
+      PUSH_URL="https://oauth2:${GITLAB_PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
+
+      git remote add azure "$AZURE_URL" 2>/dev/null || git remote set-url azure "$AZURE_URL"
+      git fetch azure gitlab-sync-branch
+      git fetch origin sandbox
+
+      AZURE_SHA="$(git rev-parse azure/gitlab-sync-branch)"
+      SANDBOX_SHA="$(git rev-parse origin/sandbox 2>/dev/null || echo "")"
+
+      if [ -n "$SANDBOX_SHA" ] && [ "$SANDBOX_SHA" = "$AZURE_SHA" ]; then
+        echo "sandbox already matches Azure gitlab-sync-branch (${AZURE_SHA}); nothing to sync."
+        exit 0
+      fi
+
+      if [ -z "$SANDBOX_SHA" ]; then
+        echo "Bootstrapping sandbox from Azure gitlab-sync-branch (${AZURE_SHA})..."
+        git push "$PUSH_URL" "${AZURE_SHA}:refs/heads/sandbox"
+      elif git merge-base --is-ancestor "$SANDBOX_SHA" "$AZURE_SHA" 2>/dev/null; then
+        echo "Fast-forwarding sandbox to Azure gitlab-sync-branch (${AZURE_SHA})..."
+        git push "$PUSH_URL" "${AZURE_SHA}:refs/heads/sandbox"
+      elif ! git merge-base "$SANDBOX_SHA" "$AZURE_SHA" >/dev/null 2>&1; then
+        echo "Unrelated histories detected; bootstrapping sandbox from Azure gitlab-sync-branch (${AZURE_SHA})."
+        git push --force "$PUSH_URL" "${AZURE_SHA}:refs/heads/sandbox"
+      else
+        echo "Cannot fast-forward sandbox from Azure gitlab-sync-branch (sandbox has extra GitLab-only commits)."
+        echo "Resolve manually, then rerun sync."
+        exit 1
+      fi
+  rules:
+    - if: $CI_COMMIT_BRANCH == "sandbox"
+
 sast:
   stage: lint
 
@@ -131,7 +214,7 @@ secret_detection:
 eslint:
   stage: lint
   extends:
-    - ".proxy"
+    - ".ensure_node"
     - ".shell_runner"
   cache:
     key: npm-$CI_COMMIT_REF_SLUG
