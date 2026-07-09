@@ -79,9 +79,10 @@ export default defineConfig(({ mode }) => {
             'Metadata-Flavor': 'Google',
           },
         },
-        '/api/v1': {
+        '/api/translation/v1': {
           target: translationApiOrigin,
           changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api\/translation/, '/api'),
           ...translationProxyTls,
           configure: (proxy: DevProxyServer) => {
             proxyAuthHeaders(proxy, hostFromOrigin(translationApiOrigin), mode === 'development')

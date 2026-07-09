@@ -9,7 +9,9 @@ export interface TranslateRequest {
   priority?: string;         // "standard" | "high"
 }
 
-// POST /api/v1/translate → 200
+// Hub browser path: /api/translation/v1/* → Translation backend /api/v1/*
+//
+// POST /api/translation/v1/translate → 200
 export interface TranslateResponse {
   job_id: string;
   status: string;

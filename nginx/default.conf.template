@@ -8,7 +8,10 @@ server {
         proxy_set_header Metadata-Flavor Google;
     }
 
-    location /api/v1/ {
+    # NOTE: In production, /api/translation/* and /api/sales/* are routed at the AI Hub ILB
+    # (path rules → translation/sales IAP backends). Nginx only serves the SPA here.
+    # These proxy blocks are for local dev parity when not behind the hub ILB URL map.
+    location /api/translation/v1/ {
         proxy_pass ${VITE_TRANSLATION_API_ORIGIN}/api/v1/;
         proxy_ssl_server_name on;
         proxy_ssl_trusted_certificate /etc/nginx/certs/colt-internal-ca.pem;
