@@ -17,17 +17,12 @@ import {
   Hash,
 } from 'lucide-react';
 import {
-  salesAuthenticate,
   initiateResearch,
   getResearchStatus,
   getResearchResult,
   downloadResearchFile,
-  saveSalesSession,
-  loadSalesSession,
-  clearSalesSession,
-  loadSalesAttributionPrefs,
-  type SalesAuthUser,
 } from '../api/salesAgentApi';
+import { useAuth } from '../context/useAuth';
 import {
   forceRefreshSalesGoogleIdToken,
   SALES_GOOGLE_TOKEN_REFRESH_INTERVAL_MS,
@@ -42,170 +37,15 @@ type Status = 'IDLE' | 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
 // ── Validation ─────────────────────────────────────────────────────────────
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Auth Gate Component
-// ══════════════════════════════════════════════════════════════════════════════
-
-interface AuthGateProps {
-  verifiedEmail: string | null;
-  onAuthenticated: (token: string, user: SalesAuthUser) => void;
-}
-
-const AuthGate: React.FC<AuthGateProps> = ({ verifiedEmail, onAuthenticated }) => {
-  const prefs = loadSalesAttributionPrefs();
-  const [businessUnit, setBusinessUnit] = useState(prefs.business_unit);
-  const [organization, setOrganization] = useState(prefs.organization);
-  const [isLoading,    setIsLoading]    = useState(false);
-  const [error,        setError]        = useState<string | null>(null);
-  const [fieldErrors,  setFieldErrors]  = useState<Record<string, string>>({});
-
-  const validate = (): boolean => {
-    const errs: Record<string, string> = {};
-    if (!businessUnit.trim()) errs.businessUnit = 'Business Unit is required.';
-    if (!organization.trim()) errs.organization = 'Organization is required.';
-    setFieldErrors(errs);
-    return Object.keys(errs).length === 0;
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validate()) return;
-    setError(null);
-    setIsLoading(true);
-
-    try {
-      const data = await salesAuthenticate(businessUnit.trim(), organization.trim());
-      const user: SalesAuthUser = {
-        email:         data.email,
-        business_unit: businessUnit.trim(),
-        organization:  organization.trim(),
-      };
-      saveSalesSession(data.access_token, data.googleIdToken, user);
-      onAuthenticated(data.access_token, user);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Authentication failed. Please try again.';
-      setError(msg);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const clearField = (field: string) => {
-    if (fieldErrors[field]) setFieldErrors(prev => { const n = { ...prev }; delete n[field]; return n; });
-  };
-
-  return (
-    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Sales Agent Login">
-      <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
-        {/* Glow accent */}
-        <div className="modal-glow" />
-
-        {/* Header */}
-        <div className="modal-header">
-          <div className="modal-logo-row">
-            <div className="modal-logo-mark">
-              <div className="logo-chevron" />
-            </div>
-            <div>
-              <div className="modal-logo-company">Colt</div>
-              <div className="modal-logo-product">AI Hub</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="modal-body">
-          <h2 className="modal-title">Sign in to continue</h2>
-          <p className="modal-subtitle">Your identity is verified via Entra SSO. Provide cost attribution details below.</p>
-
-          {verifiedEmail && (
-            <div className="login-field">
-              <label className="login-label">Signed in as</label>
-              <div className="login-input" style={{ opacity: 0.85, cursor: 'default' }} aria-readonly="true">
-                {verifiedEmail}
-              </div>
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="login-form" noValidate>
-            {/* Business Unit */}
-            <div className="login-field">
-              <label className="login-label" htmlFor="sales-bu">
-                Business Unit <span className="required">*</span>
-              </label>
-              <input
-                id="sales-bu"
-                type="text"
-                className={`login-input${fieldErrors.businessUnit ? ' input-error' : ''}`}
-                value={businessUnit}
-                onChange={(e) => { setBusinessUnit(e.target.value); clearField('businessUnit'); }}
-                placeholder="e.g. Marketing"
-              />
-              {fieldErrors.businessUnit && <span className="field-error-msg">{fieldErrors.businessUnit}</span>}
-            </div>
-
-            {/* Organization */}
-            <div className="login-field">
-              <label className="login-label" htmlFor="sales-org">
-                Organization <span className="required">*</span>
-              </label>
-              <input
-                id="sales-org"
-                type="text"
-                className={`login-input${fieldErrors.organization ? ' input-error' : ''}`}
-                value={organization}
-                onChange={(e) => { setOrganization(e.target.value); clearField('organization'); }}
-                placeholder="e.g. Acme Global"
-              />
-              {fieldErrors.organization && <span className="field-error-msg">{fieldErrors.organization}</span>}
-            </div>
-
-            {/* Server error */}
-            {error && (
-              <div className="login-error-banner" role="alert">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
-                </svg>
-                {error}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              id="sales-auth-submit-btn"
-              className="login-btn"
-              disabled={isLoading || !verifiedEmail}
-            >
-              {isLoading ? (
-                <><span className="spinner" /> Signing in…</>
-              ) : (
-                <>
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
-                    <polyline points="10 17 15 12 10 7" />
-                    <line x1="15" y1="12" x2="3" y2="12" />
-                  </svg>
-                  Sign In with Colt
-                </>
-              )}
-            </button>
-          </form>
-        </div>
-
-        <div className="modal-footer">
-          <span>Identity verified via <strong>Entra ID</strong> and GCP IAP.</span>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// ══════════════════════════════════════════════════════════════════════════════
 // Main Sales Agent Page
 // ══════════════════════════════════════════════════════════════════════════════
 
-const SalesAgentPage: React.FC<{ verifiedEmail?: string | null }> = ({ verifiedEmail = null }) => {
-  const initialSalesSession = loadSalesSession();
-  const [salesToken, setSalesToken] = useState<string | null>(initialSalesSession?.token ?? null);
-  const [salesUser,  setSalesUser]  = useState<SalesAuthUser | null>(initialSalesSession?.user ?? null);
+interface SalesAgentPageProps {
+  onRequestLogin?: () => void;
+}
+
+const SalesAgentPage: React.FC<SalesAgentPageProps> = ({ onRequestLogin }) => {
+  const { isSalesAuthenticated, salesUser, logoutSales, iapEmail } = useAuth();
 
   // ── Research state ─────────────────────────────────────────────────────────
   const [company,    setCompany]    = useState('');
@@ -218,7 +58,7 @@ const SalesAgentPage: React.FC<{ verifiedEmail?: string | null }> = ({ verifiedE
   const [downloading, setDownloading] = useState(false);
 
   const fetchResult = useCallback(async () => {
-    if (!jobId || !salesToken) return;
+    if (!jobId || !isSalesAuthenticated) return;
     try {
       const res = await getResearchResult(jobId);
       setReport(res.report_markdown ?? 'No report content available.');
@@ -226,10 +66,10 @@ const SalesAgentPage: React.FC<{ verifiedEmail?: string | null }> = ({ verifiedE
       console.error('Result fetch error:', err);
       setError('Failed to fetch research results.');
     }
-  }, [jobId, salesToken]);
+  }, [jobId, isSalesAuthenticated]);
 
   const checkStatus = useCallback(async () => {
-    if (!jobId || !salesToken) return;
+    if (!jobId || !isSalesAuthenticated) return;
     try {
       const res = await getResearchStatus(jobId);
       const newStatus = res.status as Status;
@@ -239,11 +79,11 @@ const SalesAgentPage: React.FC<{ verifiedEmail?: string | null }> = ({ verifiedE
     } catch (err) {
       console.error('Status check error:', err);
     }
-  }, [jobId, salesToken, fetchResult]);
+  }, [jobId, isSalesAuthenticated, fetchResult]);
 
   // Keep Cloud Run invoker token fresh while sales session is active
   useEffect(() => {
-    if (!salesToken) return;
+    if (!isSalesAuthenticated) return;
 
     const refresh = async () => {
       try {
@@ -255,33 +95,34 @@ const SalesAgentPage: React.FC<{ verifiedEmail?: string | null }> = ({ verifiedE
 
     const intervalId = window.setInterval(refresh, SALES_GOOGLE_TOKEN_REFRESH_INTERVAL_MS);
     return () => window.clearInterval(intervalId);
-  }, [salesToken]);
+  }, [isSalesAuthenticated]);
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | undefined;
-    if ((status === 'PENDING' || status === 'PROCESSING') && jobId && salesToken) {
+    if ((status === 'PENDING' || status === 'PROCESSING') && jobId && isSalesAuthenticated) {
       interval = setInterval(() => void checkStatus(), 5000);
     }
     return () => { if (interval) clearInterval(interval); };
-  }, [status, jobId, salesToken, checkStatus]);
+  }, [status, jobId, isSalesAuthenticated, checkStatus]);
 
-  // ── Handlers ───────────────────────────────────────────────────────────────
-
-  const handleAuthenticated = (token: string, user: SalesAuthUser) => {
-    setSalesToken(token);
-    setSalesUser(user);
+  const resetResearch = () => {
+    setCompany('');
+    setAccountId('');
+    setJobId(null);
+    setStatus('IDLE');
+    setReport(null);
+    setError(null);
+    setLastCheck(null);
   };
 
   const handleLogout = () => {
-    clearSalesSession();
-    setSalesToken(null);
-    setSalesUser(null);
+    logoutSales();
     resetResearch();
   };
 
   const startResearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!company.trim() || !accountId.trim() || !salesToken) return;
+    if (!company.trim() || !accountId.trim() || !isSalesAuthenticated) return;
 
     setStatus('PENDING');
     setError(null);
@@ -300,7 +141,7 @@ const SalesAgentPage: React.FC<{ verifiedEmail?: string | null }> = ({ verifiedE
   };
 
   const handleDownload = async () => {
-    if (!jobId || !salesToken) return;
+    if (!jobId || !isSalesAuthenticated) return;
     setDownloading(true);
     try {
       await downloadResearchFile(jobId);
@@ -312,19 +153,29 @@ const SalesAgentPage: React.FC<{ verifiedEmail?: string | null }> = ({ verifiedE
     }
   };
 
-  const resetResearch = () => {
-    setCompany('');
-    setAccountId('');
-    setJobId(null);
-    setStatus('IDLE');
-    setReport(null);
-    setError(null);
-    setLastCheck(null);
-  };
-
-  // ── Auth gate ──────────────────────────────────────────────────────────────
-  if (!salesToken) {
-    return <AuthGate verifiedEmail={verifiedEmail} onAuthenticated={handleAuthenticated} />;
+  if (!isSalesAuthenticated) {
+    return (
+      <div className="page-content">
+        <div className="auth-gate">
+          <div className="auth-gate-icon">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+              <polyline points="10 17 15 12 10 7" />
+              <line x1="15" y1="12" x2="3" y2="12" />
+            </svg>
+          </div>
+          <h2 className="auth-gate-title">Sign in to continue</h2>
+          <p className="auth-gate-sub">
+            {iapEmail
+              ? `Signed in as ${iapEmail}. Provide cost attribution to use Sales Agent.`
+              : 'Provide cost attribution to use Sales Agent.'}
+          </p>
+          <button type="button" className="auth-gate-btn" onClick={onRequestLogin} id="sales-hub-login-btn">
+            Continue
+          </button>
+        </div>
+      </div>
+    );
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────

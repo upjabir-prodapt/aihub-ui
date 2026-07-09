@@ -1,29 +1,59 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/useAuth';
 import { loadAttributionPrefs } from '../context/authStorage';
+import { loadSalesAttributionPrefs } from '../api/salesAgentApi';
+import { isHubLoginComplete } from '../api/hubAuth';
+import type { ServiceEntitlements } from './Sidebar';
 
 interface LoginModalProps {
   isOpen: boolean;
+  entitlements: ServiceEntitlements;
+  entitlementsLoaded: boolean;
+  verifiedEmail: string | null;
   onClose?: () => void;
   /** If true the modal is blocking — clicking backdrop doesn't close it */
   blocking?: boolean;
 }
 
-const LoginModalPanel: React.FC<LoginModalProps> = ({ onClose, blocking = false }) => {
-  const { login, isLoading, error, clearError, isAuthenticated, iapEmail } = useAuth();
-  const prefs = loadAttributionPrefs();
-  const [businessUnit, setBusinessUnit] = useState(prefs.business_unit);
-  const [organization, setOrganization] = useState(prefs.organization);
+const LoginModalPanel: React.FC<LoginModalProps> = ({
+  onClose,
+  blocking = false,
+  entitlements,
+  entitlementsLoaded,
+  verifiedEmail,
+}) => {
+  const {
+    login,
+    isLoading,
+    error,
+    clearError,
+    isAuthenticated,
+    isSalesAuthenticated,
+    iapEmail,
+  } = useAuth();
+  const translationPrefs = loadAttributionPrefs();
+  const salesPrefs = loadSalesAttributionPrefs();
+  const [businessUnit, setBusinessUnit] = useState(
+    translationPrefs.business_unit || salesPrefs.business_unit || 'SBU',
+  );
+  const [organization, setOrganization] = useState(
+    translationPrefs.organization || salesPrefs.organization || 'Colt',
+  );
+
+  const displayEmail = verifiedEmail ?? iapEmail;
+  const loginComplete = entitlementsLoaded
+    && isHubLoginComplete(entitlements, isAuthenticated, isSalesAuthenticated);
+  const canSubmit = entitlementsLoaded && (entitlements.translation || entitlements.sales);
 
   useEffect(() => {
     clearError();
   }, [clearError]);
 
   useEffect(() => {
-    if (isAuthenticated && onClose) {
+    if (loginComplete && onClose) {
       onClose();
     }
-  }, [isAuthenticated, onClose]);
+  }, [loginComplete, onClose]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -35,12 +65,17 @@ const LoginModalPanel: React.FC<LoginModalProps> = ({ onClose, blocking = false 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await login(businessUnit, organization);
+    await login(businessUnit, organization, entitlements);
   };
 
   const handleBackdrop = () => {
     if (!blocking && onClose) onClose();
   };
+
+  const serviceHint = [
+    entitlements.translation ? 'Translation' : null,
+    entitlements.sales ? 'Sales Agent' : null,
+  ].filter(Boolean).join(' and ');
 
   return (
     <div className="modal-backdrop" onClick={handleBackdrop} role="dialog" aria-modal="true" aria-label="Login">
@@ -68,13 +103,16 @@ const LoginModalPanel: React.FC<LoginModalProps> = ({ onClose, blocking = false 
 
         <div className="modal-body">
           <h2 className="modal-title">Sign in to continue</h2>
-          <p className="modal-subtitle">Your identity is verified via Entra SSO. Provide cost attribution details below.</p>
+          <p className="modal-subtitle">
+            Your identity is verified via Entra SSO. Provide cost attribution details below.
+            {canSubmit && serviceHint ? ` Signing in to ${serviceHint}.` : ''}
+          </p>
 
-          {iapEmail && (
+          {displayEmail && (
             <div className="login-field">
               <label className="login-label">Signed in as</label>
               <div className="login-input" style={{ opacity: 0.85, cursor: 'default' }} aria-readonly="true">
-                {iapEmail}
+                {displayEmail}
               </div>
             </div>
           )}
@@ -120,7 +158,7 @@ const LoginModalPanel: React.FC<LoginModalProps> = ({ onClose, blocking = false 
             <button
               type="submit"
               className="login-btn"
-              disabled={isLoading || !iapEmail}
+              disabled={isLoading || !displayEmail || !canSubmit}
               id="auth-submit-btn"
             >
               {isLoading ? (
