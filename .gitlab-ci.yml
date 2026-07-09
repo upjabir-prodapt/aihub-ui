@@ -116,6 +116,8 @@ variables:
       fi
 
       gcloud --version
+      # deploy-cloud-run uses gcloud beta (direct VPC network/subnet attachment)
+      gcloud components install beta --quiet
       echo "OK - gcloud ready"
 
 ".gcp_wif":
@@ -346,8 +348,11 @@ deploy-cloud-run:
   when: manual
   script:
     - |
+      : "${CLOUD_RUN_NETWORK:?Set CLOUD_RUN_NETWORK for environment ${CI_COMMIT_BRANCH}}"
+      : "${CLOUD_RUN_SUBNET:?Set CLOUD_RUN_SUBNET for environment ${CI_COMMIT_BRANCH}}"
+
       IMAGE_URI="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REPO}/${IMAGE_NAME}:${IMAGE_TAG}"
-      gcloud run deploy "$CLOUD_RUN_SERVICE" \
+      gcloud beta run deploy "$CLOUD_RUN_SERVICE" \
         --quiet \
         --update-labels="app=ai-hub-ui,env=${CI_COMMIT_BRANCH},managed-by=gitlab-ci,git-sha=${CI_COMMIT_SHORT_SHA},pipeline=${CI_PIPELINE_IID}" \
         --image "$IMAGE_URI" \
@@ -357,6 +362,8 @@ deploy-cloud-run:
         --network="$CLOUD_RUN_NETWORK" \
         --subnet="$CLOUD_RUN_SUBNET" \
         --service-account="$CLOUD_RUN_SA" \
+        --min-instances=1 \
+        --no-cpu-throttling \
         --port=8080 \
         --timeout=600 \
         --memory=1Gi \

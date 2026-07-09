@@ -7,7 +7,7 @@
  */
 import { config } from '../config';
 
-/** Upstream host for nginx (prod) and Vite proxy (dev). Browser always uses `/api/v1`. */
+/** Upstream host for nginx (prod) and Vite proxy (dev). Browser always uses `/api/translation/v1`. */
 export const TRANSLATION_API_ORIGIN = config.translation.apiOrigin;
 
 /** Colt internal CA bundle (issuing + root) for nginx / Vite / curl. */

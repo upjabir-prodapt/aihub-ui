@@ -15,7 +15,7 @@ function getEnvVar(key: string): string {
 export const config = {
   translation: {
     apiOrigin: getEnvVar('VITE_TRANSLATION_API_ORIGIN'),
-    apiBase: `${getEnvVar('VITE_TRANSLATION_API_ORIGIN')}/api/v1`,
+    apiBase: '/api/translation/v1',
     cloudRunUrl: getEnvVar('VITE_TRANSLATION_CLOUD_RUN_URL'),
   },
   sales: {

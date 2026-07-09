@@ -4,6 +4,7 @@ import { useAuth } from './context/useAuth';
 import Sidebar, { type ServiceEntitlements } from './components/Sidebar';
 import Topbar from './components/Topbar';
 import LoginModal from './components/LoginModal';
+import { TRANSLATION_API_BASE } from './api/translationConfig';
 import TranslationPage from './pages/TranslationPage';
 import SalesAgentPage from './pages/SalesAgentPage';
 import './styles/layout.css';
@@ -48,7 +49,7 @@ function AppShell() {
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/v1/auth/whoami', { credentials: 'include' }).then(async (res) => ({
+      fetch(`${TRANSLATION_API_BASE}/auth/whoami`, { credentials: 'include' }).then(async (res) => ({
         ok: res.ok,
         data: res.ok ? await res.json() as { email: string } : null,
       })),

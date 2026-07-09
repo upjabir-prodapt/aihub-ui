@@ -10,12 +10,13 @@ import {
   loadSession,
   saveSession,
 } from './authStorage';
+import { TRANSLATION_API_BASE } from '../api/translationConfig';
 import { AuthContext } from './authContext';
 
 export type { AuthUser, AuthState } from './authTypes';
 
-/** Same-origin; UI nginx / Vite proxy to Translation. */
-const API_BASE = '/api/v1';
+/** Same-origin; hub ILB / Vite proxy rewrites to Translation `/api/v1`. */
+const API_BASE = TRANSLATION_API_BASE;
 
 /** Background refresh interval for Cloud Run invoker token while logged in. */
 const GOOGLE_TOKEN_REFRESH_INTERVAL_MS = 45 * 60 * 1000;

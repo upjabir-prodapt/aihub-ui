@@ -9,10 +9,10 @@ import {
   ensureFreshGoogleIdToken,
   forceRefreshGoogleIdToken,
 } from './cloudRunAuth';
-import { TRANSLATION_API_ORIGIN } from './translationConfig';
+import { TRANSLATION_API_BASE, TRANSLATION_API_ORIGIN } from './translationConfig';
 
-/** Same-origin `/api/v1` — Vite (dev) or UI nginx (prod) proxies to Translation DNS. */
-const API_BASE = '/api/v1';
+/** Same-origin `/api/translation/v1` — Vite (dev) or hub ILB (prod) → Translation `/api/v1`. */
+const API_BASE = TRANSLATION_API_BASE;
 
 export { TRANSLATION_API_ORIGIN };
 
