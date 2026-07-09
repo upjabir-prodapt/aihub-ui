@@ -1,4 +1,6 @@
 import type { AuthUser } from './authStorage';
+import type { SalesAuthUser } from '../api/salesAgentApi';
+import type { ServiceEntitlements } from '../components/Sidebar';
 
 export type { AuthUser };
 
@@ -7,10 +9,13 @@ export interface AuthState {
   token: string | null;
   googleIdToken: string | null;
   iapEmail: string | null;
+  salesUser: SalesAuthUser | null;
   isAuthenticated: boolean;
+  isSalesAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
-  login: (business_unit: string, organization: string) => Promise<void>;
+  login: (business_unit: string, organization: string, entitlements: ServiceEntitlements) => Promise<void>;
   logout: () => void;
+  logoutSales: () => void;
   clearError: () => void;
 }
