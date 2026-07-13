@@ -4,6 +4,7 @@ import { User, LogOut } from 'lucide-react';
 import { useTranslation } from '../hooks/useTranslation';
 import { useAuth } from '../context/useAuth';
 import ReviewModal from '../components/ReviewModal';
+import type { JobStatusResponse, TranslationResult } from '../types/translation';
 import '../styles/translation.css';
 
 // ─── Constants ────────────────────────────────────────────
@@ -26,6 +27,33 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+// Human-readable duration from a number of seconds.
+function formatDuration(seconds: number): string {
+  if (seconds < 60) return `${seconds.toFixed(1)}s`;
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.round(seconds % 60);
+  return `${mins}m ${secs}s`;
+}
+
+// Translation often leaves labels.processing_time_seconds null, so always derive
+// elapsed time from submitted_at → completed_at.
+function getElapsedTime(job: JobStatusResponse): string {
+  if (job.submitted_at && job.completed_at) {
+    const diffMs =
+      new Date(job.completed_at).getTime() - new Date(job.submitted_at).getTime();
+    if (diffMs > 0) return formatDuration(diffMs / 1000);
+  }
+  return 'N/A';
+}
+
+// The model that produced the translation, e.g. "gemini-2.5-flash (v1.2)".
+function formatModel(meta: TranslationResult['metadata']): string {
+  const name = meta?.model_used?.trim();
+  if (!name) return 'Unknown';
+  const version = meta?.model_version?.trim();
+  return version ? `${name} (${version})` : name;
+}
+
 
 // ─── Sub-components ───────────────────────────────────────
 
@@ -39,12 +67,8 @@ const SkeletonLoader: React.FC = () => (
 );
 
 // ─── Main Component ───────────────────────────────────────
-interface TranslationPageProps {
-  onRequestLogin?: () => void;
-}
-
-const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => {
-  const { isAuthenticated, user, logout } = useAuth();
+const TranslationPage: React.FC = () => {
+  const { user, logout } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   
   // New fields from screenshot
@@ -89,11 +113,6 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => 
 
   // ── Translate ──
   const handleTranslate = async () => {
-    // Gate behind authentication
-    if (!isAuthenticated) {
-      onRequestLogin?.();
-      return;
-    }
     // Basic validation
     if (!file) return;
 
@@ -183,32 +202,6 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => 
   const isLoading = status === 'submitting' || status === 'polling';
 
   // ─── Render ────────────────────────────────────────────
-
-  // If not authenticated show a prompt overlay instead of the full page
-  if (!isAuthenticated) {
-    return (
-      <div className="page-content">
-        <div className="auth-gate">
-          <div className="auth-gate-icon">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-            </svg>
-          </div>
-          <h2 className="auth-gate-title">Authentication Required</h2>
-          <p className="auth-gate-sub">Sign in with your Colt credentials to access the AI Translation Service.</p>
-          <button className="auth-gate-btn" onClick={onRequestLogin} id="auth-gate-signin-btn">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
-              <polyline points="10 17 15 12 10 7"/>
-              <line x1="15" y1="12" x2="3" y2="12"/>
-            </svg>
-            Sign In with Colt
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="page-content">
@@ -485,22 +478,28 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onRequestLogin }) => 
                   {jobData.result.translated_document?.content || 'Document translated successfully. Use the download button to retrieve it.'}
                 </p>
               </div>
-              {jobData.result.labels && (
-                <div className="result-details">
-                  <div className="detail-item">
-                    <span className="detail-label">Cost:</span>
-                    <span className="detail-value">${jobData.result.labels.cost_usd.toFixed(4)}</span>
-                  </div>
-                  <div className="detail-item">
-                    <span className="detail-label">Tokens:</span>
-                    <span className="detail-value">{jobData.result.labels.token_count}</span>
-                  </div>
-                  <div className="detail-item">
-                    <span className="detail-label">Time:</span>
-                    <span className="detail-value">{jobData.result.labels.processing_time_seconds}s</span>
-                  </div>
+              <div className="result-details">
+                {jobData.result.labels && (
+                  <>
+                    <div className="detail-item">
+                      <span className="detail-label">Cost:</span>
+                      <span className="detail-value">${jobData.result.labels.cost_usd.toFixed(4)}</span>
+                    </div>
+                    <div className="detail-item">
+                      <span className="detail-label">Tokens:</span>
+                      <span className="detail-value">{jobData.result.labels.token_count}</span>
+                    </div>
+                  </>
+                )}
+                <div className="detail-item">
+                  <span className="detail-label">Time:</span>
+                  <span className="detail-value">{getElapsedTime(jobData)}</span>
                 </div>
-              )}
+                <div className="detail-item">
+                  <span className="detail-label">Model:</span>
+                  <span className="detail-value">{formatModel(jobData.result.metadata)}</span>
+                </div>
+              </div>
             </div>
           )}
 

@@ -30,12 +30,25 @@ function AccessDenied({ serviceName }: { serviceName: string }) {
   );
 }
 
+/** Shown under the hub login middleware while attribution tokens are pending. */
+function AwaitingHubLogin() {
+  return (
+    <div className="page-content" aria-busy="true">
+      <div className="auth-gate">
+        <h2 className="auth-gate-title">Sign in required</h2>
+        <p className="auth-gate-sub">
+          Provide cost attribution once to unlock your entitled services.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // ── Inner shell (has access to AuthContext) ──────────────────────────────
 
 function AppShell() {
   const [activeTab, setActiveTab] = useState('translation');
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
-  const [loginOpen, setLoginOpen] = useState(false);
   const [entitlements, setEntitlements] = useState<ServiceEntitlements>({
     translation: false,
     sales: false,
@@ -76,17 +89,18 @@ function AppShell() {
 
   const toggleTheme = () => setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
 
-  const openLogin = () => setLoginOpen(true);
-  const closeLogin = () => setLoginOpen(false);
-
   const handleTabChange = (tab: string) => {
     if (tab === 'translation' && entitlementsLoaded && !entitlements.translation) return;
     if (tab === 'sales' && entitlementsLoaded && !entitlements.sales) return;
     setActiveTab(tab);
   };
 
+  const hasAnyEntitlement = entitlements.translation || entitlements.sales;
   const loginComplete = entitlementsLoaded
     && isHubLoginComplete(entitlements, isAuthenticated, isSalesAuthenticated);
+
+  // Hub middleware: one blocking BU/Org Continue for all entitled services.
+  const hubLoginRequired = entitlementsLoaded && hasAnyEntitlement && !loginComplete;
 
   return (
     <div className="app-layout">
@@ -104,26 +118,29 @@ function AppShell() {
         <div style={{ display: activeTab === 'translation' ? 'contents' : 'none' }}>
           {entitlementsLoaded && !entitlements.translation ? (
             <AccessDenied serviceName="Translation" />
+          ) : hubLoginRequired || !isAuthenticated ? (
+            <AwaitingHubLogin />
           ) : (
-            <TranslationPage onRequestLogin={openLogin} />
+            <TranslationPage />
           )}
         </div>
         <div style={{ display: activeTab === 'sales' ? 'contents' : 'none' }}>
           {entitlementsLoaded && !entitlements.sales ? (
             <AccessDenied serviceName="Sales Agent" />
+          ) : hubLoginRequired || !isSalesAuthenticated ? (
+            <AwaitingHubLogin />
           ) : (
-            <SalesAgentPage onRequestLogin={openLogin} />
+            <SalesAgentPage />
           )}
         </div>
       </div>
 
       <LoginModal
-        isOpen={loginOpen}
+        isOpen={hubLoginRequired}
         entitlements={entitlements}
         entitlementsLoaded={entitlementsLoaded}
         verifiedEmail={hubVerifiedEmail}
-        onClose={loginComplete ? closeLogin : undefined}
-        blocking={loginOpen && !loginComplete}
+        blocking
       />
     </div>
   );
