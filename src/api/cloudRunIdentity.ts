@@ -18,12 +18,12 @@ export function createCloudRunIdentity(config: CloudRunIdentityConfig) {
   const { audience, googleTokenKey, fetchedAtKey, serviceName } = config;
 
   function getStoredGoogleIdToken(): string | null {
-    return sessionStorage.getItem(googleTokenKey);
+    return localStorage.getItem(googleTokenKey);
   }
 
   function persistGoogleIdToken(token: string): void {
-    sessionStorage.setItem(googleTokenKey, token);
-    sessionStorage.setItem(fetchedAtKey, String(Date.now()));
+    localStorage.setItem(googleTokenKey, token);
+    localStorage.setItem(fetchedAtKey, String(Date.now()));
   }
 
   async function fetchGoogleIdToken(): Promise<string> {
@@ -54,7 +54,7 @@ export function createCloudRunIdentity(config: CloudRunIdentityConfig) {
   }
 
   function isGoogleTokenStale(): boolean {
-    const fetchedAtRaw = sessionStorage.getItem(fetchedAtKey);
+    const fetchedAtRaw = localStorage.getItem(fetchedAtKey);
     if (!fetchedAtRaw) return true;
     const age = Date.now() - parseInt(fetchedAtRaw, 10);
     return Number.isNaN(age) || age >= GOOGLE_TOKEN_MAX_AGE_MS;
