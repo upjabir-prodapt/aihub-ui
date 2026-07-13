@@ -17,7 +17,7 @@ import {
   loadSalesSession,
   type SalesAuthUser,
 } from '../api/salesAgentApi';
-import { AuthContext } from './authContext';
+import { AuthContext } from './authContextValue';
 
 export type { AuthUser, AuthState } from './authTypes';
 export type { ServiceEntitlements } from '../components/Sidebar';

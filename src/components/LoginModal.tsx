@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/useAuth';
 import { loadAttributionPrefs } from '../context/authStorage';
 import { loadSalesAttributionPrefs } from '../api/salesAgentApi';
-import { isHubLoginComplete } from '../api/hubAuth';
 import type { ServiceEntitlements } from './Sidebar';
 
 interface LoginModalProps {
@@ -27,8 +26,6 @@ const LoginModalPanel: React.FC<LoginModalProps> = ({
     isLoading,
     error,
     clearError,
-    isAuthenticated,
-    isSalesAuthenticated,
     iapEmail,
   } = useAuth();
   const translationPrefs = loadAttributionPrefs();
@@ -41,19 +38,11 @@ const LoginModalPanel: React.FC<LoginModalProps> = ({
   );
 
   const displayEmail = verifiedEmail ?? iapEmail;
-  const loginComplete = entitlementsLoaded
-    && isHubLoginComplete(entitlements, isAuthenticated, isSalesAuthenticated);
   const canSubmit = entitlementsLoaded && (entitlements.translation || entitlements.sales);
 
   useEffect(() => {
     clearError();
   }, [clearError]);
-
-  useEffect(() => {
-    if (loginComplete && onClose) {
-      onClose();
-    }
-  }, [loginComplete, onClose]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {

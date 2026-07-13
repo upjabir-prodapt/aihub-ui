@@ -28,14 +28,28 @@ export interface InitiateResearchResponse {
 
 export interface ResearchStatusResponse {
   job_id: string;
-  status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+  status: 'PENDING' | 'QUEUED' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
   [key: string]: unknown;
+}
+
+/** Cost & model metadata for a completed research run (backend `model_card`). */
+export interface ResearchModelCard {
+  model_version?: string | null;
+  tokens_used?: number | null;
+  latency_seconds?: number | null;
+  cost_usd?: number | null;
 }
 
 export interface ResearchResultResponse {
   job_id: string;
+  /** Backend uses `request_id`; kept alongside job_id for compatibility. */
+  request_id?: string;
   status: string;
+  /** Canonical field returned by the backend (FastAPI `ResearchResultResponse`). */
+  report_content?: string;
+  /** Legacy alias — no longer emitted by the backend; kept for compatibility. */
   report_markdown?: string;
+  model_card?: ResearchModelCard | null;
   [key: string]: unknown;
 }
 
