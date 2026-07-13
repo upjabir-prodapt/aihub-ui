@@ -80,18 +80,18 @@ export function saveSalesSession(
   expiresInSeconds = 1800,
 ) {
   const expiry = Date.now() + expiresInSeconds * 1000;
-  sessionStorage.setItem(SALES_TOKEN_KEY, token);
+  localStorage.setItem(SALES_TOKEN_KEY, token);
   persistSalesGoogleIdToken(googleIdToken);
-  sessionStorage.setItem(SALES_USER_KEY, JSON.stringify(user));
-  sessionStorage.setItem(SALES_EXPIRY_KEY, String(expiry));
+  localStorage.setItem(SALES_USER_KEY, JSON.stringify(user));
+  localStorage.setItem(SALES_EXPIRY_KEY, String(expiry));
   saveSalesAttributionPrefs(user.business_unit, user.organization);
 }
 
 export function loadSalesSession(): { token: string; googleIdToken: string; user: SalesAuthUser } | null {
-  const token = sessionStorage.getItem(SALES_TOKEN_KEY);
-  const googleIdToken = sessionStorage.getItem('sales_google_id_token') ?? '';
-  const userRaw = sessionStorage.getItem(SALES_USER_KEY);
-  const expiryRaw = sessionStorage.getItem(SALES_EXPIRY_KEY);
+  const token = localStorage.getItem(SALES_TOKEN_KEY);
+  const googleIdToken = localStorage.getItem('sales_google_id_token') ?? '';
+  const userRaw = localStorage.getItem(SALES_USER_KEY);
+  const expiryRaw = localStorage.getItem(SALES_EXPIRY_KEY);
 
   if (!token || !userRaw || !expiryRaw) return null;
   if (Date.now() > parseInt(expiryRaw, 10)) {
@@ -108,15 +108,15 @@ export function loadSalesSession(): { token: string; googleIdToken: string; user
 }
 
 export function clearSalesSession() {
-  sessionStorage.removeItem(SALES_TOKEN_KEY);
-  sessionStorage.removeItem('sales_google_id_token');
-  sessionStorage.removeItem('sales_google_id_token_fetched_at');
-  sessionStorage.removeItem(SALES_USER_KEY);
-  sessionStorage.removeItem(SALES_EXPIRY_KEY);
+  localStorage.removeItem(SALES_TOKEN_KEY);
+  localStorage.removeItem('sales_google_id_token');
+  localStorage.removeItem('sales_google_id_token_fetched_at');
+  localStorage.removeItem(SALES_USER_KEY);
+  localStorage.removeItem(SALES_EXPIRY_KEY);
 }
 
 function getStoredSalesToken(): string | null {
-  return sessionStorage.getItem(SALES_TOKEN_KEY);
+  return localStorage.getItem(SALES_TOKEN_KEY);
 }
 
 /**

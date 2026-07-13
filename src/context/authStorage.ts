@@ -25,18 +25,18 @@ function saveAttributionPrefs(business_unit: string, organization: string) {
 
 export function saveSession(token: string, googleIdToken: string, user: AuthUser, expiresIn: number) {
   const expiry = Date.now() + expiresIn * 1000;
-  sessionStorage.setItem(TOKEN_KEY, token);
-  sessionStorage.setItem(GOOGLE_TOKEN_KEY, googleIdToken);
-  sessionStorage.setItem(USER_KEY, JSON.stringify(user));
-  sessionStorage.setItem(EXPIRY_KEY, String(expiry));
+  localStorage.setItem(TOKEN_KEY, token);
+  localStorage.setItem(GOOGLE_TOKEN_KEY, googleIdToken);
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
+  localStorage.setItem(EXPIRY_KEY, String(expiry));
   saveAttributionPrefs(user.business_unit, user.organization);
 }
 
 export function loadSession(): { token: string; googleIdToken: string; user: AuthUser } | null {
-  const token = sessionStorage.getItem(TOKEN_KEY);
-  const googleIdToken = sessionStorage.getItem(GOOGLE_TOKEN_KEY);
-  const userRaw = sessionStorage.getItem(USER_KEY);
-  const expiryRaw = sessionStorage.getItem(EXPIRY_KEY);
+  const token = localStorage.getItem(TOKEN_KEY);
+  const googleIdToken = localStorage.getItem(GOOGLE_TOKEN_KEY);
+  const userRaw = localStorage.getItem(USER_KEY);
+  const expiryRaw = localStorage.getItem(EXPIRY_KEY);
 
   if (!token || !googleIdToken || !userRaw || !expiryRaw) return null;
   if (Date.now() > parseInt(expiryRaw, 10)) {
@@ -53,8 +53,8 @@ export function loadSession(): { token: string; googleIdToken: string; user: Aut
 }
 
 export function clearSession() {
-  sessionStorage.removeItem(TOKEN_KEY);
-  sessionStorage.removeItem(GOOGLE_TOKEN_KEY);
-  sessionStorage.removeItem(USER_KEY);
-  sessionStorage.removeItem(EXPIRY_KEY);
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(GOOGLE_TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+  localStorage.removeItem(EXPIRY_KEY);
 }

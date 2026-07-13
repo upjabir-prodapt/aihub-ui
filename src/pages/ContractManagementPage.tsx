@@ -110,7 +110,14 @@ const ContractManagementPage: React.FC = () => {
       <div className="repo-controls">
         <div className="contract-search-wrapper" style={{ maxWidth: '400px' }}>
           <Search className="contract-search-icon" size={18} />
-          <input type="text" className="contract-search-input" placeholder="Search across repository..." />
+          <input
+            id="contract-repo-search"
+            name="contract_search"
+            type="search"
+            className="contract-search-input"
+            placeholder="Search across repository..."
+            aria-label="Search across repository"
+          />
         </div>
         <button className="output-action-btn">
           <Filter size={16} /> Filters

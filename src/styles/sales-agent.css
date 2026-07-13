@@ -561,11 +561,13 @@
   width: 100%;
   max-width: 1000px;
   margin: 0 auto;
+  flex: 1;
+  min-height: 0;
   border-radius: 20px;
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
   box-shadow: var(--shadow-lg);
-  overflow: hidden;                 /* clip toolbar corners */
+  overflow: hidden;                 /* clip toolbar corners; body scrolls inside */
   display: flex;
   flex-direction: column;
 }
@@ -574,6 +576,7 @@
   position: sticky;
   top: 0;
   z-index: 5;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -686,7 +689,15 @@
 }
 
 .sa-report-body {
+  flex: 1;
+  min-height: 0;
+  max-height: min(70vh, calc(100dvh - 220px));
+  overflow-y: auto;
+  overflow-x: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   padding: clamp(20px, 4vw, 40px);
+  scroll-behavior: smooth;
 }
 
 /* ── Loading (report compiling) ──────────────────────────────────────────── */

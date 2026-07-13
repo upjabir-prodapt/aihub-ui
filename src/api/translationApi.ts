@@ -19,7 +19,7 @@ export { TRANSLATION_API_ORIGIN };
 // ── Token helpers ──────────────────────────────────────────────────────────
 
 function getStoredToken(): string | null {
-  return sessionStorage.getItem('colt_auth_token');
+  return localStorage.getItem('colt_auth_token');
 }
 
 /**

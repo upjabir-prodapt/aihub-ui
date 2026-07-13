@@ -43,6 +43,9 @@ type Status = 'IDLE' | 'PENDING' | 'QUEUED' | 'PROCESSING' | 'COMPLETED' | 'FAIL
 // Statuses for which we should keep polling / show the progress tracker.
 const IN_PROGRESS: ReadonlySet<Status> = new Set<Status>(['PENDING', 'QUEUED', 'PROCESSING']);
 
+/** Status poll interval — jobs often run 20–30+ minutes. */
+const STATUS_POLL_INTERVAL_MS = 2 * 60 * 1000;
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 // Human-readable duration from a number of seconds.
@@ -51,6 +54,15 @@ function formatDuration(seconds: number): string {
   const mins = Math.floor(seconds / 60);
   const secs = Math.round(seconds % 60);
   return `${mins}m ${secs}s`;
+}
+
+function asFiniteNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
 }
 
 // The model that produced the report, e.g. "gemini-2.5-pro".
@@ -67,8 +79,8 @@ function getResearchDuration(
   startedAt: Date | null,
   completedAt: Date | null,
 ): string {
-  const latency = card?.latency_seconds;
-  if (typeof latency === 'number' && latency > 0) {
+  const latency = asFiniteNumber(card?.latency_seconds);
+  if (latency !== null && latency > 0) {
     return formatDuration(latency);
   }
   if (startedAt && completedAt) {
@@ -79,16 +91,16 @@ function getResearchDuration(
 }
 
 function formatTokens(card: ResearchModelCard | null): string {
-  const tokens = card?.tokens_used;
-  if (typeof tokens === 'number' && Number.isFinite(tokens)) {
-    return tokens.toLocaleString();
+  const tokens = asFiniteNumber(card?.tokens_used);
+  if (tokens !== null) {
+    return Math.round(tokens).toLocaleString();
   }
   return 'N/A';
 }
 
 function formatCost(card: ResearchModelCard | null): string {
-  const cost = card?.cost_usd;
-  if (typeof cost === 'number' && Number.isFinite(cost)) {
+  const cost = asFiniteNumber(card?.cost_usd);
+  if (cost !== null) {
     return `$${cost.toFixed(4)}`;
   }
   return 'N/A';
@@ -164,10 +176,15 @@ const SalesAgentPage: React.FC = () => {
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | undefined;
+    let immediate: ReturnType<typeof setTimeout> | undefined;
     if (IN_PROGRESS.has(status) && jobId && isSalesAuthenticated) {
-      interval = setInterval(() => void checkStatus(), 5000);
+      immediate = setTimeout(() => void checkStatus(), 0);
+      interval = setInterval(() => void checkStatus(), STATUS_POLL_INTERVAL_MS);
     }
-    return () => { if (interval) clearInterval(interval); };
+    return () => {
+      if (immediate) clearTimeout(immediate);
+      if (interval) clearInterval(interval);
+    };
   }, [status, jobId, isSalesAuthenticated, checkStatus]);
 
   const resetResearch = () => {
@@ -295,6 +312,7 @@ const SalesAgentPage: React.FC = () => {
                   </label>
                   <input
                     id="res-account-id"
+                    name="account_id"
                     type="text"
                     className="sa-input"
                     placeholder="e.g. ACC-123"
@@ -309,6 +327,7 @@ const SalesAgentPage: React.FC = () => {
                   </label>
                   <input
                     id="res-company-name"
+                    name="company_name"
                     type="text"
                     className="sa-input"
                     placeholder="e.g. Acme Corp, OpenAI…"

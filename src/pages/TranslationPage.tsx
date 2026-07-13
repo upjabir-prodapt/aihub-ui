@@ -267,7 +267,7 @@ const TranslationPage: React.FC = () => {
             {/* File Upload Mode */}
             {!file ? (
               <div {...getRootProps()} className={`drop-zone ${isDragActive ? 'drag-over' : ''}`}>
-                <input {...getInputProps()} />
+                <input {...getInputProps({ 'aria-label': 'Upload translation file', name: 'translation_file' })} />
                 <div className="drop-zone-icon">
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -307,8 +307,8 @@ const TranslationPage: React.FC = () => {
 
             {/* Bug 8: Domain field — single field, no grid wrapper */}
             <div className="form-field">
-              <label className="field-label">Domain <span className="required">*</span></label>
-              <select className="field-select" value={domain} onChange={(e) => setDomain(e.target.value)}>
+              <label className="field-label" htmlFor="tr-domain">Domain <span className="required">*</span></label>
+              <select id="tr-domain" name="domain" className="field-select" value={domain} onChange={(e) => setDomain(e.target.value)}>
                 <option value="commercial">Commercial</option>
                 <option value="legal">Legal</option>
                 <option value="finance">Finance</option>
@@ -320,8 +320,8 @@ const TranslationPage: React.FC = () => {
             {/* Language Config */}
             <div className="lang-config">
               <div className="lang-field">
-                <label className="lang-label">Source Language</label>
-                <select className="lang-select" value={sourceLang} onChange={(e) => setSourceLang(e.target.value)}>
+                <label className="lang-label" htmlFor="tr-source-lang">Source Language</label>
+                <select id="tr-source-lang" name="source_language" className="lang-select" value={sourceLang} onChange={(e) => setSourceLang(e.target.value)}>
                   {SOURCE_LANGUAGES.map((l) => (
                     <option key={l.code} value={l.code}>{l.label}</option>
                   ))}
@@ -336,8 +336,8 @@ const TranslationPage: React.FC = () => {
               </div>
 
               <div className="lang-field">
-                <label className="lang-label">Target Language <span className="required">*</span></label>
-                <select className="lang-select" value={targetLang} onChange={(e) => setTargetLang(e.target.value)}>
+                <label className="lang-label" htmlFor="tr-target-lang">Target Language <span className="required">*</span></label>
+                <select id="tr-target-lang" name="target_language" className="lang-select" value={targetLang} onChange={(e) => setTargetLang(e.target.value)}>
                   {LANGUAGES.map((l) => (
                     <option key={l.code} value={l.code}>{l.label}</option>
                   ))}
@@ -348,22 +348,22 @@ const TranslationPage: React.FC = () => {
             {/* Advanced Settings */}
             <div className="form-grid">
               <div className="form-field">
-                <label className="field-label">Enable DLP</label>
-                <select className="field-select" value={String(enableDlp)} onChange={(e) => setEnableDlp(e.target.value === 'true')}>
+                <label className="field-label" htmlFor="tr-enable-dlp">Enable DLP</label>
+                <select id="tr-enable-dlp" name="enable_dlp" className="field-select" value={String(enableDlp)} onChange={(e) => setEnableDlp(e.target.value === 'true')}>
                   <option value="true">True</option>
                   <option value="false">False</option>
                 </select>
               </div>
               <div className="form-field">
-                <label className="field-label">Enable Chunking</label>
-                <select className="field-select" value={String(enableChunking)} onChange={(e) => setEnableChunking(e.target.value === 'true')}>
+                <label className="field-label" htmlFor="tr-enable-chunking">Enable Chunking</label>
+                <select id="tr-enable-chunking" name="enable_chunking" className="field-select" value={String(enableChunking)} onChange={(e) => setEnableChunking(e.target.value === 'true')}>
                   <option value="true">True</option>
                   <option value="false">False</option>
                 </select>
               </div>
               <div className="form-field">
-                <label className="field-label">Priority</label>
-                <select className="field-select" value={priority} onChange={(e) => setPriority(e.target.value)}>
+                <label className="field-label" htmlFor="tr-priority">Priority</label>
+                <select id="tr-priority" name="priority" className="field-select" value={priority} onChange={(e) => setPriority(e.target.value)}>
                   <option value="standard">Standard</option>
                   <option value="high">High</option>
                 </select>

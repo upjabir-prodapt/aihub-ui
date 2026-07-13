@@ -99,10 +99,18 @@ const LoginModalPanel: React.FC<LoginModalProps> = ({
 
           {displayEmail && (
             <div className="login-field">
-              <label className="login-label">Signed in as</label>
-              <div className="login-input" style={{ opacity: 0.85, cursor: 'default' }} aria-readonly="true">
-                {displayEmail}
-              </div>
+              <label className="login-label" htmlFor="auth-signed-in-as">
+                Signed in as
+              </label>
+              <input
+                id="auth-signed-in-as"
+                type="text"
+                className="login-input"
+                value={displayEmail}
+                readOnly
+                tabIndex={0}
+                style={{ opacity: 0.85, cursor: 'default' }}
+              />
             </div>
           )}
 
@@ -113,11 +121,13 @@ const LoginModalPanel: React.FC<LoginModalProps> = ({
               </label>
               <input
                 id="auth-bu"
+                name="business_unit"
                 type="text"
                 className="login-input"
                 value={businessUnit}
                 onChange={(e) => setBusinessUnit(e.target.value)}
                 placeholder="e.g. SBU"
+                autoComplete="organization"
               />
             </div>
 
@@ -127,11 +137,13 @@ const LoginModalPanel: React.FC<LoginModalProps> = ({
               </label>
               <input
                 id="auth-org"
+                name="organization"
                 type="text"
                 className="login-input"
                 value={organization}
                 onChange={(e) => setOrganization(e.target.value)}
                 placeholder="e.g. Colt"
+                autoComplete="organization"
               />
             </div>
 
