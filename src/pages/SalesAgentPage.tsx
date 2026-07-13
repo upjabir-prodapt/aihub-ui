@@ -176,11 +176,15 @@ const SalesAgentPage: React.FC = () => {
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | undefined;
+    let immediate: ReturnType<typeof setTimeout> | undefined;
     if (IN_PROGRESS.has(status) && jobId && isSalesAuthenticated) {
-      void checkStatus();
+      immediate = setTimeout(() => void checkStatus(), 0);
       interval = setInterval(() => void checkStatus(), STATUS_POLL_INTERVAL_MS);
     }
-    return () => { if (interval) clearInterval(interval); };
+    return () => {
+      if (immediate) clearTimeout(immediate);
+      if (interval) clearInterval(interval);
+    };
   }, [status, jobId, isSalesAuthenticated, checkStatus]);
 
   const resetResearch = () => {
@@ -308,6 +312,7 @@ const SalesAgentPage: React.FC = () => {
                   </label>
                   <input
                     id="res-account-id"
+                    name="account_id"
                     type="text"
                     className="sa-input"
                     placeholder="e.g. ACC-123"
@@ -322,6 +327,7 @@ const SalesAgentPage: React.FC = () => {
                   </label>
                   <input
                     id="res-company-name"
+                    name="company_name"
                     type="text"
                     className="sa-input"
                     placeholder="e.g. Acme Corp, OpenAI…"
