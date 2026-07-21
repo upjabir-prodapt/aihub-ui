@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { User, LogOut } from 'lucide-react';
-import { useTranslation } from '../hooks/useTranslation';
+import { useMultiTranslation, LangJobStatus, type LanguageJob } from '../hooks/useMultiTranslation';
 import { useAuth } from '../context/useAuth';
 import ReviewModal from '../components/ReviewModal';
 import type { JobStatusResponse, TranslationResult } from '../types/translation';
@@ -9,16 +9,18 @@ import '../styles/translation.css';
 
 // ─── Constants ────────────────────────────────────────────
 const LANGUAGES = [
-  { code: 'en', label: 'English' },
-  { code: 'de', label: 'German' },
-  { code: 'it', label: 'Italian' },
-  { code: 'fr', label: 'French' },
-  { code: 'es', label: 'Spanish' },
-  { code: 'ja', label: 'Japanese' },
+  { code: 'en', label: 'English', flag: 'EN' },
+  { code: 'de', label: 'German', flag: '🇩🇪' },
+  { code: 'it', label: 'Italian', flag: '🇮🇹' },
+  { code: 'fr', label: 'French', flag: '🇫🇷' },
+  { code: 'es', label: 'Spanish', flag: '🇪🇸' },
+  { code: 'ja', label: 'Japanese', flag: '🇯🇵' },
 ];
 
 const SOURCE_LANGUAGES = LANGUAGES;
 
+const langLabel = (code: string) => LANGUAGES.find((l) => l.code === code)?.label ?? code.toUpperCase();
+const langFlag = (code: string) => LANGUAGES.find((l) => l.code === code)?.flag ?? '🌐';
 
 // ─── Helpers ──────────────────────────────────────────────
 function formatBytes(bytes: number): string {
@@ -54,15 +56,21 @@ function formatModel(meta: TranslationResult['metadata']): string {
   return version ? `${name} (${version})` : name;
 }
 
+// A short, human-friendly status line for a running job.
+function runningLabel(job: LanguageJob): string {
+  if (job.status === LangJobStatus.Submitting) return 'Submitting…';
+  const s = job.jobData?.status ?? 'queued';
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 
 // ─── Sub-components ───────────────────────────────────────
 
 const SkeletonLoader: React.FC = () => (
-  <div className="output-loading">
-    {[100, 85, 92, 70, 95].map((w, i) => (
-      <div key={i} className="skeleton" style={{ height: 14, width: `${w}%` }} />
+  <div className="card-skeleton">
+    {[100, 82, 92].map((w, i) => (
+      <div key={i} className="skeleton" style={{ height: 10, width: `${w}%` }} />
     ))}
-    <div className="skeleton" style={{ height: 14, width: '60%' }} />
   </div>
 );
 
@@ -70,19 +78,20 @@ const SkeletonLoader: React.FC = () => (
 const TranslationPage: React.FC = () => {
   const { user, logout } = useAuth();
   const [file, setFile] = useState<File | null>(null);
-  
-  // New fields from screenshot
+
+  // Configuration
   const [sourceLang, setSourceLang] = useState('en');
-  const [targetLang, setTargetLang] = useState('de');
+  const [targetLangs, setTargetLangs] = useState<string[]>(['de']);
   const [domain, setDomain] = useState('legal');
   const [enableDlp, setEnableDlp] = useState(true);
   const [enableChunking, setEnableChunking] = useState(true);
   const [priority, setPriority] = useState('standard');
 
-  const { status, jobData, downloadInfo, error, startTranslation, retryOrReset, reset, getValidDownloadUrl } = useTranslation();
+  const { jobs, isRunning, startTranslations, retryLang, getValidDownloadUrl, reset } =
+    useMultiTranslation();
 
-  const [copied, setCopied] = useState(false);
-  const [reviewOpen, setReviewOpen] = useState(false);
+  const [copiedLang, setCopiedLang] = useState<string | null>(null);
+  const [reviewJobId, setReviewJobId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ ok: boolean; message: string } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const resultRef = useRef<HTMLDivElement>(null);
@@ -94,10 +103,10 @@ const TranslationPage: React.FC = () => {
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: { 
-      'text/plain': ['.txt'], 
+    accept: {
+      'text/plain': ['.txt'],
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
-      'application/pdf': ['.pdf']
+      'application/pdf': ['.pdf'],
     },
     maxFiles: 1,
     maxSize: 10 * 1024 * 1024,
@@ -105,89 +114,96 @@ const TranslationPage: React.FC = () => {
   });
 
   // ── Clear ──
-  // Bug 7: Also reset translation state so stale output is not shown for a new file
   const clearFile = () => {
     setFile(null);
     reset();
   };
 
+  // ── Target language multi-select ──
+  const toggleTarget = (code: string) => {
+    if (code === sourceLang) return; // can't translate a language into itself
+    setTargetLangs((prev) =>
+      prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code],
+    );
+  };
+
+  // When the source changes, drop it from the target selection if present.
+  const handleSourceChange = (code: string) => {
+    setSourceLang(code);
+    setTargetLangs((prev) => prev.filter((c) => c !== code));
+  };
+
+  // Factory that builds a fresh FormData per language (unconsumed file stream each time).
+  const makeBuildFormData = (uploaded: File) => (targetLang: string) => {
+    const fd = new FormData();
+    fd.append('target_language', targetLang);
+    if (sourceLang) fd.append('source_language', sourceLang);
+    fd.append('domain', domain);
+    fd.append('enable_dlp', String(enableDlp));
+    fd.append('enable_chunking', String(enableChunking));
+    fd.append('priority', priority);
+    fd.append('file', uploaded);
+    return fd;
+  };
+
   // ── Translate ──
-  const handleTranslate = async () => {
-    // Basic validation
-    if (!file) return;
+  const handleTranslate = () => {
+    if (!file || targetLangs.length === 0) return;
 
-    // Bug 6: Prevent same source and target language submission
-    if (sourceLang === targetLang) {
-      alert('Source and target languages must be different.');
-      return;
-    }
-
-    // Bug 2: Pass a factory so each retry attempt builds fresh FormData
-    // with an unconsumed file stream (same FormData cannot be re-sent).
-    const buildFormData = () => {
-      const fd = new FormData();
-      fd.append('target_language', targetLang);
-      if (sourceLang) fd.append('source_language', sourceLang);
-      fd.append('domain', domain);
-      fd.append('enable_dlp', String(enableDlp));
-      fd.append('enable_chunking', String(enableChunking));
-      fd.append('priority', priority);
-      fd.append('file', file);
-      return fd;
-    };
-
-    // Bug 3: Await the async call so unhandled rejections don't go silent
-    await startTranslation(buildFormData);
+    startTranslations(targetLangs, makeBuildFormData(file));
 
     setTimeout(() => {
-      if (resultRef.current) {
-        resultRef.current.scrollIntoView({ behavior: 'smooth' });
-      }
-    }, 500);
+      resultRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 200);
+  };
+
+  const handleRetryLang = (targetLang: string) => {
+    if (!file) return;
+    retryLang(targetLang, makeBuildFormData(file));
   };
 
   // ── Copy ──
-  const handleCopy = async () => {
-    const translatedText = jobData?.result?.translated_document?.content;
+  const handleCopy = async (job: LanguageJob) => {
+    const translatedText = job.jobData?.result?.translated_document?.content;
     if (!translatedText) return;
     await navigator.clipboard.writeText(translatedText);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setCopiedLang(job.targetLang);
+    setTimeout(() => setCopiedLang((c) => (c === job.targetLang ? null : c)), 2000);
   };
 
   // ── Download ──
-  // Bug 5: getValidDownloadUrl auto-refreshes the signed URL if expired.
-  const handleDownload = async () => {
-    // Try the (potentially refreshed) signed URL first
-    const signedUrl = await getValidDownloadUrl()
-      ?? jobData?.result?.translated_document?.download_url;
+  const handleDownload = async (job: LanguageJob) => {
+    const signedUrl =
+      (await getValidDownloadUrl(job.targetLang)) ??
+      job.jobData?.result?.translated_document?.download_url;
 
     if (signedUrl) {
       const filename =
-        downloadInfo?.filename ??
-        jobData?.result?.translated_document?.filename ??
-        `translated_${Date.now()}.pdf`;
+        job.downloadInfo?.filename ??
+        job.jobData?.result?.translated_document?.filename ??
+        `translated_${job.targetLang}_${Date.now()}.pdf`;
       const anchor = document.createElement('a');
       anchor.href = signedUrl;
       anchor.download = filename;
       anchor.target = '_blank';
       anchor.rel = 'noopener noreferrer';
       anchor.click();
-    } else {
-      // Fallback: download inline text content if present
-      const translatedText = jobData?.result?.translated_document?.content;
-      if (!translatedText) {
-        console.warn('No download URL or inline content available.');
-        return;
-      }
-      const blob = new Blob([translatedText], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `translated_${Date.now()}.txt`;
-      a.click();
-      URL.revokeObjectURL(url);
+      return;
     }
+
+    // Fallback: download inline text content if present
+    const translatedText = job.jobData?.result?.translated_document?.content;
+    if (!translatedText) {
+      console.warn('No download URL or inline content available.');
+      return;
+    }
+    const blob = new Blob([translatedText], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `translated_${job.targetLang}_${Date.now()}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   // ── Review toast ──
@@ -197,9 +213,11 @@ const TranslationPage: React.FC = () => {
     toastTimer.current = setTimeout(() => setToast(null), 4500);
   };
 
-  // Bug 6: Also disallow same source/target language
-  const canTranslate = !!file && sourceLang !== targetLang;
-  const isLoading = status === 'submitting' || status === 'polling';
+  const canTranslate = !!file && targetLangs.length > 0;
+  const completedCount = jobs.filter((j) => j.status === LangJobStatus.Completed).length;
+  const failedCount = jobs.filter((j) => j.status === LangJobStatus.Failed).length;
+  const runningCount = jobs.length - completedCount - failedCount;
+  const hasJobs = jobs.length > 0;
 
   // ─── Render ────────────────────────────────────────────
 
@@ -218,8 +236,8 @@ const TranslationPage: React.FC = () => {
           <div>
             <h1 className="hero-title">AI Translation Service</h1>
             <p className="hero-subtitle">
-              Enterprise translation with automated DLP and anonymization. 
-              Integrated with Colt's Security Policy for structure-preserving Word & PDF conversion.
+              Enterprise translation with automated DLP and anonymization.
+              Translate one document into multiple languages at once — each runs in parallel.
             </p>
           </div>
         </div>
@@ -231,8 +249,8 @@ const TranslationPage: React.FC = () => {
             </div>
             <div className="stat-divider" />
             <div className="stat-item">
-              <div className="stat-value">DLP</div>
-              <div className="stat-label">Secure API</div>
+              <div className="stat-value">Multi</div>
+              <div className="stat-label">Parallel Jobs</div>
             </div>
             <div className="stat-divider" />
             <div className="stat-item">
@@ -305,7 +323,7 @@ const TranslationPage: React.FC = () => {
               </div>
             )}
 
-            {/* Bug 8: Domain field — single field, no grid wrapper */}
+            {/* Domain */}
             <div className="form-field">
               <label className="field-label" htmlFor="tr-domain">Domain <span className="required">*</span></label>
               <select id="tr-domain" name="domain" className="field-select" value={domain} onChange={(e) => setDomain(e.target.value)}>
@@ -317,31 +335,52 @@ const TranslationPage: React.FC = () => {
               </select>
             </div>
 
-            {/* Language Config */}
-            <div className="lang-config">
-              <div className="lang-field">
-                <label className="lang-label" htmlFor="tr-source-lang">Source Language</label>
-                <select id="tr-source-lang" name="source_language" className="lang-select" value={sourceLang} onChange={(e) => setSourceLang(e.target.value)}>
-                  {SOURCE_LANGUAGES.map((l) => (
-                    <option key={l.code} value={l.code}>{l.label}</option>
-                  ))}
-                </select>
-              </div>
+            {/* Source language */}
+            <div className="form-field">
+              <label className="field-label" htmlFor="tr-source-lang">Source Language</label>
+              <select id="tr-source-lang" name="source_language" className="field-select" value={sourceLang} onChange={(e) => handleSourceChange(e.target.value)}>
+                {SOURCE_LANGUAGES.map((l) => (
+                  <option key={l.code} value={l.code}>{l.label}</option>
+                ))}
+              </select>
+            </div>
 
-              <div className="lang-arrow">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="5" y1="12" x2="19" y2="12"/>
-                  <polyline points="12,5 19,12 12,19"/>
-                </svg>
+            {/* Target languages — multi-select chips */}
+            <div className="form-field">
+              <div className="targets-label-row">
+                <label className="field-label">
+                  Target Languages <span className="required">*</span>
+                </label>
+                <span className="targets-count">{targetLangs.length} selected</span>
               </div>
-
-              <div className="lang-field">
-                <label className="lang-label" htmlFor="tr-target-lang">Target Language <span className="required">*</span></label>
-                <select id="tr-target-lang" name="target_language" className="lang-select" value={targetLang} onChange={(e) => setTargetLang(e.target.value)}>
-                  {LANGUAGES.map((l) => (
-                    <option key={l.code} value={l.code}>{l.label}</option>
-                  ))}
-                </select>
+              <div className="lang-chip-grid" role="group" aria-label="Target languages">
+                {LANGUAGES.map((l) => {
+                  const isSource = l.code === sourceLang;
+                  const isSelected = targetLangs.includes(l.code);
+                  return (
+                    <button
+                      key={l.code}
+                      type="button"
+                      className={`lang-chip ${isSelected ? 'selected' : ''} ${isSource ? 'is-source' : ''}`}
+                      onClick={() => toggleTarget(l.code)}
+                      disabled={isSource}
+                      aria-pressed={isSelected}
+                      title={isSource ? 'Source language' : isSelected ? 'Click to remove' : 'Click to add'}
+                    >
+                      <span className="lang-chip-flag">{l.flag}</span>
+                      <span className="lang-chip-label">{l.label}</span>
+                      {isSource ? (
+                        <span className="lang-chip-tag">Source</span>
+                      ) : (
+                        <span className="lang-chip-check" aria-hidden="true">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -374,12 +413,12 @@ const TranslationPage: React.FC = () => {
             <button
               className="translate-btn"
               onClick={handleTranslate}
-              disabled={!canTranslate || isLoading}
+              disabled={!canTranslate || isRunning}
             >
-              {isLoading ? (
+              {isRunning ? (
                 <>
                   <span className="spinner" />
-                  {status === 'submitting' ? 'Submitting...' : 'Processing (Job ID: ' + jobData?.job_id?.substring(0, 8) + '...)'}
+                  Translating {jobs.length} {jobs.length === 1 ? 'language' : 'languages'}…
                 </>
               ) : (
                 <>
@@ -387,7 +426,9 @@ const TranslationPage: React.FC = () => {
                     <path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/>
                     <path d="m22 22-5-10-5 10"/><path d="M14 18h6"/>
                   </svg>
-                  Translate
+                  {targetLangs.length > 1
+                    ? `Translate to ${targetLangs.length} languages`
+                    : 'Translate'}
                 </>
               )}
             </button>
@@ -398,40 +439,24 @@ const TranslationPage: React.FC = () => {
         <div className="panel" ref={resultRef}>
           <div className="panel-header">
             <h2 className="panel-title">Output</h2>
-            {status === 'completed' && (downloadInfo || jobData?.result) && (
-              <div className="output-actions">
-                {jobData?.result?.translated_document?.content && (
-                  <button
-                    className={`output-action-btn ${copied ? 'copied' : ''}`}
-                    onClick={handleCopy}
-                  >
-                    {copied ? 'Copied!' : 'Copy'}
-                  </button>
+            {hasJobs && (
+              <div className="output-summary">
+                <span className="summary-chip summary-done">{completedCount} done</span>
+                {runningCount > 0 && (
+                  <span className="summary-chip summary-running">
+                    <span className="pulse-dot" />
+                    {runningCount} running
+                  </span>
                 )}
-                <button className="output-action-btn primary icon-only" onClick={handleDownload} id="download-btn" title={downloadInfo?.filename ? `Download · ${downloadInfo.filename}` : 'Download'}>
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                    <polyline points="7 10 12 15 17 10"/>
-                    <line x1="12" y1="15" x2="12" y2="3"/>
-                  </svg>
-                </button>
-                <button
-                  className="output-action-btn"
-                  onClick={() => setReviewOpen(true)}
-                  id="rate-btn"
-                  title="Rate this translation"
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                  </svg>
-                  Rate
-                </button>
+                {failedCount > 0 && (
+                  <span className="summary-chip summary-failed">{failedCount} failed</span>
+                )}
               </div>
             )}
           </div>
 
           {/* Idle */}
-          {status === 'idle' && (
+          {!hasJobs && (
             <div className="output-placeholder">
               <div className="output-placeholder-icon">
                 <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
@@ -439,103 +464,147 @@ const TranslationPage: React.FC = () => {
                   <path d="m22 22-5-10-5 10"/><path d="M14 18h6"/>
                 </svg>
               </div>
-              <p className="output-placeholder-title">No translation yet</p>
+              <p className="output-placeholder-title">No translations yet</p>
               <p className="output-placeholder-sub">
-                Fill in the details and click <strong>Translate</strong> to start a job.
+                Pick one or more <strong>target languages</strong> and click <strong>Translate</strong> —
+                each language runs as its own job.
               </p>
             </div>
           )}
 
-          {/* Loading / Polling */}
-          {isLoading && (
-            <div className="polling-container">
-              <SkeletonLoader />
-              <div className="polling-status">
-                <span className="pulse-dot"></span>
-                <span>Job Status: <strong>{(jobData?.status ?? 'queued').toUpperCase()}</strong></span>
-                {jobData?.submitted_at && (
-                  <span className="job-time">Started: {new Date(jobData.submitted_at).toLocaleTimeString()}</span>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Success */}
-          {status === 'completed' && jobData?.result && (
-            <div>
-              <div className="result-meta">
-                <span className="meta-chip">
-                  {jobData.result.metadata.source_language}
-                </span>
-                <span className="meta-arrow">→</span>
-                <span className="meta-chip teal">
-                  {jobData.result.metadata.target_language}
-                </span>
-
-              </div>
-              <div className="result-text-container">
-                <p className="result-text">
-                  {jobData.result.translated_document?.content || 'Document translated successfully. Use the download button to retrieve it.'}
-                </p>
-              </div>
-              <div className="result-details">
-                {jobData.result.labels && (
-                  <>
-                    <div className="detail-item">
-                      <span className="detail-label">Cost:</span>
-                      <span className="detail-value">${jobData.result.labels.cost_usd.toFixed(4)}</span>
+          {/* Result cards — one per target language, scrollable */}
+          {hasJobs && (
+            <div className="result-cards">
+              {jobs.map((job) => {
+                const result = job.jobData?.result;
+                const doc = result?.translated_document;
+                const isBusy =
+                  job.status === LangJobStatus.Submitting || job.status === LangJobStatus.Polling;
+                return (
+                  <div key={job.targetLang} className={`result-card status-${job.status}`}>
+                    {/* Card header */}
+                    <div className="result-card-header">
+                      <div className="result-card-lang">
+                        <span className="result-card-flag">{langFlag(job.targetLang)}</span>
+                        <div className="result-card-route">
+                          <span className="result-card-target">{langLabel(job.targetLang)}</span>
+                          <span className="result-card-source">from {langLabel(sourceLang)}</span>
+                        </div>
+                      </div>
+                      <span className={`status-badge status-badge-${job.status}`}>
+                        {isBusy && <span className="pulse-dot" />}
+                        {job.status === LangJobStatus.Completed
+                          ? 'Completed'
+                          : job.status === LangJobStatus.Failed
+                            ? 'Failed'
+                            : runningLabel(job)}
+                      </span>
                     </div>
-                    <div className="detail-item">
-                      <span className="detail-label">Tokens:</span>
-                      <span className="detail-value">{jobData.result.labels.token_count}</span>
-                    </div>
-                  </>
-                )}
-                <div className="detail-item">
-                  <span className="detail-label">Time:</span>
-                  <span className="detail-value">{getElapsedTime(jobData)}</span>
-                </div>
-                <div className="detail-item">
-                  <span className="detail-label">Model:</span>
-                  <span className="detail-value">{formatModel(jobData.result.metadata)}</span>
-                </div>
-              </div>
-            </div>
-          )}
 
-          {/* Error */}
-          {status === 'failed' && (
-            <div className="output-error">
-              <div className="error-icon">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10"/>
-                  <line x1="12" y1="8" x2="12" y2="12"/>
-                  <line x1="12" y1="16" x2="12.01" y2="16"/>
-                </svg>
-              </div>
-              <p className="error-title">Translation Failed</p>
-              <p className="error-message">{error}</p>
-              <div className="error-actions">
-                <button className="retry-btn" onClick={retryOrReset} id="retry-btn">
-                  {jobData?.job_id ? 'Resume Checking Status' : 'Try Again'}
-                </button>
-                {jobData?.job_id && (
-                  <button className="retry-btn secondary" onClick={reset} id="reset-btn">
-                    Start Over
-                  </button>
-                )}
-              </div>
+                    {/* Card body */}
+                    {isBusy && (
+                      <div className="result-card-body">
+                        <SkeletonLoader />
+                      </div>
+                    )}
+
+                    {job.status === LangJobStatus.Failed && (
+                      <div className="result-card-body">
+                        <div className="card-error">
+                          <p className="card-error-msg">{job.error || 'Translation failed.'}</p>
+                          <button
+                            className="retry-btn card-retry-btn"
+                            onClick={() => handleRetryLang(job.targetLang)}
+                            disabled={!file}
+                          >
+                            Retry {langLabel(job.targetLang)}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {job.status === LangJobStatus.Completed && result && (
+                      <>
+                        <div className="result-card-body">
+                          <p className="result-card-text">
+                            {doc?.content ||
+                              'Document translated successfully. Use Download to retrieve it.'}
+                          </p>
+                        </div>
+
+                        <div className="result-card-meta">
+                          {result.labels && (
+                            <>
+                              <div className="detail-item">
+                                <span className="detail-label">Cost</span>
+                                <span className="detail-value">${result.labels.cost_usd.toFixed(4)}</span>
+                              </div>
+                              <div className="detail-item">
+                                <span className="detail-label">Tokens</span>
+                                <span className="detail-value">{result.labels.token_count}</span>
+                              </div>
+                            </>
+                          )}
+                          <div className="detail-item">
+                            <span className="detail-label">Time</span>
+                            <span className="detail-value">{getElapsedTime(job.jobData!)}</span>
+                          </div>
+                          <div className="detail-item detail-item-model">
+                            <span className="detail-label">Model</span>
+                            <span className="detail-value">{formatModel(result.metadata)}</span>
+                          </div>
+                        </div>
+
+                        <div className="result-card-actions">
+                          {doc?.content && (
+                            <button
+                              className={`output-action-btn ${copiedLang === job.targetLang ? 'copied' : ''}`}
+                              onClick={() => handleCopy(job)}
+                            >
+                              {copiedLang === job.targetLang ? 'Copied!' : 'Copy'}
+                            </button>
+                          )}
+                          <button
+                            className="output-action-btn primary"
+                            onClick={() => handleDownload(job)}
+                            title={job.downloadInfo?.filename ? `Download · ${job.downloadInfo.filename}` : 'Download'}
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                              <polyline points="7 10 12 15 17 10"/>
+                              <line x1="12" y1="15" x2="12" y2="3"/>
+                            </svg>
+                            Download
+                          </button>
+                          {job.jobId && (
+                            <button
+                              className="output-action-btn"
+                              onClick={() => setReviewJobId(job.jobId)}
+                              title="Rate this translation"
+                            >
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                              </svg>
+                              Rate
+                            </button>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
 
       </div>
 
-      {jobData?.job_id && (
+      {reviewJobId && (
         <ReviewModal
-          isOpen={reviewOpen}
-          jobId={jobData.job_id}
-          onClose={() => setReviewOpen(false)}
+          isOpen={!!reviewJobId}
+          jobId={reviewJobId}
+          onClose={() => setReviewJobId(null)}
           onSubmitted={handleReviewSubmitted}
         />
       )}
