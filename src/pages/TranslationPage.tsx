@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { User, LogOut } from 'lucide-react';
 import { useMultiTranslation, LangJobStatus, type LanguageJob } from '../hooks/useMultiTranslation';
@@ -93,8 +93,21 @@ const TranslationPage: React.FC = () => {
   const [copiedLang, setCopiedLang] = useState<string | null>(null);
   const [reviewJobId, setReviewJobId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ ok: boolean; message: string } | null>(null);
+  const [targetDropdownOpen, setTargetDropdownOpen] = useState(false);
+  const targetDropdownRef = useRef<HTMLDivElement>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const resultRef = useRef<HTMLDivElement>(null);
+
+  // Close target-language dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (targetDropdownRef.current && !targetDropdownRef.current.contains(e.target as Node)) {
+        setTargetDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // ── Dropzone ──
   const onDrop = useCallback((accepted: File[]) => {
@@ -345,7 +358,7 @@ const TranslationPage: React.FC = () => {
               </select>
             </div>
 
-            {/* Target languages — multi-select chips */}
+            {/* Target languages — multi-select dropdown */}
             <div className="form-field">
               <div className="targets-label-row">
                 <label className="field-label">
@@ -353,34 +366,71 @@ const TranslationPage: React.FC = () => {
                 </label>
                 <span className="targets-count">{targetLangs.length} selected</span>
               </div>
-              <div className="lang-chip-grid" role="group" aria-label="Target languages">
-                {LANGUAGES.map((l) => {
-                  const isSource = l.code === sourceLang;
-                  const isSelected = targetLangs.includes(l.code);
-                  return (
-                    <button
-                      key={l.code}
-                      type="button"
-                      className={`lang-chip ${isSelected ? 'selected' : ''} ${isSource ? 'is-source' : ''}`}
-                      onClick={() => toggleTarget(l.code)}
-                      disabled={isSource}
-                      aria-pressed={isSelected}
-                      title={isSource ? 'Source language' : isSelected ? 'Click to remove' : 'Click to add'}
-                    >
-                      <span className="lang-chip-flag">{l.flag}</span>
-                      <span className="lang-chip-label">{l.label}</span>
-                      {isSource ? (
-                        <span className="lang-chip-tag">Source</span>
-                      ) : (
-                        <span className="lang-chip-check" aria-hidden="true">
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="20 6 9 17 4 12" />
+              <div className="multiselect-dropdown" ref={targetDropdownRef}>
+                <button
+                  type="button"
+                  className={`multiselect-trigger ${targetDropdownOpen ? 'open' : ''}`}
+                  onClick={() => setTargetDropdownOpen((v) => !v)}
+                  aria-haspopup="listbox"
+                  aria-expanded={targetDropdownOpen}
+                >
+                  <div className="multiselect-pills">
+                    {targetLangs.length === 0 && (
+                      <span className="multiselect-placeholder">Select target languages…</span>
+                    )}
+                    {targetLangs.map((code) => (
+                      <span key={code} className="multiselect-pill">
+                        <span className="multiselect-pill-flag">{langFlag(code)}</span>
+                        <span className="multiselect-pill-label">{langLabel(code)}</span>
+                        <span
+                          className="multiselect-pill-remove"
+                          role="button"
+                          tabIndex={-1}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleTarget(code);
+                          }}
+                          aria-label={`Remove ${langLabel(code)}`}
+                        >
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
                           </svg>
                         </span>
-                      )}
-                    </button>
-                  );
-                })}
+                      </span>
+                    ))}
+                  </div>
+                  <span className={`multiselect-chevron ${targetDropdownOpen ? 'rotated' : ''}`}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                  </span>
+                </button>
+                {targetDropdownOpen && (
+                  <ul className="multiselect-menu" role="listbox" aria-label="Target languages">
+                    {LANGUAGES.filter((l) => l.code !== sourceLang).map((l) => {
+                      const isSelected = targetLangs.includes(l.code);
+                      return (
+                        <li
+                          key={l.code}
+                          role="option"
+                          aria-selected={isSelected}
+                          className={`multiselect-option ${isSelected ? 'selected' : ''}`}
+                          onClick={() => toggleTarget(l.code)}
+                        >
+                          <span className="multiselect-option-flag">{l.flag}</span>
+                          <span className="multiselect-option-label">{l.label}</span>
+                          <span className="multiselect-option-check">
+                            {isSelected && (
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="20 6 9 17 4 12"/>
+                              </svg>
+                            )}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
               </div>
             </div>
 
