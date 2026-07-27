@@ -66,23 +66,133 @@ const SkeletonLoader: React.FC = () => (
   </div>
 );
 
+interface TranslationResultCardProps {
+  job: JobStatusResponse;
+  copied: boolean;
+  onCopy: () => void;
+  onDownload: () => void;
+  onRate: () => void;
+}
+
+const TranslationResultCard: React.FC<TranslationResultCardProps> = ({
+  job,
+  copied,
+  onCopy,
+  onDownload,
+  onRate,
+}) => {
+  const isCompleted = job.status === 'completed';
+  const isFailed = job.status === 'failed' || job.status === 'cancelled';
+  const result = job.result;
+
+  return (
+    <div className={`batch-result-card ${isFailed ? 'batch-result-card--failed' : ''}`}>
+      <div className="batch-result-header">
+        <div className="result-meta">
+          <span className="meta-chip">{result?.metadata.source_language ?? job.job_id.substring(0, 8)}</span>
+          <span className="meta-arrow">→</span>
+          <span className="meta-chip teal">{result?.metadata.target_language ?? '…'}</span>
+        </div>
+        <div className="batch-result-status">
+          <span className={`status-badge status-badge--${job.status}`}>{job.status}</span>
+        </div>
+      </div>
+
+      {isFailed ? (
+        <div className="batch-result-error">
+          {job.error_message || 'This language translation failed.'}
+        </div>
+      ) : (
+        <div className="result-text-container">
+          <p className="result-text">
+            {result?.translated_document?.content || 'Document translated successfully. Use the download button to retrieve it.'}
+          </p>
+        </div>
+      )}
+
+      {result && (
+        <div className="result-details">
+          {result.labels && (
+            <>
+              <div className="detail-item">
+                <span className="detail-label">Cost:</span>
+                <span className="detail-value">${result.labels.cost_usd.toFixed(4)}</span>
+              </div>
+              <div className="detail-item">
+                <span className="detail-label">Tokens:</span>
+                <span className="detail-value">{result.labels.token_count}</span>
+              </div>
+            </>
+          )}
+          <div className="detail-item">
+            <span className="detail-label">Time:</span>
+            <span className="detail-value">{getElapsedTime(job)}</span>
+          </div>
+          <div className="detail-item">
+            <span className="detail-label">Model:</span>
+            <span className="detail-value">{formatModel(result.metadata)}</span>
+          </div>
+        </div>
+      )}
+
+      {isCompleted && (
+        <div className="batch-result-actions">
+          {result?.translated_document?.content && (
+            <button className={`output-action-btn ${copied ? 'copied' : ''}`} onClick={onCopy}>
+              {copied ? 'Copied!' : 'Copy'}
+            </button>
+          )}
+          <button
+            className="output-action-btn primary icon-only"
+            onClick={onDownload}
+            title="Download translation"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+          </button>
+          <button className="output-action-btn" onClick={onRate} title="Rate this translation">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+            </svg>
+            Rate
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── Main Component ───────────────────────────────────────
 const TranslationPage: React.FC = () => {
   const { user, logout } = useAuth();
   const [file, setFile] = useState<File | null>(null);
-  
-  // New fields from screenshot
+
+  // Multi-target language selection
   const [sourceLang, setSourceLang] = useState('en');
-  const [targetLang, setTargetLang] = useState('de');
+  const [targetLangs, setTargetLangs] = useState<string[]>(['de']);
   const [domain, setDomain] = useState('legal');
   const [enableDlp, setEnableDlp] = useState(true);
   const [enableChunking, setEnableChunking] = useState(true);
   const [priority, setPriority] = useState('standard');
 
-  const { status, jobData, downloadInfo, error, startTranslation, retryOrReset, reset, getValidDownloadUrl } = useTranslation();
+  const {
+    status,
+    batchId,
+    jobs,
+    jobOrder,
+    downloadInfo,
+    error,
+    startTranslation,
+    retryOrReset,
+    reset,
+    getValidDownloadUrl,
+  } = useTranslation();
 
-  const [copied, setCopied] = useState(false);
-  const [reviewOpen, setReviewOpen] = useState(false);
+  const [copiedJobId, setCopiedJobId] = useState<string | null>(null);
+  const [reviewJobId, setReviewJobId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ ok: boolean; message: string } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const resultRef = useRef<HTMLDivElement>(null);
@@ -111,22 +221,42 @@ const TranslationPage: React.FC = () => {
     reset();
   };
 
+  // ── Target language selection helpers ──
+  const toggleTargetLang = useCallback((code: string) => {
+    setTargetLangs((prev) => {
+      if (prev.includes(code)) {
+        // Always keep at least one target language selected
+        if (prev.length === 1) return prev;
+        return prev.filter((c) => c !== code);
+      }
+      if (prev.length >= 5) return prev;
+      return [...prev, code];
+    });
+  }, []);
+
   // ── Translate ──
   const handleTranslate = async () => {
-    // Basic validation
     if (!file) return;
 
-    // Bug 6: Prevent same source and target language submission
-    if (sourceLang === targetLang) {
+    if (targetLangs.length === 0) {
+      alert('Please select at least one target language.');
+      return;
+    }
+
+    if (targetLangs.length > 5) {
+      alert('You can select up to 5 target languages.');
+      return;
+    }
+
+    if (targetLangs.includes(sourceLang)) {
       alert('Source and target languages must be different.');
       return;
     }
 
-    // Bug 2: Pass a factory so each retry attempt builds fresh FormData
-    // with an unconsumed file stream (same FormData cannot be re-sent).
+    // Pass a factory so each retry builds fresh FormData with an unconsumed file stream.
     const buildFormData = () => {
       const fd = new FormData();
-      fd.append('target_language', targetLang);
+      targetLangs.forEach((lang) => fd.append('target_languages', lang));
       if (sourceLang) fd.append('source_language', sourceLang);
       fd.append('domain', domain);
       fd.append('enable_dlp', String(enableDlp));
@@ -136,7 +266,6 @@ const TranslationPage: React.FC = () => {
       return fd;
     };
 
-    // Bug 3: Await the async call so unhandled rejections don't go silent
     await startTranslation(buildFormData);
 
     setTimeout(() => {
@@ -147,26 +276,24 @@ const TranslationPage: React.FC = () => {
   };
 
   // ── Copy ──
-  const handleCopy = async () => {
-    const translatedText = jobData?.result?.translated_document?.content;
+  const handleCopy = async (jobId: string) => {
+    const translatedText = jobs[jobId]?.result?.translated_document?.content;
     if (!translatedText) return;
     await navigator.clipboard.writeText(translatedText);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setCopiedJobId(jobId);
+    setTimeout(() => setCopiedJobId(null), 2000);
   };
 
   // ── Download ──
-  // Bug 5: getValidDownloadUrl auto-refreshes the signed URL if expired.
-  const handleDownload = async () => {
-    // Try the (potentially refreshed) signed URL first
-    const signedUrl = await getValidDownloadUrl()
-      ?? jobData?.result?.translated_document?.download_url;
+  const handleDownload = async (jobId: string) => {
+    const signedUrl = await getValidDownloadUrl(jobId)
+      ?? jobs[jobId]?.result?.translated_document?.download_url;
 
     if (signedUrl) {
       const filename =
-        downloadInfo?.filename ??
-        jobData?.result?.translated_document?.filename ??
-        `translated_${Date.now()}.pdf`;
+        downloadInfo[jobId]?.filename ??
+        jobs[jobId]?.result?.translated_document?.filename ??
+        `translated_${jobId}.pdf`;
       const anchor = document.createElement('a');
       anchor.href = signedUrl;
       anchor.download = filename;
@@ -174,8 +301,7 @@ const TranslationPage: React.FC = () => {
       anchor.rel = 'noopener noreferrer';
       anchor.click();
     } else {
-      // Fallback: download inline text content if present
-      const translatedText = jobData?.result?.translated_document?.content;
+      const translatedText = jobs[jobId]?.result?.translated_document?.content;
       if (!translatedText) {
         console.warn('No download URL or inline content available.');
         return;
@@ -184,7 +310,7 @@ const TranslationPage: React.FC = () => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `translated_${Date.now()}.txt`;
+      a.download = `translated_${jobId}.txt`;
       a.click();
       URL.revokeObjectURL(url);
     }
@@ -197,8 +323,11 @@ const TranslationPage: React.FC = () => {
     toastTimer.current = setTimeout(() => setToast(null), 4500);
   };
 
-  // Bug 6: Also disallow same source/target language
-  const canTranslate = !!file && sourceLang !== targetLang;
+  const canTranslate =
+    !!file &&
+    targetLangs.length > 0 &&
+    targetLangs.length <= 5 &&
+    !targetLangs.includes(sourceLang);
   const isLoading = status === 'submitting' || status === 'polling';
 
   // ─── Render ────────────────────────────────────────────
@@ -336,12 +465,33 @@ const TranslationPage: React.FC = () => {
               </div>
 
               <div className="lang-field">
-                <label className="lang-label" htmlFor="tr-target-lang">Target Language <span className="required">*</span></label>
-                <select id="tr-target-lang" name="target_language" className="lang-select" value={targetLang} onChange={(e) => setTargetLang(e.target.value)}>
-                  {LANGUAGES.map((l) => (
-                    <option key={l.code} value={l.code}>{l.label}</option>
-                  ))}
-                </select>
+                <label className="lang-label">Target Languages <span className="required">*</span></label>
+                <div className="target-lang-chips" role="group" aria-label="Target languages">
+                  {LANGUAGES.map((l) => {
+                    const selected = targetLangs.includes(l.code);
+                    const disabled = l.code === sourceLang || (!selected && targetLangs.length >= 5);
+                    return (
+                      <button
+                        key={l.code}
+                        type="button"
+                        className={`target-lang-chip ${selected ? 'selected' : ''} ${disabled ? 'disabled' : ''}`}
+                        onClick={() => toggleTargetLang(l.code)}
+                        disabled={disabled}
+                        aria-pressed={selected}
+                        title={l.code === sourceLang ? 'Source and target must differ' : l.label}
+                      >
+                        <span className="target-lang-chip-code">{l.code.toUpperCase()}</span>
+                        <span className="target-lang-chip-label">{l.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="target-lang-hint">
+                  {targetLangs.length}/5 selected
+                  {targetLangs.includes(sourceLang) && (
+                    <span className="target-lang-error"> · Source language cannot also be a target</span>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -379,7 +529,9 @@ const TranslationPage: React.FC = () => {
               {isLoading ? (
                 <>
                   <span className="spinner" />
-                  {status === 'submitting' ? 'Submitting...' : 'Processing (Job ID: ' + jobData?.job_id?.substring(0, 8) + '...)'}
+                  {status === 'submitting'
+                    ? 'Submitting...'
+                    : `Processing ${Object.values(jobs).filter((j) => j.status === 'completed').length}/${jobOrder.length} languages`}
                 </>
               ) : (
                 <>
@@ -387,7 +539,7 @@ const TranslationPage: React.FC = () => {
                     <path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/>
                     <path d="m22 22-5-10-5 10"/><path d="M14 18h6"/>
                   </svg>
-                  Translate
+                  Translate{targetLangs.length > 1 ? ` (${targetLangs.length} languages)` : ''}
                 </>
               )}
             </button>
@@ -398,35 +550,10 @@ const TranslationPage: React.FC = () => {
         <div className="panel" ref={resultRef}>
           <div className="panel-header">
             <h2 className="panel-title">Output</h2>
-            {status === 'completed' && (downloadInfo || jobData?.result) && (
-              <div className="output-actions">
-                {jobData?.result?.translated_document?.content && (
-                  <button
-                    className={`output-action-btn ${copied ? 'copied' : ''}`}
-                    onClick={handleCopy}
-                  >
-                    {copied ? 'Copied!' : 'Copy'}
-                  </button>
-                )}
-                <button className="output-action-btn primary icon-only" onClick={handleDownload} id="download-btn" title={downloadInfo?.filename ? `Download · ${downloadInfo.filename}` : 'Download'}>
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                    <polyline points="7 10 12 15 17 10"/>
-                    <line x1="12" y1="15" x2="12" y2="3"/>
-                  </svg>
-                </button>
-                <button
-                  className="output-action-btn"
-                  onClick={() => setReviewOpen(true)}
-                  id="rate-btn"
-                  title="Rate this translation"
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                  </svg>
-                  Rate
-                </button>
-              </div>
+            {batchId && (
+              <span className="batch-id" title={batchId}>
+                Batch {batchId.substring(0, 8)}…
+              </span>
             )}
           </div>
 
@@ -452,54 +579,40 @@ const TranslationPage: React.FC = () => {
               <SkeletonLoader />
               <div className="polling-status">
                 <span className="pulse-dot"></span>
-                <span>Job Status: <strong>{(jobData?.status ?? 'queued').toUpperCase()}</strong></span>
-                {jobData?.submitted_at && (
-                  <span className="job-time">Started: {new Date(jobData.submitted_at).toLocaleTimeString()}</span>
+                <span>
+                  Batch Status:{' '}
+                  <strong>
+                    {jobOrder.length > 0
+                      ? `${Object.values(jobs).filter((j) => j.status === 'completed').length}/${jobOrder.length} completed`
+                      : (status ?? 'queued').toUpperCase()}
+                  </strong>
+                </span>
+                {jobOrder.length > 0 && (
+                  <span className="job-time">
+                    {Object.values(jobs).filter((j) => j.status === 'failed' || j.status === 'cancelled').length} failed
+                  </span>
                 )}
               </div>
             </div>
           )}
 
-          {/* Success */}
-          {status === 'completed' && jobData?.result && (
-            <div>
-              <div className="result-meta">
-                <span className="meta-chip">
-                  {jobData.result.metadata.source_language}
-                </span>
-                <span className="meta-arrow">→</span>
-                <span className="meta-chip teal">
-                  {jobData.result.metadata.target_language}
-                </span>
-
-              </div>
-              <div className="result-text-container">
-                <p className="result-text">
-                  {jobData.result.translated_document?.content || 'Document translated successfully. Use the download button to retrieve it.'}
-                </p>
-              </div>
-              <div className="result-details">
-                {jobData.result.labels && (
-                  <>
-                    <div className="detail-item">
-                      <span className="detail-label">Cost:</span>
-                      <span className="detail-value">${jobData.result.labels.cost_usd.toFixed(4)}</span>
-                    </div>
-                    <div className="detail-item">
-                      <span className="detail-label">Tokens:</span>
-                      <span className="detail-value">{jobData.result.labels.token_count}</span>
-                    </div>
-                  </>
-                )}
-                <div className="detail-item">
-                  <span className="detail-label">Time:</span>
-                  <span className="detail-value">{getElapsedTime(jobData)}</span>
-                </div>
-                <div className="detail-item">
-                  <span className="detail-label">Model:</span>
-                  <span className="detail-value">{formatModel(jobData.result.metadata)}</span>
-                </div>
-              </div>
+          {/* Success / Partial results */}
+          {(status === 'completed' || status === 'partial') && jobOrder.length > 0 && (
+            <div className="batch-result-list">
+              {jobOrder.map((jobId) => {
+                const job = jobs[jobId];
+                if (!job) return null;
+                return (
+                  <TranslationResultCard
+                    key={jobId}
+                    job={job}
+                    copied={copiedJobId === jobId}
+                    onCopy={() => handleCopy(jobId)}
+                    onDownload={() => handleDownload(jobId)}
+                    onRate={() => setReviewJobId(jobId)}
+                  />
+                );
+              })}
             </div>
           )}
 
@@ -517,9 +630,9 @@ const TranslationPage: React.FC = () => {
               <p className="error-message">{error}</p>
               <div className="error-actions">
                 <button className="retry-btn" onClick={retryOrReset} id="retry-btn">
-                  {jobData?.job_id ? 'Resume Checking Status' : 'Try Again'}
+                  {jobOrder.length > 0 ? 'Resume Checking Status' : 'Try Again'}
                 </button>
-                {jobData?.job_id && (
+                {jobOrder.length > 0 && (
                   <button className="retry-btn secondary" onClick={reset} id="reset-btn">
                     Start Over
                   </button>
@@ -531,11 +644,11 @@ const TranslationPage: React.FC = () => {
 
       </div>
 
-      {jobData?.job_id && (
+      {reviewJobId && (
         <ReviewModal
-          isOpen={reviewOpen}
-          jobId={jobData.job_id}
-          onClose={() => setReviewOpen(false)}
+          isOpen={!!reviewJobId}
+          jobId={reviewJobId}
+          onClose={() => setReviewJobId(null)}
           onSubmitted={handleReviewSubmitted}
         />
       )}
