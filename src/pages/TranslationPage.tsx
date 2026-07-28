@@ -358,49 +358,25 @@ const TranslationPage: React.FC = () => {
               </select>
             </div>
 
-            {/* Target languages — multi-select dropdown */}
+            {/* Target languages — multi-select dropdown (mirrors source language style) */}
             <div className="form-field">
-              <div className="targets-label-row">
-                <label className="field-label">
-                  Target Languages <span className="required">*</span>
-                </label>
-                <span className="targets-count">{targetLangs.length} selected</span>
-              </div>
+              <label className="field-label" htmlFor="tr-target-lang">Target Language <span className="required">*</span></label>
               <div className="multiselect-dropdown" ref={targetDropdownRef}>
                 <button
                   type="button"
-                  className={`multiselect-trigger ${targetDropdownOpen ? 'open' : ''}`}
+                  id="tr-target-lang"
+                  className={`field-select multiselect-trigger-clean ${targetDropdownOpen ? 'open' : ''}`}
                   onClick={() => setTargetDropdownOpen((v) => !v)}
                   aria-haspopup="listbox"
                   aria-expanded={targetDropdownOpen}
                 >
-                  <div className="multiselect-pills">
-                    {targetLangs.length === 0 && (
-                      <span className="multiselect-placeholder">Select target languages…</span>
-                    )}
-                    {targetLangs.map((code) => (
-                      <span key={code} className="multiselect-pill">
-                        <span className="multiselect-pill-flag">{langFlag(code)}</span>
-                        <span className="multiselect-pill-label">{langLabel(code)}</span>
-                        <span
-                          className="multiselect-pill-remove"
-                          role="button"
-                          tabIndex={-1}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleTarget(code);
-                          }}
-                          aria-label={`Remove ${langLabel(code)}`}
-                        >
-                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                          </svg>
-                        </span>
-                      </span>
-                    ))}
-                  </div>
+                  <span className={targetLangs.length === 0 ? 'multiselect-clean-placeholder' : 'multiselect-clean-value'}>
+                    {targetLangs.length === 0
+                      ? 'Select languages…'
+                      : targetLangs.map((c) => langLabel(c)).join(', ')}
+                  </span>
                   <span className={`multiselect-chevron ${targetDropdownOpen ? 'rotated' : ''}`}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                       <polyline points="6 9 12 15 18 9"/>
                     </svg>
                   </span>

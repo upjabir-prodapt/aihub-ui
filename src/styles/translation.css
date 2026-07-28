@@ -837,7 +837,42 @@
 /* ── Dropdown Container ── */
 .multiselect-dropdown {
   position: relative;
-  margin-top: 6px;
+}
+
+/* ── Clean trigger (mirrors .field-select / source language style) ── */
+.multiselect-trigger-clean {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  appearance: none;
+  /* Reset field-select background-image so we use our own chevron */
+  background-image: none !important;
+}
+
+.multiselect-trigger-clean.open {
+  border-color: var(--colt-teal);
+  box-shadow: 0 0 0 2px var(--colt-teal-light);
+}
+
+.multiselect-clean-value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.multiselect-clean-placeholder {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 13px;
 }
 
 .multiselect-trigger {
