@@ -5,12 +5,13 @@
    ========================================================================== */
 
 /* ── Page shell ─────────────────────────────────────────────────────────────
-   Lives directly inside .main-content (a fixed-height flex column). We claim
-   the remaining space and OWN the scroll here — this is what stops the page
-   from being "chopped". */
+   Lives inside .main-pane (fixed-height flex column). This is the single
+   scroll owner for the Sales Agent page — header + report/markdown scroll
+   together so content is never clipped without a scrollbar. */
 .sa-page {
   flex: 1;
   min-height: 0;
+  width: 100%;
   overflow-y: auto;
   overflow-x: hidden;
   display: flex;
@@ -18,6 +19,34 @@
   gap: 22px;
   padding: 26px clamp(16px, 4vw, 40px) 40px;
   scroll-behavior: smooth;
+  scrollbar-gutter: stable;
+}
+
+/* Visible scrollbars (Windows overlay scrollbars often look "missing") */
+.sa-page,
+.sa-report-body {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-default) transparent;
+}
+
+.sa-page::-webkit-scrollbar,
+.sa-report-body::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.sa-page::-webkit-scrollbar-thumb,
+.sa-report-body::-webkit-scrollbar-thumb {
+  background: var(--border-default);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.sa-page::-webkit-scrollbar-thumb:hover,
+.sa-report-body::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+  background-clip: padding-box;
 }
 
 /* ── Header banner ───────────────────────────────────────────────────────── */
@@ -177,10 +206,10 @@
 
 /* ── Body ────────────────────────────────────────────────────────────────── */
 .sa-body {
-  flex: 1;
-  min-height: 0;
   display: flex;
   flex-direction: column;
+  flex: 0 0 auto;
+  width: 100%;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -561,13 +590,13 @@
   width: 100%;
   max-width: 1000px;
   margin: 0 auto;
-  flex: 1;
-  min-height: 0;
+  flex: 0 0 auto;
   border-radius: 20px;
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
   box-shadow: var(--shadow-lg);
-  overflow: hidden;                 /* clip toolbar corners; body scrolls inside */
+  /* Grow with markdown; .sa-page owns vertical scroll (no nested clip). */
+  overflow: visible;
   display: flex;
   flex-direction: column;
 }
@@ -585,6 +614,7 @@
   padding: 16px 22px;
   background: var(--bg-elevated);
   border-bottom: 1px solid var(--border-subtle);
+  border-radius: 20px 20px 0 0;
   backdrop-filter: blur(8px);
 }
 
@@ -689,15 +719,10 @@
 }
 
 .sa-report-body {
-  flex: 1;
-  min-height: 0;
-  max-height: min(70vh, calc(100dvh - 220px));
-  overflow-y: auto;
+  flex: 0 0 auto;
   overflow-x: auto;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
+  overflow-y: visible;
   padding: clamp(20px, 4vw, 40px);
-  scroll-behavior: smooth;
 }
 
 /* ── Loading (report compiling) ──────────────────────────────────────────── */

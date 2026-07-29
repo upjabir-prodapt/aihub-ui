@@ -410,6 +410,133 @@
   flex-shrink: 0;
 }
 
+/* ===== TARGET LANGUAGE MULTI-SELECT DROPDOWN ===== */
+
+/* ── Dropdown Container ── */
+.multiselect-dropdown {
+  position: relative;
+}
+
+/* ── Clean trigger (mirrors .field-select / source language style) ── */
+.multiselect-trigger-clean {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  appearance: none;
+  /* Reset field-select background-image so we use our own chevron */
+  background-image: none !important;
+}
+
+.multiselect-trigger-clean.open {
+  border-color: var(--colt-teal);
+  box-shadow: 0 0 0 2px var(--colt-teal-light);
+}
+
+.multiselect-clean-value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.multiselect-clean-placeholder {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* ── Chevron ── */
+.multiselect-chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--text-muted);
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.multiselect-chevron.rotated {
+  transform: rotate(180deg);
+  color: var(--colt-teal);
+}
+
+/* ── Dropdown Menu ── */
+.multiselect-menu {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  right: 0;
+  z-index: 50;
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  border-radius: 12px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-elevated);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.08);
+  animation: dropdownSlideIn 0.15s ease-out;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+@keyframes dropdownSlideIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.multiselect-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.multiselect-option:hover {
+  background: var(--colt-teal-light);
+  color: var(--text-primary);
+}
+
+.multiselect-option.selected {
+  color: var(--colt-teal);
+  font-weight: 600;
+  background: var(--colt-teal-light);
+}
+
+.multiselect-option-flag {
+  font-size: 16px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.multiselect-option-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.multiselect-option-check {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--colt-teal);
+}
+
 /* ===== TRANSLATE BUTTON ===== */
 .translate-btn {
   width: 100%;
@@ -607,6 +734,102 @@
   font-size: 10px;
   color: var(--text-muted);
   font-weight: 500;
+}
+
+/* ===== BATCH RESULTS ===== */
+.batch-id {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--bg-elevated);
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
+}
+
+.batch-result-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.batch-result-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.batch-result-card--failed {
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.batch-result-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-card);
+}
+
+.batch-result-header .result-meta {
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+.batch-result-status {
+  flex-shrink: 0;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-badge--completed {
+  background: rgba(74, 222, 128, 0.12);
+  color: #4ade80;
+}
+
+.status-badge--processing,
+.status-badge--queued {
+  background: rgba(0, 215, 189, 0.12);
+  color: var(--colt-teal);
+}
+
+.status-badge--failed,
+.status-badge--cancelled {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+}
+
+.batch-result-error {
+  padding: 16px 20px;
+  font-size: 13px;
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.06);
+}
+
+.batch-result-actions {
+  display: flex;
+  gap: 6px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-card);
 }
 
 .result-text-container {
@@ -813,493 +1036,6 @@
 }
 
 /* =========================================================
-   TARGET LANGUAGE MULTI-SELECT DROPDOWN
-   ========================================================= */
-.targets-label-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.targets-count {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.4px;
-  color: var(--colt-teal);
-  background: var(--colt-teal-light);
-  border: 1px solid var(--border-teal);
-  padding: 2px 8px;
-  border-radius: 99px;
-  white-space: nowrap;
-}
-
-/* ── Dropdown Container ── */
-.multiselect-dropdown {
-  position: relative;
-}
-
-/* ── Clean trigger (mirrors .field-select / source language style) ── */
-.multiselect-trigger-clean {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  width: 100%;
-  text-align: left;
-  cursor: pointer;
-  appearance: none;
-  /* Reset field-select background-image so we use our own chevron */
-  background-image: none !important;
-}
-
-.multiselect-trigger-clean.open {
-  border-color: var(--colt-teal);
-  box-shadow: 0 0 0 2px var(--colt-teal-light);
-}
-
-.multiselect-clean-value {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--text-primary);
-  font-size: 13px;
-}
-
-.multiselect-clean-placeholder {
-  flex: 1;
-  min-width: 0;
-  color: var(--text-muted);
-  font-size: 13px;
-}
-
-.multiselect-trigger {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  width: 100%;
-  min-height: 40px;
-  padding: 5px 10px 5px 10px;
-  border-radius: 10px;
-  border: 1px solid var(--border-default);
-  background: var(--bg-elevated);
-  color: var(--text-primary);
-  font-size: 13px;
-  cursor: pointer;
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
-  text-align: left;
-}
-
-.multiselect-trigger:hover {
-  border-color: var(--colt-teal);
-}
-
-.multiselect-trigger.open {
-  border-color: var(--colt-teal);
-  box-shadow: 0 0 0 2px rgba(0, 169, 157, 0.12);
-}
-
-/* ── Pills Area ── */
-.multiselect-pills {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  flex: 1;
-  min-width: 0;
-  align-items: center;
-}
-
-.multiselect-placeholder {
-  color: var(--text-muted);
-  font-size: 13px;
-  padding: 2px 0;
-}
-
-.multiselect-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 6px 3px 7px;
-  border-radius: 7px;
-  background: var(--colt-teal-light);
-  border: 1px solid var(--border-teal);
-  color: var(--colt-teal);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.3;
-  white-space: nowrap;
-  transition: background var(--transition-fast);
-  animation: pillAppear 0.15s ease-out;
-}
-
-@keyframes pillAppear {
-  from { opacity: 0; transform: scale(0.85); }
-  to   { opacity: 1; transform: scale(1); }
-}
-
-.multiselect-pill-flag {
-  font-size: 13px;
-  line-height: 1;
-}
-
-.multiselect-pill-label {
-  font-size: 11.5px;
-}
-
-.multiselect-pill-remove {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  cursor: pointer;
-  color: var(--colt-teal);
-  opacity: 0.6;
-  transition: opacity var(--transition-fast), background var(--transition-fast);
-  flex-shrink: 0;
-}
-
-.multiselect-pill-remove:hover {
-  opacity: 1;
-  background: rgba(0, 169, 157, 0.15);
-}
-
-/* ── Chevron ── */
-.multiselect-chevron {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  color: var(--text-muted);
-  transition: transform 0.2s ease, color 0.2s ease;
-}
-
-.multiselect-chevron.rotated {
-  transform: rotate(180deg);
-  color: var(--colt-teal);
-}
-
-/* ── Dropdown Menu ── */
-.multiselect-menu {
-  position: absolute;
-  top: calc(100% + 5px);
-  left: 0;
-  right: 0;
-  z-index: 50;
-  list-style: none;
-  margin: 0;
-  padding: 4px;
-  border-radius: 12px;
-  border: 1px solid var(--border-default);
-  background: var(--bg-elevated);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.08);
-  animation: dropdownSlideIn 0.15s ease-out;
-  max-height: 220px;
-  overflow-y: auto;
-}
-
-@keyframes dropdownSlideIn {
-  from { opacity: 0; transform: translateY(-6px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-.multiselect-option {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 12px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  transition: background var(--transition-fast), color var(--transition-fast);
-}
-
-.multiselect-option:hover {
-  background: var(--colt-teal-light);
-  color: var(--text-primary);
-}
-
-.multiselect-option.selected {
-  color: var(--colt-teal);
-  font-weight: 600;
-  background: var(--colt-teal-light);
-}
-
-.multiselect-option-flag {
-  font-size: 16px;
-  line-height: 1;
-  flex-shrink: 0;
-}
-
-.multiselect-option-label {
-  flex: 1;
-  min-width: 0;
-}
-
-.multiselect-option-check {
-  width: 18px;
-  height: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  color: var(--colt-teal);
-}
-
-
-/* =========================================================
-   OUTPUT SUMMARY (header chips)
-   ========================================================= */
-.output-summary {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.summary-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 3px 9px;
-  border-radius: 99px;
-  border: 1px solid var(--border-default);
-  color: var(--text-secondary);
-  background: var(--bg-card);
-  white-space: nowrap;
-}
-
-.summary-chip.summary-done {
-  color: #16a34a;
-  border-color: rgba(34, 197, 94, 0.3);
-  background: rgba(34, 197, 94, 0.08);
-}
-
-.summary-chip.summary-running {
-  color: var(--colt-teal);
-  border-color: var(--border-teal);
-  background: var(--colt-teal-light);
-}
-
-.summary-chip.summary-failed {
-  color: #ef4444;
-  border-color: rgba(239, 68, 68, 0.3);
-  background: rgba(239, 68, 68, 0.08);
-}
-
-/* =========================================================
-   RESULT CARDS (one per target language, scrollable list)
-   ========================================================= */
-.result-cards {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.result-card {
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-subtle);
-  border-left: 3px solid var(--border-default);
-  border-radius: 12px;
-  overflow: hidden;
-  transition: border-color var(--transition-fast), box-shadow var(--transition-mid);
-  animation: card-in 0.28s ease both;
-}
-
-@keyframes card-in {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-.result-card:hover { box-shadow: var(--shadow-sm); }
-
-.result-card.status-completed { border-left-color: #22c55e; }
-.result-card.status-failed { border-left-color: #ef4444; }
-.result-card.status-polling,
-.result-card.status-submitting { border-left-color: var(--colt-teal); }
-
-.result-card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 11px 14px;
-  border-bottom: 1px solid var(--border-subtle);
-  background: var(--bg-card);
-}
-
-.result-card-lang {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-
-.result-card-flag {
-  width: 34px;
-  height: 34px;
-  border-radius: 9px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-default);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 17px;
-  font-weight: 700;
-  letter-spacing: 0.3px;
-  flex-shrink: 0;
-}
-
-.result-card-route {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.result-card-target {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-primary);
-  line-height: 1.2;
-}
-
-.result-card-source {
-  font-size: 10px;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  font-weight: 500;
-}
-
-/* Status badge */
-.status-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.3px;
-  text-transform: uppercase;
-  padding: 4px 9px;
-  border-radius: 99px;
-  border: 1px solid transparent;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.status-badge-completed {
-  color: #16a34a;
-  background: rgba(34, 197, 94, 0.1);
-  border-color: rgba(34, 197, 94, 0.3);
-}
-
-.status-badge-failed {
-  color: #ef4444;
-  background: rgba(239, 68, 68, 0.1);
-  border-color: rgba(239, 68, 68, 0.3);
-}
-
-.status-badge-polling,
-.status-badge-submitting {
-  color: var(--colt-teal);
-  background: var(--colt-teal-light);
-  border-color: var(--border-teal);
-}
-
-/* Card body */
-.result-card-body {
-  padding: 14px;
-}
-
-.result-card-text {
-  font-size: 13px;
-  line-height: 1.7;
-  color: var(--text-primary);
-  white-space: pre-wrap;
-  word-break: break-word;
-  max-height: 180px;
-  overflow-y: auto;
-}
-
-.card-skeleton {
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-  padding: 4px 0;
-}
-
-/* Card meta row */
-.result-card-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px 18px;
-  padding: 11px 14px;
-  border-top: 1px solid var(--border-subtle);
-  background: var(--bg-card);
-}
-
-.detail-item-model {
-  min-width: 0;
-}
-
-.detail-item-model .detail-value {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 160px;
-}
-
-/* Card actions */
-.result-card-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-  padding: 11px 14px;
-  border-top: 1px solid var(--border-subtle);
-}
-
-/* Card error */
-.card-error {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-.card-error-msg {
-  font-size: 12px;
-  color: var(--text-secondary);
-  line-height: 1.5;
-  padding: 8px 12px;
-  border-radius: 8px;
-  background: rgba(239, 68, 68, 0.06);
-  border: 1px solid rgba(239, 68, 68, 0.15);
-  font-family: 'JetBrains Mono', monospace;
-  width: 100%;
-  word-break: break-word;
-}
-
-.card-retry-btn {
-  padding: 7px 16px;
-  font-size: 12px;
-}
-
-/* =========================================================
    RESPONSIVE — TRANSLATION PAGE
    ========================================================= */
 
@@ -1403,12 +1139,6 @@
   .output-placeholder { padding: 40px 16px; }
 
   .result-text-container { max-height: 300px; }
-
-  /* Output panel gets more room on mobile so cards aren't cramped */
-  .workspace > .panel:last-child { max-height: 75vh; }
-
-  .result-cards { padding: 12px; gap: 12px; }
-  .result-card-text { max-height: 150px; }
 }
 
 /* ── Small phones (≤480px) ── */
@@ -1432,16 +1162,6 @@
 
   .output-actions { flex-wrap: wrap; }
   .output-action-btn { font-size: 11px; padding: 4px 8px; }
-
-  /* Multi-select dropdown: pills shrink on small screens */
-  .multiselect-pill-label { font-size: 10.5px; }
-  .multiselect-pill { padding: 2px 5px 2px 6px; }
-  .multiselect-menu { max-height: 180px; }
-
-  /* Card meta wraps cleanly; actions stretch full width */
-  .result-card-meta { gap: 10px 14px; }
-  .result-card-actions .output-action-btn { flex: 1; justify-content: center; }
-  .detail-item-model .detail-value { max-width: 120px; }
 }
 
 /* =========================================================

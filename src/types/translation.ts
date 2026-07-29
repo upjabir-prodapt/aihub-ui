@@ -1,21 +1,45 @@
 // ── Submit Translation Job ─────────────────────────────────────────────────
 export interface TranslateRequest {
   file: File;
-  target_language: string;   // e.g. "en", "de", "es"
-  source_language?: string;  // Optional – auto-detected if omitted
-  domain: string;            // "commercial" | "legal" | "finance" | "hr" | "operations"
+  target_languages: string[]; // 1–5 target language codes (e.g. ["de", "fr"])
+  source_language?: string;   // Optional – auto-detected if omitted
+  domain: string;             // "commercial" | "legal" | "finance" | "hr" | "operations"
   enable_dlp?: boolean;
   enable_chunking?: boolean;
-  priority?: string;         // "standard" | "high"
+  priority?: string;          // "standard" | "high"
 }
 
 // Hub browser path: /api/translation/v1/* → Translation backend /api/v1/*
 //
-// POST /api/translation/v1/translate → 200
-export interface TranslateResponse {
+// POST /api/translation/v1/translate → 202
+export interface MultiTranslateJobResponse {
   job_id: string;
+  target_language: string;
   status: string;
   status_url: string;
+}
+
+export interface MultiTranslateResponse {
+  batch_id: string;
+  jobs: MultiTranslateJobResponse[];
+}
+
+// POST /api/translation/v1/jobs/status → 200
+export interface MultiJobStatusRequest {
+  job_ids: string[];
+}
+
+export interface MultiJobStatusItem {
+  job_id: string;
+  target_language: string;
+  status: 'queued' | 'processing' | 'completed' | 'failed' | 'cancelled';
+  download_url?: string | null;
+  download_filename?: string | null;
+  error_message?: string | null;
+}
+
+export interface MultiJobStatusResponse {
+  jobs: MultiJobStatusItem[];
 }
 
 // ── Job result payload ─────────────────────────────────────────────────────

@@ -7,7 +7,6 @@ node_modules/
 
 # Vite cache
 /.vite/
-.claude
 
 # Logs
 npm-debug.log*

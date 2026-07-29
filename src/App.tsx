@@ -115,7 +115,10 @@ function AppShell() {
           theme={theme}
           onToggleTheme={toggleTheme}
         />
-        <div style={{ display: activeTab === 'translation' ? 'contents' : 'none' }}>
+        <div
+          className="main-pane"
+          style={{ display: activeTab === 'translation' ? 'flex' : 'none' }}
+        >
           {entitlementsLoaded && !entitlements.translation ? (
             <AccessDenied serviceName="Translation" />
           ) : hubLoginRequired || !isAuthenticated ? (
@@ -124,7 +127,10 @@ function AppShell() {
             <TranslationPage />
           )}
         </div>
-        <div style={{ display: activeTab === 'sales' ? 'contents' : 'none' }}>
+        <div
+          className="main-pane"
+          style={{ display: activeTab === 'sales' ? 'flex' : 'none' }}
+        >
           {entitlementsLoaded && !entitlements.sales ? (
             <AccessDenied serviceName="Sales Agent" />
           ) : hubLoginRequired || !isSalesAuthenticated ? (

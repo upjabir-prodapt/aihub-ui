@@ -1,5 +1,7 @@
 import type {
-  TranslateResponse,
+  MultiTranslateResponse,
+  MultiJobStatusRequest,
+  MultiJobStatusResponse,
   JobStatusResponse,
   DownloadUrlResponse,
   ReviewRequest,
@@ -74,7 +76,7 @@ async function parseApiError(response: Response, fallback: string): Promise<stri
 // ── API ────────────────────────────────────────────────────────────────────
 
 export const translationApi = {
-  async startTranslation(formData: FormData): Promise<TranslateResponse> {
+  async startTranslation(formData: FormData): Promise<MultiTranslateResponse> {
     const response = await fetchWithAuth(`${API_BASE}/translate`, {
       method: 'POST',
       body: formData,
@@ -82,6 +84,21 @@ export const translationApi = {
 
     if (!response.ok) {
       throw new Error(await parseApiError(response, 'Failed to submit translation job'));
+    }
+
+    return response.json();
+  },
+
+  async getMultipleJobStatuses(jobIds: string[]): Promise<MultiJobStatusResponse> {
+    const requestBody: MultiJobStatusRequest = { job_ids: jobIds };
+    const response = await fetchWithAuth(`${API_BASE}/jobs/status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      throw new Error(await parseApiError(response, 'Failed to fetch job statuses'));
     }
 
     return response.json();
