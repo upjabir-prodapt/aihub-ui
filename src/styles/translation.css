@@ -410,69 +410,131 @@
   flex-shrink: 0;
 }
 
-/* ===== TARGET LANGUAGE CHIPS ===== */
-.target-lang-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-default);
+/* ===== TARGET LANGUAGE MULTI-SELECT DROPDOWN ===== */
+
+/* ── Dropdown Container ── */
+.multiselect-dropdown {
+  position: relative;
 }
 
-.target-lang-chip {
+/* ── Clean trigger (mirrors .field-select / source language style) ── */
+.multiselect-trigger-clean {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 10px;
-  border-radius: 99px;
-  border: 1px solid var(--border-default);
-  background: var(--bg-card);
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 500;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
   cursor: pointer;
-  transition: all var(--transition-fast);
+  appearance: none;
+  /* Reset field-select background-image so we use our own chevron */
+  background-image: none !important;
 }
 
-.target-lang-chip:hover:not(:disabled) {
+.multiselect-trigger-clean.open {
   border-color: var(--colt-teal);
+  box-shadow: 0 0 0 2px var(--colt-teal-light);
+}
+
+.multiselect-clean-value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--text-primary);
+  font-size: 13px;
+}
+
+.multiselect-clean-placeholder {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* ── Chevron ── */
+.multiselect-chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--text-muted);
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.multiselect-chevron.rotated {
+  transform: rotate(180deg);
+  color: var(--colt-teal);
+}
+
+/* ── Dropdown Menu ── */
+.multiselect-menu {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  right: 0;
+  z-index: 50;
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  border-radius: 12px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-elevated);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.08);
+  animation: dropdownSlideIn 0.15s ease-out;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+@keyframes dropdownSlideIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.multiselect-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.multiselect-option:hover {
+  background: var(--colt-teal-light);
+  color: var(--text-primary);
+}
+
+.multiselect-option.selected {
+  color: var(--colt-teal);
+  font-weight: 600;
   background: var(--colt-teal-light);
 }
 
-.target-lang-chip.selected {
-  background: var(--colt-teal);
-  border-color: var(--colt-teal);
-  color: #ffffff;
+.multiselect-option-flag {
+  font-size: 16px;
+  line-height: 1;
+  flex-shrink: 0;
 }
 
-.target-lang-chip.selected:hover:not(:disabled) {
-  filter: brightness(1.1);
+.multiselect-option-label {
+  flex: 1;
+  min-width: 0;
 }
 
-.target-lang-chip.disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.target-lang-chip-code {
-  font-weight: 700;
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.target-lang-hint {
-  font-size: 11px;
-  color: var(--text-muted);
-  margin-top: 6px;
-}
-
-.target-lang-error {
-  color: #ef4444;
-  font-weight: 500;
+.multiselect-option-check {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--colt-teal);
 }
 
 /* ===== TRANSLATE BUTTON ===== */
