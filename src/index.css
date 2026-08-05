@@ -132,6 +132,60 @@ button:focus-visible, a:focus-visible, select:focus-visible, textarea:focus-visi
 }
 button, a, select { cursor: pointer; }
 
+/* ===== SHARED ACTION BUTTON ===== */
+.output-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 7px;
+  border: 1px solid var(--border-default);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  transition: all var(--transition-fast);
+}
+
+.output-action-btn:hover {
+  border-color: var(--colt-teal);
+  color: var(--colt-teal);
+  background: var(--colt-teal-light);
+}
+
+.output-action-btn.copied {
+  border-color: #4ade80;
+  color: #4ade80;
+  background: rgba(74, 222, 128, 0.08);
+}
+
+.output-action-btn.primary {
+  background: var(--colt-teal);
+  border-color: var(--colt-teal);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.output-action-btn.primary:hover {
+  background: var(--colt-teal);
+  filter: brightness(1.1);
+  border-color: var(--colt-teal);
+  color: #ffffff;
+}
+
+/* Icon-only compact variant */
+.output-action-btn.icon-only {
+  padding: 5px 8px;
+  min-width: unset;
+}
+
+/* Keep icons visible inside buttons on small screens */
+button svg,
+.output-action-btn svg,
+.sa-btn svg {
+  flex-shrink: 0;
+}
+
 /* ===== RESPONSIVE HELPERS ===== */
 @media (max-width: 1024px) {
   :root {
@@ -148,6 +202,26 @@ button, a, select { cursor: pointer; }
   /* Allow page body to scroll on mobile */
   html, body, #root {
     overflow: auto;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Hide download button labels on very small screens; keep icons visible */
+  .download-btn .btn-label {
+    display: none;
+  }
+
+  .output-action-btn.download-btn,
+  .sa-btn.download-btn {
+    padding: 6px;
+    justify-content: center;
+    min-width: 34px;
+    min-height: 34px;
+  }
+
+  .output-action-btn {
+    font-size: 11px;
+    padding: 4px 8px;
   }
 }
 

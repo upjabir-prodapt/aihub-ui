@@ -122,8 +122,8 @@ const ContractManagementPage: React.FC = () => {
         <button className="output-action-btn">
           <Filter size={16} /> Filters
         </button>
-        <button className="output-action-btn" style={{ marginLeft: 'auto' }}>
-          <Download size={16} /> Export CSV
+        <button className="output-action-btn download-btn" style={{ marginLeft: 'auto' }}>
+          <Download size={16} /> <span className="btn-label">Export CSV</span>
         </button>
       </div>
 

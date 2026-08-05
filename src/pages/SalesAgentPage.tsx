@@ -438,14 +438,14 @@ const SalesAgentPage: React.FC = () => {
               <div className="sa-report-actions">
                 <button
                   id="res-download-btn"
-                  className="sa-btn"
+                  className="sa-btn download-btn"
                   onClick={handleDownload}
                   disabled={downloading}
                   title="Download research report file"
                 >
                   {downloading
-                    ? <><RefreshCw size={14} className="spin" /> Downloading…</>
-                    : <><Download size={15} /> Download</>}
+                    ? <><RefreshCw size={14} className="spin" /> <span className="btn-label">Downloading…</span></>
+                    : <><Download size={15} /> <span className="btn-label">Download</span></>}
                 </button>
                 <button className="sa-btn sa-btn--primary" onClick={resetResearch}>
                   New research

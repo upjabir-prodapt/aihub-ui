@@ -118,11 +118,11 @@ const TranslationResultCard: React.FC<TranslationResultCardProps> = ({
             <>
               <div className="detail-item">
                 <span className="detail-label">Cost:</span>
-                <span className="detail-value">${result.labels.cost_usd.toFixed(4)}</span>
+                <span className="detail-value">{typeof result.labels.cost_usd === 'number' ? `$${result.labels.cost_usd.toFixed(4)}` : '—'}</span>
               </div>
               <div className="detail-item">
                 <span className="detail-label">Tokens:</span>
-                <span className="detail-value">{result.labels.token_count}</span>
+                <span className="detail-value">{result.labels.token_count ?? '—'}</span>
               </div>
             </>
           )}
@@ -145,7 +145,7 @@ const TranslationResultCard: React.FC<TranslationResultCardProps> = ({
             </button>
           )}
           <button
-            className="output-action-btn primary icon-only"
+            className="output-action-btn primary icon-only download-btn"
             onClick={onDownload}
             title="Download translation"
           >
