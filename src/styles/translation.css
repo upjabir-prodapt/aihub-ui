@@ -717,6 +717,8 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  /* Never squash cards to fit the list — let the list scroll instead. */
+  flex: 0 0 auto;
 }
 
 .batch-result-card--failed {
@@ -730,6 +732,7 @@
   padding: 10px 14px;
   border-bottom: 1px solid var(--border-subtle);
   background: var(--bg-card);
+  flex-shrink: 0;
 }
 
 .batch-result-header .result-meta {
@@ -796,8 +799,9 @@
 .result-text-container {
   padding: 20px;
   overflow-y: auto;
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
+  max-height: 220px;
 }
 
 .result-text {
@@ -977,6 +981,7 @@
   border-top: 1px solid var(--border-subtle);
   background: var(--bg-elevated);
   margin-top: auto;
+  flex-shrink: 0;
 }
 
 .detail-item {
