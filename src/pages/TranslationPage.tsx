@@ -155,11 +155,11 @@ const TranslationResultCard: React.FC<TranslationResultCardProps> = ({
               <line x1="12" y1="15" x2="12" y2="3"/>
             </svg>
           </button>
-          <button className="output-action-btn" onClick={onRate} title="Rate this translation">
+          <button className="output-action-btn icon-only rate-btn" onClick={onRate} title="Rate this translation">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="none">
               <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
             </svg>
-            Rate
+            <span className="btn-label">Rate</span>
           </button>
         </div>
       )}

@@ -206,11 +206,12 @@ button svg,
 }
 
 @media (max-width: 480px) {
-  /* Hide download button labels on very small screens; keep icons visible */
-  .download-btn .btn-label {
+  /* Hide icon-only button labels on very small screens; keep icons visible */
+  .icon-only .btn-label {
     display: none;
   }
 
+  .output-action-btn.icon-only,
   .output-action-btn.download-btn,
   .sa-btn.download-btn {
     padding: 6px;
