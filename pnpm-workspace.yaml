@@ -1,0 +1,3 @@
+allowBuilds:
+  protobufjs: true
+  unrs-resolver: set this to true or false

@@ -1,0 +1,226 @@
+/* ===== CSS RESET & BASE ===== */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  /* Colt Brand Colors - Consistent across themes */
+  --colt-teal: #00D7BD;
+  --colt-teal-dark: #00b09c;
+  --colt-teal-light: #00d7bd1a;
+  --colt-teal-mid: #00d7bd33;
+
+  /* Sizes */
+  --sidebar-width: 256px;
+  --topbar-height: 60px;
+
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-mid: 250ms ease;
+
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Default Dark Theme */
+:root, [data-theme='dark'] {
+  --bg-base: #09090f;
+  --bg-surface: #11111c;
+  --bg-elevated: #18182a;
+  --bg-card: #1e1e30;
+  --bg-hover: #24243a;
+  --bg-active: #2a2a42;
+
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-default: rgba(255, 255, 255, 0.10);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --border-teal: rgba(0, 215, 189, 0.3);
+
+  --text-primary: #f0f0f8;
+  --text-secondary: #9090b0;
+  --text-muted: #5a5a78;
+  --text-teal: #00D7BD;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6);
+  --shadow-teal: 0 0 24px rgba(0, 215, 189, 0.12);
+
+  --scrollbar-thumb: rgba(255, 255, 255, 0.12);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.2);
+}
+
+/* Light Theme */
+[data-theme='light'] {
+  --bg-base: #f8fafc;
+  --bg-surface: #ffffff;
+  --bg-elevated: #f1f5f9;
+  --bg-card: #ffffff;
+  --bg-hover: #f1f5f9;
+  --bg-active: #e2e8f0;
+
+  --border-subtle: rgba(0, 0, 0, 0.04);
+  --border-default: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.12);
+  --border-teal: rgba(0, 215, 189, 0.4);
+
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+  --text-teal: #00b09c;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-teal: 0 0 20px rgba(0, 215, 189, 0.08);
+
+  --scrollbar-thumb: rgba(0, 0, 0, 0.1);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.2);
+}
+
+body {
+  color: var(--text-primary);
+  background: var(--bg-base);
+  transition: background-color var(--transition-mid), color var(--transition-mid);
+}
+
+[data-theme='light'] .sidebar {
+  background: var(--bg-surface);
+}
+
+[data-theme='light'] .nav-item.active {
+  background: rgba(0, 215, 189, 0.08);
+}
+
+[data-theme='light'] .lang-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+}
+
+[data-theme='light'] .hero-banner {
+  background: linear-gradient(135deg, #ffffff 0%, rgba(0, 215, 189, 0.08) 100%);
+  box-shadow: var(--shadow-md);
+}
+
+[data-theme='light'] .drop-zone {
+  background: #f8fafc;
+}
+
+
+
+html, body, #root {
+  height: 100%;
+  overflow: hidden;
+}
+
+/* ===== SCROLLBAR ===== */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
+
+
+/* ===== FOCUS RESET ===== */
+button:focus-visible, a:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--colt-teal);
+  outline-offset: 2px;
+}
+button, a, select { cursor: pointer; }
+
+/* ===== SHARED ACTION BUTTON ===== */
+.output-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 7px;
+  border: 1px solid var(--border-default);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  transition: all var(--transition-fast);
+}
+
+.output-action-btn:hover {
+  border-color: var(--colt-teal);
+  color: var(--colt-teal);
+  background: var(--colt-teal-light);
+}
+
+.output-action-btn.copied {
+  border-color: #4ade80;
+  color: #4ade80;
+  background: rgba(74, 222, 128, 0.08);
+}
+
+.output-action-btn.primary {
+  background: var(--colt-teal);
+  border-color: var(--colt-teal);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.output-action-btn.primary:hover {
+  background: var(--colt-teal);
+  filter: brightness(1.1);
+  border-color: var(--colt-teal);
+  color: #ffffff;
+}
+
+/* Icon-only compact variant */
+.output-action-btn.icon-only {
+  padding: 5px 8px;
+  min-width: unset;
+}
+
+/* Keep icons visible inside buttons on small screens */
+button svg,
+.output-action-btn svg,
+.sa-btn svg {
+  flex-shrink: 0;
+}
+
+/* ===== RESPONSIVE HELPERS ===== */
+@media (max-width: 1024px) {
+  :root {
+    --sidebar-width: 220px;
+  }
+}
+
+@media (max-width: 768px) {
+  :root {
+    --sidebar-width: 0px;
+    --topbar-height: 56px;
+  }
+
+  /* Allow page body to scroll on mobile */
+  html, body, #root {
+    overflow: auto;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Hide icon-only button labels on very small screens; keep icons visible */
+  .icon-only .btn-label {
+    display: none;
+  }
+
+  .output-action-btn.icon-only,
+  .output-action-btn.download-btn,
+  .sa-btn.download-btn {
+    padding: 6px;
+    justify-content: center;
+    min-width: 34px;
+    min-height: 34px;
+  }
+
+  .output-action-btn {
+    font-size: 11px;
+    padding: 4px 8px;
+  }
+}
+

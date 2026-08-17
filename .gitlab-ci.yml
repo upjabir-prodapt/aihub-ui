@@ -1,124 +1,196 @@
 include:
-  - template: Security/SAST.gitlab-ci.yml
-  - template: Security/Secret-Detection.gitlab-ci.yml
+- template: Security/SAST.gitlab-ci.yml
+- template: Security/Secret-Detection.gitlab-ci.yml
+- template: Security/Dependency-Scanning.gitlab-ci.yml
 
 workflow:
   rules:
-    - if: $CI_COMMIT_BRANCH == "sandbox"
-    - if: $CI_COMMIT_BRANCH == "dev"
-    - if: $CI_COMMIT_BRANCH == "prod"
+  - if: $CI_COMMIT_BRANCH == "sandbox"
+  - if: $CI_COMMIT_BRANCH == "dev"
+  - if: $CI_COMMIT_BRANCH == "prod"
 
 stages:
-  - sync
-  - lint
-  - build
-  - deploy
-  - promote
+- sync
+- lint
+- test
+- build
+- deploy
+- dast
+- promote
 
 variables:
   IMAGE_TAG: "$CI_PIPELINE_IID"
   # Group CI/CD variables: HTTP_PROXY, HTTPS_PROXY, AZURE_PAT (Azure DevOps Code Read), GITLAB_PUSH_TOKEN
-  # WIF: WORKLOAD_IDENTITY_PROJECT_NUMBER, WORKLOAD_IDENTITY_POOL,
-  #      WORKLOAD_IDENTITY_PROVIDER, SERVICE_ACCOUNT, GCP_PROJECT_ID
+  # WIF: one pool is SHARED across every AI CoE repo (gitlab-pool/gitlab-provider in the
+  #      seed project aicoe-sharedwif — see AICOE-Terraform/terraform/0-bootstrap/wif.tf).
+  #      WORKLOAD_IDENTITY_PROJECT_NUMBER, WORKLOAD_IDENTITY_POOL, WORKLOAD_IDENTITY_PROVIDER
+  #      SERVICE_ACCOUNT (per-project tf-deployer@<project>.iam.gserviceaccount.com), GCP_PROJECT_ID
+  #      NOTE: this repo's GitLab project_path must be added to the provider's
+  #      allowed_repositories list (terraform/envs/dev/terraform.tfvars) before WIF auth
+  #      will succeed here — see docs/deployment.md §3.2.
+
   # Per-environment: GCP_REGION, ARTIFACT_REPO, IMAGE_NAME, CLOUD_RUN_SERVICE,
-  #                  CLOUD_RUN_NETWORK, CLOUD_RUN_SUBNET, CLOUD_RUN_SA
-  # Vite build-time (per env): VITE_TRANSLATION_API_ORIGIN, VITE_SALES_API_ORIGIN,
-  #   VITE_TRANSLATION_CLOUD_RUN_URL, VITE_SALES_CLOUD_RUN_URL, VITE_CONTRACTS_API_BASE,
-  #   VITE_GCP_PROJECT_ID, VITE_GCP_PROJECT_NUMBER, VITE_GCP_REGION, VITE_TLS_CA_FILE
-  # See GITLAB_CI_VARIABLES.md
+  #                  CLOUD_RUN_NETWORK, CLOUD_RUN_SUBNET, CLOUD_RUN_SA,
+  #                  ENTRA_TENANT_ID, ENTRA_CLIENT_ID, ENTRA_REDIRECT_URI, ENTRA_CLIENT_SECRET_SECRET_NAME,
+  #                  GCP_PROJECT_NUMBER, GCP_KMS_KEY_RING, GCP_KMS_KEY_NAME, GCP_KMS_LOCATION,
+  #                  APIGEE_CLIENT_KEY_SECRET_NAME, TRANSLATION_API_ORIGIN, SALES_API_ORIGIN
+  # Build-time (client bundle) — passed as docker --build-arg in build-and-push:
+  #                  VITE_TRANSLATION_API_ORIGIN, VITE_TRANSLATION_CLOUD_RUN_URL,
+  #                  VITE_SALES_API_ORIGIN, VITE_SALES_CLOUD_RUN_URL, VITE_CONTRACTS_API_BASE,
+  #                  VITE_GCP_PROJECT_ID, VITE_GCP_PROJECT_NUMBER, VITE_GCP_REGION, VITE_TLS_CA_FILE
   GCLOUD_USER_INSTALL_DIR: "${CI_PROJECT_DIR}/.tools/google-cloud-sdk"
   GCLOUD_ARCHIVE_URL: "https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz"
+  # Shell runner tag: Shell1 (shell executor on amsgit02)
+  # Avoid ~/.cache/* and ~/.local/share/pnpm under $HOME — home partition is often full
+  PNPM_HOME: "${CI_PROJECT_DIR}/.tools/pnpm"
+  PNPM_STORE_DIR: "${CI_PROJECT_DIR}/.cache/pnpm-store"
+  XDG_CACHE_HOME: "${CI_PROJECT_DIR}/.cache/xdg"
+  # Keep gcloud state off $HOME — shell runners often have a full home partition
   CLOUDSDK_CONFIG: "${CI_PROJECT_DIR}/.cache/gcloud-config"
   CLOUDSDK_CORE_DISABLE_PROMPTS: "1"
+  # Docker login/configure-docker writes ~/.docker/config.json — redirect to build volume
   DOCKER_CONFIG: "${CI_PROJECT_DIR}/.cache/docker"
+  # Do not set TMPDIR here — GitLab Runner uses $CI_PROJECT_DIR/.tmp for artifact downloads
   CI_WORK_TMP: "${CI_PROJECT_DIR}/.ci-work"
-  NPM_CONFIG_CACHE: "${CI_PROJECT_DIR}/.cache/npm"
-  # Vite 8 requires Node ^20.19.0 — install to project dir (avoids broken nvm on shell runners).
-  NODE_VERSION: "20.19.4"
-  NODE_INSTALL_DIR: "${CI_PROJECT_DIR}/.tools/node-v20.19.4"
 
 ".shell_runner":
   tags:
-    - Shell1
+  - Shell1
+
+".docker_runner":
+  image: node:20
+  tags: []
 
 ".proxy":
   before_script:
-    - |
-      export http_proxy="$HTTP_PROXY"
-      export https_proxy="${HTTPS_PROXY:-$HTTP_PROXY}"
-      export HTTP_PROXY="$HTTP_PROXY"
-      export HTTPS_PROXY="${HTTPS_PROXY:-$HTTP_PROXY}"
-      echo "Proxy configured (HTTP_PROXY=$HTTP_PROXY)"
+  - |
+    export http_proxy="$HTTP_PROXY"
+    export https_proxy="${HTTPS_PROXY:-$HTTP_PROXY}"
+    export HTTP_PROXY="$HTTP_PROXY"
+    export HTTPS_PROXY="${HTTPS_PROXY:-$HTTP_PROXY}"
+    echo "Proxy configured (HTTP_PROXY=$HTTP_PROXY)"
 
-".ensure_node":
+".runner_shell":
   before_script:
-    - !reference [".proxy", before_script]
-    - |
-      set -e
-      NODE_VERSION="${NODE_VERSION:-20.19.4}"
-      NODE_INSTALL_DIR="${NODE_INSTALL_DIR:-${CI_PROJECT_DIR}/.tools/node-v${NODE_VERSION}}"
-      NODE_DIST="node-v${NODE_VERSION}-linux-x64"
-
-      if [ ! -x "${NODE_INSTALL_DIR}/bin/node" ]; then
-        echo "Installing Node.js ${NODE_VERSION} to ${NODE_INSTALL_DIR}..."
-        mkdir -p "${CI_PROJECT_DIR}/.tools" "${CI_WORK_TMP:-${CI_PROJECT_DIR}/.ci-work}"
-        tmp="$(mktemp -d "${CI_WORK_TMP:-${CI_PROJECT_DIR}/.ci-work}/node-install.XXXXXX")"
-        curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/${NODE_DIST}.tar.gz" -o "${tmp}/node.tar.gz"
-        tar -xzf "${tmp}/node.tar.gz" -C "${CI_PROJECT_DIR}/.tools"
-        mv "${CI_PROJECT_DIR}/.tools/${NODE_DIST}" "${NODE_INSTALL_DIR}"
-        rm -rf "$tmp"
+  - |
+    shell_run_root() {
+      if [ "$(id -u)" -eq 0 ]; then
+        "$@"
+      elif command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+        sudo -n "$@"
+      else
+        return 1
       fi
+    }
 
-      # Prefer project-local Node over runner globals (/app/BuiltTools/npm + nvm).
-      export PATH="${NODE_INSTALL_DIR}/bin:$PATH"
-      unset NPM_CONFIG_PREFIX
-      hash -r
-
-      node_major="$(node -p 'parseInt(process.versions.node.split(".")[0], 10)')"
-      if [ "$node_major" -lt 20 ]; then
-        echo "ERROR - Node >=20 required (found $(node -v))"
-        exit 1
+    check_build_disk_space() {
+      local mount="${CI_PROJECT_DIR:-.}"
+      local avail_kb min_kb=524288
+      avail_kb="$(df -Pk "$mount" 2>/dev/null | awk 'NR==2 {print $4}')"
+      echo "Build volume: $(df -h "$mount" 2>/dev/null | awk 'NR==2 {print $2 " total, " $3 " used, " $4 " avail (" $5 " used)"}')"
+      if [ -n "$avail_kb" ] && [ "$avail_kb" -lt "$min_kb" ]; then
+        echo "ERROR - less than 512 MiB free on ${mount}; ask infra to clean /app/builds on $(hostname -s 2>/dev/null || hostname)"
+        return 1
       fi
-      echo "OK - node $(node -v), npm $(npm -v)"
+    }
+
+    check_home_disk_space() {
+      local home="${HOME:-/home/devopsadmin}"
+      local avail_kb min_kb=10240
+      avail_kb="$(df -Pk "$home" 2>/dev/null | awk 'NR==2 {print $4}')"
+      echo "Home volume: $(df -h "$home" 2>/dev/null | awk 'NR==2 {print $2 " total, " $3 " used, " $4 " avail (" $5 " used)"}')"
+      if [ -n "$avail_kb" ] && [ "$avail_kb" -lt "$min_kb" ]; then
+        echo "WARNING - less than 10 MiB free on ${home}; using DOCKER_CONFIG under CI_PROJECT_DIR"
+      fi
+    }
 
 ".ensure_gcloud":
   before_script:
-    - !reference [".proxy", before_script]
-    - |
-      set -e
-      export CLOUDSDK_CONFIG="${CLOUDSDK_CONFIG:-${CI_PROJECT_DIR}/.cache/gcloud-config}"
-      export CLOUDSDK_CORE_DISABLE_PROMPTS="${CLOUDSDK_CORE_DISABLE_PROMPTS:-1}"
-      export TMPDIR="${CI_WORK_TMP:-${CI_PROJECT_DIR}/.ci-work}"
-      mkdir -p "$CLOUDSDK_CONFIG" "$TMPDIR"
+  - !reference [".proxy", before_script]
+  - !reference [".runner_shell", before_script]
+  - |
+    set -e
+    export CLOUDSDK_CONFIG="${CLOUDSDK_CONFIG:-${CI_PROJECT_DIR}/.cache/gcloud-config}"
+    export CLOUDSDK_CORE_DISABLE_PROMPTS="${CLOUDSDK_CORE_DISABLE_PROMPTS:-1}"
+    export TMPDIR="${CI_WORK_TMP:-${CI_PROJECT_DIR}/.ci-work}"
+    mkdir -p "$CLOUDSDK_CONFIG" "$TMPDIR"
+    check_build_disk_space
 
-      if ! command -v gcloud >/dev/null 2>&1; then
-        for candidate in /usr/bin/gcloud /usr/local/bin/gcloud /opt/google-cloud-sdk/bin/gcloud; do
-          if [ -x "$candidate" ]; then
-            export PATH="$(dirname "$candidate"):$PATH"
-            break
-          fi
-        done
-      fi
-
-      if ! command -v gcloud >/dev/null 2>&1; then
-        if [ -x "${GCLOUD_USER_INSTALL_DIR}/bin/gcloud" ]; then
-          export PATH="${GCLOUD_USER_INSTALL_DIR}/bin:$PATH"
-        else
-          echo "Installing gcloud to ${GCLOUD_USER_INSTALL_DIR}..."
-          tmp="$(mktemp -d)"
-          curl -fsSL "$GCLOUD_ARCHIVE_URL" -o "${tmp}/google-cloud-cli.tar.gz"
-          tar -xzf "${tmp}/google-cloud-cli.tar.gz" -C "$tmp"
-          mkdir -p "$(dirname "$GCLOUD_USER_INSTALL_DIR")"
-          mv "${tmp}/google-cloud-sdk" "$GCLOUD_USER_INSTALL_DIR"
-          rm -rf "$tmp"
-          export PATH="${GCLOUD_USER_INSTALL_DIR}/bin:$PATH"
+    if ! command -v gcloud >/dev/null 2>&1; then
+      for candidate in \
+        /usr/bin/gcloud \
+        /usr/local/bin/gcloud \
+        /opt/google-cloud-sdk/bin/gcloud \
+        /app/google-cloud-sdk/bin/gcloud \
+        /usr/lib/google-cloud-sdk/bin/gcloud \
+        /usr/libexec/google-cloud-sdk/bin/gcloud; do
+        if [ -x "$candidate" ]; then
+          export PATH="$(dirname "$candidate"):$PATH"
+          break
         fi
+      done
+      if [ -n "${GCLOUD_SDK_ROOT:-}" ] && [ -x "${GCLOUD_SDK_ROOT}/bin/gcloud" ]; then
+        export PATH="${GCLOUD_SDK_ROOT}/bin:$PATH"
       fi
+    fi
 
-      gcloud --version
-      # deploy-cloud-run uses gcloud beta (direct VPC network/subnet attachment)
-      gcloud components install beta --quiet
-      echo "OK - gcloud ready"
+    install_gcloud_user_local() {
+      if [ -x "${GCLOUD_USER_INSTALL_DIR}/bin/gcloud" ]; then
+        export PATH="${GCLOUD_USER_INSTALL_DIR}/bin:$PATH"
+        echo "Using cached gcloud at ${GCLOUD_USER_INSTALL_DIR}"
+        return 0
+      fi
+      command -v curl >/dev/null 2>&1 || { echo "ERROR - curl required to download Cloud SDK"; return 1; }
+      echo "Installing Google Cloud CLI to ${GCLOUD_USER_INSTALL_DIR} (no sudo)..."
+      tmp="$(mktemp -d)"
+      mkdir -p "$(dirname "$GCLOUD_USER_INSTALL_DIR")"
+      curl -fsSL "$GCLOUD_ARCHIVE_URL" -o "${tmp}/google-cloud-cli.tar.gz"
+      tar -xzf "${tmp}/google-cloud-cli.tar.gz" -C "$tmp"
+      rm -rf "$GCLOUD_USER_INSTALL_DIR"
+      if [ -d "${tmp}/google-cloud-sdk" ]; then
+        mv "${tmp}/google-cloud-sdk" "$GCLOUD_USER_INSTALL_DIR"
+      else
+        echo "ERROR - unexpected Cloud SDK archive layout"
+        rm -rf "$tmp"
+        return 1
+      fi
+      rm -rf "$tmp"
+      export PATH="${GCLOUD_USER_INSTALL_DIR}/bin:$PATH"
+      echo "OK - gcloud installed under ${GCLOUD_USER_INSTALL_DIR}"
+    }
+
+    if ! command -v gcloud >/dev/null 2>&1; then
+      if shell_run_root true 2>/dev/null; then
+        if command -v apt-get >/dev/null 2>&1; then
+          shell_run_root apt-get update -qq
+          shell_run_root apt-get install -y -qq apt-transport-https ca-certificates gnupg curl
+          curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg \
+            | shell_run_root gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg
+          echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" \
+            | shell_run_root tee /etc/apt/sources.list.d/google-cloud-sdk.list
+          shell_run_root apt-get update -qq
+          shell_run_root apt-get install -y -qq google-cloud-cli
+        else
+          install_gcloud_user_local || {
+            echo "ERROR - could not install gcloud; check proxy and ${GCLOUD_ARCHIVE_URL}"
+            exit 1
+          }
+        fi
+      else
+        install_gcloud_user_local || {
+          echo "ERROR - could not install gcloud; check proxy and ${GCLOUD_ARCHIVE_URL}"
+          exit 1
+        }
+      fi
+    fi
+
+    if ! command -v gcloud >/dev/null 2>&1; then
+      echo "ERROR - gcloud not available after install attempt"
+      exit 1
+    fi
+    gcloud --version
+    gcloud components install beta --quiet
+    echo "OK - gcloud ready"
 
 ".gcp_wif":
   extends: ".ensure_gcloud"
@@ -128,246 +200,380 @@ variables:
     WORKLOAD_IDENTITY_TOKEN:
       aud: https://iam.googleapis.com
   before_script:
-    - !reference [".ensure_gcloud", before_script]
-    - echo "$WORKLOAD_IDENTITY_TOKEN" > workload_identity.jwt
-    - |
-      printf '%s\n' "{
-        \"type\": \"external_account\",
-        \"audience\": \"//iam.googleapis.com/projects/${WORKLOAD_IDENTITY_PROJECT_NUMBER}/locations/global/workloadIdentityPools/${WORKLOAD_IDENTITY_POOL}/providers/${WORKLOAD_IDENTITY_PROVIDER}\",
-        \"subject_token_type\": \"urn:ietf:params:oauth:token-type:jwt\",
-        \"token_url\": \"https://sts.googleapis.com/v1/token\",
-        \"credential_source\": { \"file\": \"workload_identity.jwt\" },
-        \"service_account_impersonation_url\": \"https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${SERVICE_ACCOUNT}:generateAccessToken\"
-      }" > credentials.json
-    - gcloud auth login --cred-file=credentials.json --quiet
-    - gcloud config set project "$GCP_PROJECT_ID"
+  - !reference [".ensure_gcloud", before_script]
+  - echo "$WORKLOAD_IDENTITY_TOKEN" > workload_identity.jwt
+  - |
+    printf '%s\n' "{
+      \"type\": \"external_account\",
+      \"audience\": \"//iam.googleapis.com/projects/${WORKLOAD_IDENTITY_PROJECT_NUMBER}/locations/global/workloadIdentityPools/${WORKLOAD_IDENTITY_POOL}/providers/${WORKLOAD_IDENTITY_PROVIDER}\",
+      \"subject_token_type\": \"urn:ietf:params:oauth:token-type:jwt\",
+      \"token_url\": \"https://sts.googleapis.com/v1/token\",
+      \"credential_source\": { \"file\": \"workload_identity.jwt\" },
+      \"service_account_impersonation_url\": \"https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${SERVICE_ACCOUNT}:generateAccessToken\"
+    }" > credentials.json
+  - gcloud auth login --cred-file=credentials.json --quiet
+  - gcloud config set project "$GCP_PROJECT_ID"
+  cache:
+    key: gcloud-sdk-$CI_COMMIT_REF_SLUG
+    paths:
+    - .tools/google-cloud-sdk/
+    policy: pull-push
   after_script:
-    - rm -rf workload_identity.jwt credentials.json 2>/dev/null || true
+  - rm -rf "${CI_PROJECT_DIR}/.cache/gcloud-config" "${CI_PROJECT_DIR}/.cache/docker" workload_identity.jwt credentials.json 2>/dev/null || true
 
+".ensure_pnpm":
+  before_script:
+  - !reference [".proxy", before_script]
+  - |
+    set -e
+    export PNPM_HOME="${PNPM_HOME:-${CI_PROJECT_DIR}/.tools/pnpm}"
+    export PNPM_STORE_DIR="${PNPM_STORE_DIR:-${CI_PROJECT_DIR}/.cache/pnpm-store}"
+    export XDG_CACHE_HOME="${XDG_CACHE_HOME:-${CI_PROJECT_DIR}/.cache/xdg}"
+    export TMPDIR="${CI_WORK_TMP:-${CI_PROJECT_DIR}/.ci-work}"
+    export PATH="${PNPM_HOME}:$PATH"
+    mkdir -p "$PNPM_HOME" "$PNPM_STORE_DIR" "$XDG_CACHE_HOME" "$TMPDIR"
+
+    command -v node >/dev/null 2>&1 || { echo "ERROR - node not found on runner (need Node 20+)"; exit 1; }
+    node --version
+
+    if ! command -v pnpm >/dev/null 2>&1; then
+      echo "Enabling corepack + preparing pnpm..."
+      corepack enable
+      corepack prepare pnpm@latest --activate
+    fi
+    pnpm config set store-dir "$PNPM_STORE_DIR"
+    pnpm --version
+    echo "OK - pnpm ready"
+
+".node_ci_base":
+  extends: ".ensure_pnpm"
+  cache:
+    key:
+      files:
+      - pnpm-lock.yaml
+    paths:
+    - ".cache/pnpm-store/"
+
+# Security scanners: docker executor runners (template runs /analyzer in analyzer image).
+# App build/test/deploy jobs use Shell1 — do not route DS/SAST/secret jobs to shell tags.
 # Pull Azure gitlab-sync-branch into GitLab sandbox (manual). The push triggers a new pipeline
-# that runs lint → build → deploy; use promote-* jobs for sandbox → dev → prod.
+# that runs lint → test → build → deploy; use promote-* jobs for sandbox → dev → prod.
 sync-from-azure:
   extends:
-    - ".proxy"
-    - ".shell_runner"
+  - ".proxy"
+  - ".shell_runner"
   stage: sync
   variables:
     GIT_DEPTH: "0"
   before_script:
-    - !reference [".proxy", before_script]
+  - !reference [".proxy", before_script]
   when: manual
   script:
-    - |
-      : "${AZURE_PAT:?Set masked+protected variable AZURE_PAT (Azure DevOps Code Read)}"
-      : "${GITLAB_PUSH_TOKEN:?Set masked+protected variable GITLAB_PUSH_TOKEN (scope: write_repository)}"
+  - |
+    : "${AZURE_PAT:?Set masked+protected variable AZURE_PAT (Azure DevOps Code Read)}"
+    : "${GITLAB_PUSH_TOKEN:?Set masked+protected variable GITLAB_PUSH_TOKEN (scope: write_repository)}"
 
-      AZURE_URL="https://ColtProgrammeOffice:${AZURE_PAT}@dev.azure.com/ColtProgrammeOffice/Google%20Vertex/_git/AI-Hub-UI"
-      PUSH_URL="https://oauth2:${GITLAB_PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
+    AZURE_URL="https://ColtProgrammeOffice:${AZURE_PAT}@dev.azure.com/ColtProgrammeOffice/Google%20Vertex/_git/AI-Hub-UI"
+    PUSH_URL="https://oauth2:${GITLAB_PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
 
-      git remote add azure "$AZURE_URL" 2>/dev/null || git remote set-url azure "$AZURE_URL"
-      git fetch azure gitlab-sync-branch
-      git fetch origin sandbox
+    git remote add azure "$AZURE_URL" 2>/dev/null || git remote set-url azure "$AZURE_URL"
+    git fetch azure gitlab-sync-branch
+    git fetch origin sandbox
 
-      AZURE_SHA="$(git rev-parse azure/gitlab-sync-branch)"
-      SANDBOX_SHA="$(git rev-parse origin/sandbox 2>/dev/null || echo "")"
+    AZURE_SHA="$(git rev-parse azure/gitlab-sync-branch)"
+    SANDBOX_SHA="$(git rev-parse origin/sandbox 2>/dev/null || echo "")"
 
-      if [ -n "$SANDBOX_SHA" ] && [ "$SANDBOX_SHA" = "$AZURE_SHA" ]; then
-        echo "sandbox already matches Azure gitlab-sync-branch (${AZURE_SHA}); nothing to sync."
-        exit 0
-      fi
+    if [ -n "$SANDBOX_SHA" ] && [ "$SANDBOX_SHA" = "$AZURE_SHA" ]; then
+      echo "sandbox already matches Azure gitlab-sync-branch (${AZURE_SHA}); nothing to sync."
+      exit 0
+    fi
 
-      if [ -z "$SANDBOX_SHA" ]; then
-        echo "Bootstrapping sandbox from Azure gitlab-sync-branch (${AZURE_SHA})..."
-        git push "$PUSH_URL" "${AZURE_SHA}:refs/heads/sandbox"
-      elif git merge-base --is-ancestor "$SANDBOX_SHA" "$AZURE_SHA" 2>/dev/null; then
-        echo "Fast-forwarding sandbox to Azure gitlab-sync-branch (${AZURE_SHA})..."
-        git push "$PUSH_URL" "${AZURE_SHA}:refs/heads/sandbox"
-      elif ! git merge-base "$SANDBOX_SHA" "$AZURE_SHA" >/dev/null 2>&1; then
-        echo "Unrelated histories detected; bootstrapping sandbox from Azure gitlab-sync-branch (${AZURE_SHA})."
-        git push --force "$PUSH_URL" "${AZURE_SHA}:refs/heads/sandbox"
-      else
-        echo "Cannot fast-forward sandbox from Azure gitlab-sync-branch (sandbox has extra GitLab-only commits)."
-        echo "Resolve manually, then rerun sync."
-        exit 1
-      fi
+    if [ -z "$SANDBOX_SHA" ]; then
+      echo "Bootstrapping sandbox from Azure gitlab-sync-branch (${AZURE_SHA})..."
+      git push "$PUSH_URL" "${AZURE_SHA}:refs/heads/sandbox"
+    elif git merge-base --is-ancestor "$SANDBOX_SHA" "$AZURE_SHA" 2>/dev/null; then
+      echo "Fast-forwarding sandbox to Azure gitlab-sync-branch (${AZURE_SHA})..."
+      git push "$PUSH_URL" "${AZURE_SHA}:refs/heads/sandbox"
+    elif ! git merge-base "$SANDBOX_SHA" "$AZURE_SHA" >/dev/null 2>&1; then
+      echo "Unrelated histories detected; bootstrapping sandbox from Azure gitlab-sync-branch (${AZURE_SHA})."
+      git push --force "$PUSH_URL" "${AZURE_SHA}:refs/heads/sandbox"
+    else
+      echo "Cannot fast-forward sandbox from Azure gitlab-sync-branch (sandbox has extra GitLab-only commits)."
+      echo "Resolve manually, then rerun sync."
+      exit 1
+    fi
   rules:
-    - if: $CI_COMMIT_BRANCH == "sandbox"
+  - if: $CI_COMMIT_BRANCH == "sandbox"
 
 sast:
   stage: lint
-
 ".sast-analyzer":
   tags:
-    - Sast
-    - secret-detection
-    - container
-    - codequality
-
+  - Sast
+  - secret-detection
+  - container
+  - codequality
 ".secret-analyzer":
   stage: lint
   tags:
-    - Sast
-    - secret-detection
-    - container
-    - codequality
+  - Sast
+  - secret-detection
+  - container
+  - codequality
 
-secret_detection:
+lint-and-typecheck:
   stage: lint
-
-eslint:
-  stage: lint
-  extends:
-    - ".ensure_node"
-    - ".shell_runner"
-  cache:
-    key: npm-$CI_COMMIT_REF_SLUG
-    paths:
-      - node_modules/
-      - .cache/npm/
-      - .tools/node-v20.19.4/
+  extends: ".node_ci_base"
+  image: node:20
+  tags: []
+  variables:
+    GIT_DEPTH: "0"
   script:
-    - |
-      export PATH="${NODE_INSTALL_DIR}/bin:$PATH"
-      export NPM_CONFIG_CACHE="${NPM_CONFIG_CACHE:-${CI_PROJECT_DIR}/.cache/npm}"
-      unset NPM_CONFIG_PREFIX
-      mkdir -p "$NPM_CONFIG_CACHE"
-      npm ci
-      npm run lint
+  - |
+    export PNPM_HOME="${PNPM_HOME:-${CI_PROJECT_DIR}/.tools/pnpm}"
+    export PATH="${PNPM_HOME}:$PATH"
+    pnpm install --frozen-lockfile
+    pnpm lint
+    pnpm exec tsc --noEmit
   rules:
-    - if: $CI_COMMIT_BRANCH == "sandbox"
-    - if: $CI_COMMIT_BRANCH == "dev"
-    - if: $CI_COMMIT_BRANCH == "prod"
+  - if: $CI_COMMIT_BRANCH == "sandbox"
+  - if: $CI_COMMIT_BRANCH == "dev"
+  - if: $CI_COMMIT_BRANCH == "prod"
 
 env-scope-check:
   extends:
-    - ".proxy"
-    - ".shell_runner"
+  - ".proxy"
+  - ".shell_runner"
   stage: lint
+  before_script:
+  - !reference [".proxy", before_script]
   environment:
     name: "$CI_COMMIT_BRANCH"
   when: manual
   allow_failure: true
   script:
-    - |
-      required_vars="WORKLOAD_IDENTITY_PROJECT_NUMBER WORKLOAD_IDENTITY_POOL WORKLOAD_IDENTITY_PROVIDER \
-        SERVICE_ACCOUNT GCP_PROJECT_ID GCP_REGION ARTIFACT_REPO IMAGE_NAME \
-        CLOUD_RUN_NETWORK CLOUD_RUN_SUBNET CLOUD_RUN_SA CLOUD_RUN_SERVICE \
-        VITE_TRANSLATION_API_ORIGIN VITE_SALES_API_ORIGIN \
-        VITE_TRANSLATION_CLOUD_RUN_URL VITE_SALES_CLOUD_RUN_URL \
-        VITE_CONTRACTS_API_BASE VITE_GCP_PROJECT_ID VITE_GCP_PROJECT_NUMBER VITE_GCP_REGION VITE_TLS_CA_FILE"
-      missing=0
-      for var in $required_vars; do
-        if [ -n "$(printenv "$var")" ]; then
-          echo "OK - $var is set"
-        else
-          echo "MISSING - $var is not set for environment ${CI_COMMIT_BRANCH}"
-          missing=1
-        fi
-      done
-      if [ "$missing" -eq 1 ]; then
-        exit 1
+  - |
+    required_vars="WORKLOAD_IDENTITY_PROJECT_NUMBER WORKLOAD_IDENTITY_POOL WORKLOAD_IDENTITY_PROVIDER \
+      SERVICE_ACCOUNT GCP_PROJECT_ID GCP_REGION ARTIFACT_REPO IMAGE_NAME \
+      CLOUD_RUN_NETWORK CLOUD_RUN_SUBNET CLOUD_RUN_SA CLOUD_RUN_SERVICE \
+      ENTRA_TENANT_ID ENTRA_CLIENT_ID ENTRA_REDIRECT_URI ENTRA_CLIENT_SECRET_SECRET_NAME \
+      GCP_PROJECT_NUMBER GCP_KMS_KEY_RING GCP_KMS_KEY_NAME GCP_KMS_LOCATION \
+      APIGEE_CLIENT_KEY_SECRET_NAME TRANSLATION_API_ORIGIN SALES_API_ORIGIN"
+    optional_vars="VITE_TRANSLATION_API_ORIGIN VITE_TRANSLATION_CLOUD_RUN_URL \
+      VITE_SALES_API_ORIGIN VITE_SALES_CLOUD_RUN_URL VITE_CONTRACTS_API_BASE \
+      VITE_GCP_PROJECT_ID VITE_GCP_PROJECT_NUMBER VITE_GCP_REGION VITE_TLS_CA_FILE"
+    missing=0
+    for var in $required_vars; do
+      if [ -n "$(printenv "$var")" ]; then
+        echo "OK - $var is set"
+      else
+        echo "MISSING - $var is not set for environment ${CI_COMMIT_BRANCH}"
+        missing=1
       fi
-      echo "All required environment-scoped variables are available."
+    done
+    for var in $optional_vars; do
+      if [ -n "$(printenv "$var")" ]; then
+        echo "OK - $var is set (optional/build-time)"
+      else
+        echo "NOTE - $var not set (client bundle will fall back to development-placeholder)"
+      fi
+    done
+    if [ "$missing" -eq 1 ]; then
+      echo "One or more required environment-scoped variables are missing."
+      exit 1
+    fi
+    echo "All required environment-scoped variables are available."
   rules:
-    - if: $CI_COMMIT_BRANCH == "sandbox"
-    - if: $CI_COMMIT_BRANCH == "dev"
-    - if: $CI_COMMIT_BRANCH == "prod"
+  - if: $CI_COMMIT_BRANCH == "sandbox"
+  - if: $CI_COMMIT_BRANCH == "dev"
+  - if: $CI_COMMIT_BRANCH == "prod"
+
+build-verify:
+  stage: test
+  extends: ".node_ci_base"
+  image: node:20
+  tags: []
+  needs:
+  - job: lint-and-typecheck
+    artifacts: false
+  script:
+  - |
+    export PNPM_HOME="${PNPM_HOME:-${CI_PROJECT_DIR}/.tools/pnpm}"
+    export PATH="${PNPM_HOME}:$PATH"
+    pnpm install --frozen-lockfile
+    pnpm build
+  artifacts:
+    when: always
+    paths:
+    - .next/
+    expire_in: 1 day
+  rules:
+  - if: $CI_COMMIT_BRANCH == "sandbox"
+  - if: $CI_COMMIT_BRANCH == "dev"
+  - if: $CI_COMMIT_BRANCH == "prod"
 
 build-and-push:
   stage: build
   extends:
-    - ".gcp_wif"
-    - ".shell_runner"
+  - ".gcp_wif"
+  - ".shell_runner"
   needs:
-    - job: eslint
-      artifacts: false
+  - job: build-verify
+    artifacts: false
   when: manual
   script:
-    - |
-      export DOCKER_CONFIG="${DOCKER_CONFIG:-${CI_PROJECT_DIR}/.cache/docker}"
-      mkdir -p "$DOCKER_CONFIG"
+  - |
+    export DOCKER_CONFIG="${DOCKER_CONFIG:-${CI_PROJECT_DIR}/.cache/docker}"
+    mkdir -p "$DOCKER_CONFIG"
+    check_home_disk_space
 
-      case "$CI_COMMIT_BRANCH" in
-        sandbox) BUILD_MODE="sandbox" ;;
-        dev)     BUILD_MODE="development" ;;
-        prod)    BUILD_MODE="production" ;;
-        *)       echo "Unsupported branch: $CI_COMMIT_BRANCH"; exit 1 ;;
-      esac
+    if ! docker info >/dev/null 2>&1; then
+      echo "ERROR - docker daemon not reachable on shell runner; check docker service and group membership"
+      exit 1
+    fi
 
-      IMAGE_URI="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REPO}/${IMAGE_NAME}:${IMAGE_TAG}"
-      gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin \
-        "https://${GCP_REGION}-docker.pkg.dev"
+    IMAGE_URI="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REPO}/${IMAGE_NAME}:${IMAGE_TAG}"
+    gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin \
+      "https://${GCP_REGION}-docker.pkg.dev"
 
-      PROXY_ARGS=""
-      if [ -n "${HTTP_PROXY:-}" ]; then
-        PROXY_ARGS="--build-arg HTTP_PROXY=${HTTP_PROXY} --build-arg HTTPS_PROXY=${HTTPS_PROXY:-$HTTP_PROXY}"
-        if [ -n "${NO_PROXY:-}" ]; then
-          PROXY_ARGS="${PROXY_ARGS} --build-arg NO_PROXY=${NO_PROXY}"
-        fi
+    PROXY_ARGS=""
+    if [ -n "${HTTP_PROXY:-}" ]; then
+      PROXY_ARGS="--build-arg HTTP_PROXY=${HTTP_PROXY} --build-arg HTTPS_PROXY=${HTTPS_PROXY:-$HTTP_PROXY}"
+      if [ -n "${NO_PROXY:-}" ]; then
+        PROXY_ARGS="${PROXY_ARGS} --build-arg NO_PROXY=${NO_PROXY}"
       fi
+    fi
 
-      TLS_CA_PATH="${VITE_TLS_CA_FILE:-certs/colt-internal-ca.pem}"
-      mkdir -p "$(dirname "$TLS_CA_PATH")"
-      if [ -n "${COLT_INTERNAL_CA_PEM:-}" ] && [ -f "$COLT_INTERNAL_CA_PEM" ]; then
-        cp "$COLT_INTERNAL_CA_PEM" "$TLS_CA_PATH"
-        echo "OK - Colt internal CA copied from COLT_INTERNAL_CA_PEM to ${TLS_CA_PATH}"
-      elif [ ! -f "$TLS_CA_PATH" ]; then
-        echo "ERROR - Missing ${TLS_CA_PATH}. Set GitLab File variable COLT_INTERNAL_CA_PEM or commit the cert for local builds."
-        exit 1
-      fi
+    # Client bundle values baked in at build time (Vite-derived VITE_* naming preserved from legacy SPA)
+    BUILD_ARGS="--build-arg VITE_TRANSLATION_API_ORIGIN=${VITE_TRANSLATION_API_ORIGIN} \
+      --build-arg VITE_TRANSLATION_CLOUD_RUN_URL=${VITE_TRANSLATION_CLOUD_RUN_URL} \
+      --build-arg VITE_SALES_API_ORIGIN=${VITE_SALES_API_ORIGIN} \
+      --build-arg VITE_SALES_CLOUD_RUN_URL=${VITE_SALES_CLOUD_RUN_URL} \
+      --build-arg VITE_CONTRACTS_API_BASE=${VITE_CONTRACTS_API_BASE} \
+      --build-arg VITE_GCP_PROJECT_ID=${VITE_GCP_PROJECT_ID} \
+      --build-arg VITE_GCP_PROJECT_NUMBER=${VITE_GCP_PROJECT_NUMBER} \
+      --build-arg VITE_GCP_REGION=${VITE_GCP_REGION} \
+      --build-arg VITE_TLS_CA_FILE=${VITE_TLS_CA_FILE}"
 
-      # shellcheck disable=SC2086
-      docker build $PROXY_ARGS \
-        --build-arg BUILD_MODE="${BUILD_MODE}" \
-        --build-arg VITE_TRANSLATION_API_ORIGIN="${VITE_TRANSLATION_API_ORIGIN}" \
-        --build-arg VITE_SALES_API_ORIGIN="${VITE_SALES_API_ORIGIN}" \
-        --build-arg VITE_TRANSLATION_CLOUD_RUN_URL="${VITE_TRANSLATION_CLOUD_RUN_URL}" \
-        --build-arg VITE_SALES_CLOUD_RUN_URL="${VITE_SALES_CLOUD_RUN_URL}" \
-        --build-arg VITE_CONTRACTS_API_BASE="${VITE_CONTRACTS_API_BASE}" \
-        --build-arg VITE_GCP_PROJECT_ID="${VITE_GCP_PROJECT_ID}" \
-        --build-arg VITE_GCP_PROJECT_NUMBER="${VITE_GCP_PROJECT_NUMBER}" \
-        --build-arg VITE_GCP_REGION="${VITE_GCP_REGION}" \
-        --build-arg VITE_TLS_CA_FILE="${VITE_TLS_CA_FILE:-certs/colt-internal-ca.pem}" \
-        -t "$IMAGE_URI" .
-
-      docker push "$IMAGE_URI"
+    # shellcheck disable=SC2086
+    docker build $PROXY_ARGS $BUILD_ARGS -t "$IMAGE_URI" .
+    docker push "$IMAGE_URI"
   rules:
-    - if: $CI_COMMIT_BRANCH == "sandbox"
-    - if: $CI_COMMIT_BRANCH == "dev"
-    - if: $CI_COMMIT_BRANCH == "prod"
+  - if: $CI_COMMIT_BRANCH == "sandbox"
+  - if: $CI_COMMIT_BRANCH == "dev"
+  - if: $CI_COMMIT_BRANCH == "prod"
 
 deploy-cloud-run:
   stage: deploy
   extends:
+  - ".gcp_wif"
+  - ".shell_runner"
+  needs:
+  - build-and-push
+  environment:
+    name: "$CI_COMMIT_BRANCH"
+  when: manual
+  script:
+  - |
+    IMAGE_URI="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REPO}/${IMAGE_NAME}:${IMAGE_TAG}"
+
+    # No --allow-unauthenticated: per terraform/6-workloads/6a-gclt-aicoe-dev-aihub-ui,
+    # the ONLY IAP in the platform sits in front of this service (bs-aihub-bff backend
+    # service + internal ALB). The IAP service agent is granted roles/run.invoker
+    # separately by Terraform — this pipeline never grants public/allUsers access.
+    gcloud run deploy "$CLOUD_RUN_SERVICE" \
+      --quiet \
+      --update-labels="app=aihub-bff,env=${CI_COMMIT_BRANCH},managed-by=gitlab-ci,git-sha=${CI_COMMIT_SHORT_SHA}" \
+      --image "$IMAGE_URI" \
+      --platform=managed \
+      --region="$GCP_REGION" \
+      --project="$GCP_PROJECT_ID" \
+      --ingress=internal-and-cloud-load-balancing \
+      --network="$CLOUD_RUN_NETWORK" \
+      --subnet="$CLOUD_RUN_SUBNET" \
+      --vpc-egress=private-ranges-only \
+      --service-account="$CLOUD_RUN_SA" \
+      --min-instances=1 \
+      --max-instances="${CLOUD_RUN_MAX_INSTANCES:-30}" \
+      --concurrency=80 \
+      --port=8080 \
+      --timeout=60 \
+      --memory=512Mi \
+      --cpu=1 \
+      --no-allow-unauthenticated \
+      --set-env-vars="ENTRA_TENANT_ID=${ENTRA_TENANT_ID},ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID},ENTRA_REDIRECT_URI=${ENTRA_REDIRECT_URI},ENTRA_CLIENT_SECRET_SECRET_NAME=${ENTRA_CLIENT_SECRET_SECRET_NAME},GCP_PROJECT_ID=${GCP_PROJECT_ID},GCP_PROJECT_NUMBER=${GCP_PROJECT_NUMBER},GCP_KMS_KEY_RING=${GCP_KMS_KEY_RING},GCP_KMS_KEY_NAME=${GCP_KMS_KEY_NAME},GCP_KMS_LOCATION=${GCP_KMS_LOCATION},APIGEE_CLIENT_KEY_SECRET_NAME=${APIGEE_CLIENT_KEY_SECRET_NAME},TRANSLATION_API_ORIGIN=${TRANSLATION_API_ORIGIN},SALES_API_ORIGIN=${SALES_API_ORIGIN}"
+  rules:
+  - if: $CI_COMMIT_BRANCH == "sandbox"
+  - if: $CI_COMMIT_BRANCH == "dev"
+  - if: $CI_COMMIT_BRANCH == "prod"
+
+resolve-dast-target:
+  stage: dast
+  extends:
     - ".gcp_wif"
     - ".shell_runner"
   needs:
-    - build-and-push
+    - job: deploy-cloud-run
+      artifacts: false
   environment:
     name: "$CI_COMMIT_BRANCH"
   when: manual
   script:
     - |
-      : "${CLOUD_RUN_NETWORK:?Set CLOUD_RUN_NETWORK for environment ${CI_COMMIT_BRANCH}}"
-      : "${CLOUD_RUN_SUBNET:?Set CLOUD_RUN_SUBNET for environment ${CI_COMMIT_BRANCH}}"
-
-      IMAGE_URI="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REPO}/${IMAGE_NAME}:${IMAGE_TAG}"
-      gcloud beta run deploy "$CLOUD_RUN_SERVICE" \
-        --quiet \
-        --update-labels="app=ai-hub-ui,env=${CI_COMMIT_BRANCH},managed-by=gitlab-ci,git-sha=${CI_COMMIT_SHORT_SHA},pipeline=${CI_PIPELINE_IID}" \
-        --image "$IMAGE_URI" \
-        --platform=managed \
+      set -e
+      echo "Resolving deployed URL for: $CLOUD_RUN_SERVICE (region: $GCP_REGION, project: $GCP_PROJECT_ID)..."
+      TARGET_URL="$(gcloud run services describe "$CLOUD_RUN_SERVICE" \
         --region="$GCP_REGION" \
         --project="$GCP_PROJECT_ID" \
-        --network="$CLOUD_RUN_NETWORK" \
-        --subnet="$CLOUD_RUN_SUBNET" \
-        --service-account="$CLOUD_RUN_SA" \
-        --min-instances=1 \
-        --no-cpu-throttling \
-        --port=8080 \
-        --timeout=600 \
-        --memory=1Gi \
-        --cpu=1
+        --format='value(status.url)')"
+      if [ -z "$TARGET_URL" ]; then
+        echo "ERROR: could not resolve URL for $CLOUD_RUN_SERVICE - has it been deployed on this branch?"
+        exit 1
+      fi
+      echo "Resolved target: $TARGET_URL"
+      echo "TARGET_URL=$TARGET_URL" > dast.env
+  artifacts:
+    reports:
+      dotenv: dast.env
+  rules:
+    - if: $CI_COMMIT_BRANCH == "sandbox"
+    - if: $CI_COMMIT_BRANCH == "dev"
+    - if: $CI_COMMIT_BRANCH == "prod"
+
+dast-scan:
+  stage: dast
+  tags:
+    - container
+  image:
+    name: ghcr.io/zaproxy/zaproxy:stable
+    entrypoint: [""]
+  needs:
+    - job: resolve-dast-target
+      artifacts: true
+  when: manual
+  script:
+    - mkdir -p /zap/wrk
+    - |
+      echo "=== Connectivity diagnostic before running ZAP ==="
+      curl -v --max-time 15 -o /dev/null -s -w "HTTP status: %{http_code}\n" "$TARGET_URL" \
+        && echo "curl SUCCEEDED - if ZAP still times out below, it's a Java/proxy config gap, not a network block." \
+        || echo "curl ALSO FAILED - this is a network/firewall issue on the container runner, not something our script can fix."
+      echo "=================================================="
+    - |
+      zap-baseline.py \
+        -t "$TARGET_URL" \
+        -r dast-report.html \
+        -J dast-report.json \
+        -w dast-report.md \
+        -I
+      # -I = report-only mode, findings won't fail the pipeline yet.
+  artifacts:
+    when: always
+    paths:
+      - dast-report.html
+      - dast-report.json
+      - dast-report.md
+    expire_in: 1 week
   rules:
     - if: $CI_COMMIT_BRANCH == "sandbox"
     - if: $CI_COMMIT_BRANCH == "dev"
@@ -375,60 +581,76 @@ deploy-cloud-run:
 
 promote-sandbox-to-dev:
   extends:
-    - ".proxy"
-    - ".shell_runner"
+  - ".proxy"
+  - ".shell_runner"
   stage: promote
   variables:
     GIT_DEPTH: "0"
+  before_script:
+  - !reference [".proxy", before_script]
   when: manual
   script:
-    - |
-      : "${GITLAB_PUSH_TOKEN:?Set masked+protected variable GITLAB_PUSH_TOKEN (scope: write_repository)}"
-      git fetch origin sandbox dev
-      SANDBOX_SHA="$(git rev-parse origin/sandbox)"
-      DEV_SHA="$(git rev-parse origin/dev)"
-      PUSH_URL="https://oauth2:${GITLAB_PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
-      if [ "$DEV_SHA" = "$SANDBOX_SHA" ]; then
-        echo "dev already matches sandbox (${SANDBOX_SHA}); nothing to promote."
-        exit 0
-      fi
-      if git merge-base --is-ancestor "$DEV_SHA" "$SANDBOX_SHA" 2>/dev/null; then
-        git push "$PUSH_URL" "${SANDBOX_SHA}:refs/heads/dev"
-      elif ! git merge-base "$DEV_SHA" "$SANDBOX_SHA" >/dev/null 2>&1; then
-        git push --force "$PUSH_URL" "${SANDBOX_SHA}:refs/heads/dev"
-      else
-        echo "Cannot fast-forward dev from sandbox; resolve manually."
-        exit 1
-      fi
+  - |
+    : "${GITLAB_PUSH_TOKEN:?Set masked+protected variable GITLAB_PUSH_TOKEN (scope: write_repository)}"
+
+    git fetch origin sandbox dev
+    SANDBOX_SHA="$(git rev-parse origin/sandbox)"
+    DEV_SHA="$(git rev-parse origin/dev)"
+    PUSH_URL="https://oauth2:${GITLAB_PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
+
+    if [ "$DEV_SHA" = "$SANDBOX_SHA" ]; then
+      echo "dev already matches sandbox (${SANDBOX_SHA}); nothing to promote."
+      exit 0
+    fi
+
+    if git merge-base --is-ancestor "$DEV_SHA" "$SANDBOX_SHA" 2>/dev/null; then
+      echo "Fast-forwarding dev to sandbox (${SANDBOX_SHA})..."
+      git push "$PUSH_URL" "${SANDBOX_SHA}:refs/heads/dev"
+    elif ! git merge-base "$DEV_SHA" "$SANDBOX_SHA" >/dev/null 2>&1; then
+      echo "Unrelated histories detected; bootstrapping dev from sandbox (${SANDBOX_SHA})."
+      git push --force "$PUSH_URL" "${SANDBOX_SHA}:refs/heads/dev"
+    else
+      echo "Cannot fast-forward dev from sandbox (dev has extra commits)."
+      echo "Please merge/rebase branches manually once, then rerun."
+      exit 1
+    fi
   rules:
-    - if: $CI_COMMIT_BRANCH == "sandbox"
+  - if: $CI_COMMIT_BRANCH == "sandbox"
 
 promote-dev-to-prod:
   extends:
-    - ".proxy"
-    - ".shell_runner"
+  - ".proxy"
+  - ".shell_runner"
   stage: promote
   variables:
     GIT_DEPTH: "0"
+  before_script:
+  - !reference [".proxy", before_script]
   when: manual
   script:
-    - |
-      : "${GITLAB_PUSH_TOKEN:?Set masked+protected variable GITLAB_PUSH_TOKEN (scope: write_repository)}"
-      git fetch origin dev prod
-      DEV_SHA="$(git rev-parse origin/dev)"
-      PROD_SHA="$(git rev-parse origin/prod)"
-      PUSH_URL="https://oauth2:${GITLAB_PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
-      if [ "$PROD_SHA" = "$DEV_SHA" ]; then
-        echo "prod already matches dev (${DEV_SHA}); nothing to promote."
-        exit 0
-      fi
-      if git merge-base --is-ancestor "$PROD_SHA" "$DEV_SHA" 2>/dev/null; then
-        git push "$PUSH_URL" "${DEV_SHA}:refs/heads/prod"
-      elif ! git merge-base "$PROD_SHA" "$DEV_SHA" >/dev/null 2>&1; then
-        git push --force "$PUSH_URL" "${DEV_SHA}:refs/heads/prod"
-      else
-        echo "Cannot fast-forward prod from dev; resolve manually."
-        exit 1
-      fi
+  - |
+    : "${GITLAB_PUSH_TOKEN:?Set masked+protected variable GITLAB_PUSH_TOKEN (scope: write_repository)}"
+
+    git fetch origin dev prod
+    DEV_SHA="$(git rev-parse origin/dev)"
+    PROD_SHA="$(git rev-parse origin/prod)"
+    PUSH_URL="https://oauth2:${GITLAB_PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
+
+    if [ "$PROD_SHA" = "$DEV_SHA" ]; then
+      echo "prod already matches dev (${DEV_SHA}); nothing to promote."
+      exit 0
+    fi
+
+    if git merge-base --is-ancestor "$PROD_SHA" "$DEV_SHA" 2>/dev/null; then
+      echo "Fast-forwarding prod to dev (${DEV_SHA})..."
+      git push "$PUSH_URL" "${DEV_SHA}:refs/heads/prod"
+    elif ! git merge-base "$PROD_SHA" "$DEV_SHA" >/dev/null 2>&1; then
+      echo "Unrelated histories detected; bootstrapping prod from dev (${DEV_SHA})."
+      git push --force "$PUSH_URL" "${DEV_SHA}:refs/heads/prod"
+    else
+      echo "Cannot fast-forward prod from dev (prod has extra commits)."
+      echo "Please merge/rebase branches manually once, then rerun."
+      exit 1
+    fi
   rules:
-    - if: $CI_COMMIT_BRANCH == "dev"
+  - if: $CI_COMMIT_BRANCH == "dev"
