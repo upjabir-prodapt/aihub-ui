@@ -69,6 +69,12 @@ async function handleProxy(req: NextRequest, targetBaseUrl: string) {
     headers.set('Authorization', `Bearer ${refreshedToken}`);
     headers.set('x-colt-user-id', session.oid);
     headers.set('x-colt-user-department', session.department);
+    // department/companyName are fetched from Microsoft Graph at sign-in time (not real
+    // Entra token claims — see docs/19-department-companyname-claim-options.md in the
+    // AICOE-Terraform repo), so Apigee/downstream services never see them in the forwarded
+    // JWT itself; the BFF injects them here as trusted headers instead, same pattern as oid/roles.
+    headers.set('x-colt-user-company', session.companyName);
+
 
     // Inject Apigee Client Key securely sourced from GCP Secret Manager
     const apigeeClientKey = await getSecret(env.APIGEE_CLIENT_KEY_SECRET_NAME);

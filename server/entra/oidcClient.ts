@@ -9,9 +9,14 @@ export function getAuthorizationUrl(loginHint?: string | null): string {
     response_type: 'code',
     redirect_uri: env.ENTRA_REDIRECT_URI,
     response_mode: 'query',
-    scope: 'openid profile offline_access api://aicoe-platform/Translation.Translate api://aicoe-platform/Sales.Research',
+    // User.Read is required so the callback can fetch department/companyName from
+    // Microsoft Graph after token exchange — Entra's optional-claims picker does not
+    // offer those two fields (see docs/19-department-companyname-claim-options.md in
+    // the AICOE-Terraform repo for why, and getDepartmentAndCompany() below).
+    scope: 'openid profile offline_access User.Read api://aicoe-platform/Translation.Translate api://aicoe-platform/Sales.Research',
     state: 'unbound-state-token', // Hardened against CSRF, optionally bind a state here
   });
+
 
   if (loginHint) {
     params.append('login_hint', loginHint);
@@ -34,11 +39,12 @@ export async function exchangeCodeForTokens(code: string, clientSecret: string):
   const body = new URLSearchParams({
     client_id: env.ENTRA_CLIENT_ID,
     client_secret: clientSecret,
-    scope: 'openid profile offline_access api://aicoe-platform/Translation.Translate api://aicoe-platform/Sales.Research',
+    scope: 'openid profile offline_access User.Read api://aicoe-platform/Translation.Translate api://aicoe-platform/Sales.Research',
     code,
     redirect_uri: env.ENTRA_REDIRECT_URI,
     grant_type: 'authorization_code',
   });
+
 
   const res = await fetch(`https://login.microsoftonline.com/${env.ENTRA_TENANT_ID}/oauth2/v2.0/token`, {
     method: 'POST',
@@ -61,10 +67,11 @@ export async function refreshAccessToken(refreshToken: string, clientSecret: str
   const body = new URLSearchParams({
     client_id: env.ENTRA_CLIENT_ID,
     client_secret: clientSecret,
-    scope: 'openid profile offline_access api://aicoe-platform/Translation.Translate api://aicoe-platform/Sales.Research',
+    scope: 'openid profile offline_access User.Read api://aicoe-platform/Translation.Translate api://aicoe-platform/Sales.Research',
     refresh_token: refreshToken,
     grant_type: 'refresh_token',
   });
+
 
   const res = await fetch(`https://login.microsoftonline.com/${env.ENTRA_TENANT_ID}/oauth2/v2.0/token`, {
     method: 'POST',
@@ -84,11 +91,19 @@ export interface EntraClaims {
   oid: string;
   email: string;
   roles: string[];
+  /** @deprecated Not reliably present on the JWT — see getDepartmentAndCompany() below. Kept as a last-resort fallback only. */
   department: string;
 }
 
 /**
  * Decodes the tokens payload (best effort OID / email extraction).
+ *
+ * NOTE: `department` is NOT a real Entra token claim (see
+ * docs/19-department-companyname-claim-options.md in the AICOE-Terraform repo) — Entra's
+ * optional-claims picker does not offer it, so this will essentially always fall through
+ * to 'Unknown Department' unless a custom directory-extension claim (Option B) was set up.
+ * The recommended path (Option A) is getDepartmentAndCompany() below, called separately
+ * with a Microsoft Graph /me request.
  */
 export function decodeJwtClaims(jwt: string): EntraClaims {
   try {
@@ -115,3 +130,45 @@ export function decodeJwtClaims(jwt: string): EntraClaims {
     };
   }
 }
+
+export interface DepartmentAndCompany {
+  department: string;
+  companyName: string;
+}
+
+/**
+ * Fetches `department` and `companyName` from Microsoft Graph's /me endpoint.
+ *
+ * This is Option A from docs/19-department-companyname-claim-options.md in the
+ * AICOE-Terraform repo: Entra's optional-claims picker does not offer these two
+ * fields (they are ordinary Graph user-profile properties, not token claims), so
+ * they are fetched with a single extra call right after the authorization-code
+ * exchange, using the same access token (requires the `User.Read` delegated scope,
+ * already included in the scope strings above).
+ *
+ * Fails open with placeholder values — department/companyName are a reporting
+ * dimension only (see docs/11-reconciled-architecture.md), never a security
+ * control, so a Graph hiccup here must never block sign-in.
+ */
+export async function getDepartmentAndCompany(accessToken: string): Promise<DepartmentAndCompany> {
+  try {
+    const res = await fetch('https://graph.microsoft.com/v1.0/me?$select=department,companyName', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (!res.ok) {
+      console.warn(`Graph /me lookup failed with status ${res.status}; using placeholders.`);
+      return { department: 'Unknown Department', companyName: 'Unknown Company' };
+    }
+
+    const profile = await res.json();
+    return {
+      department: profile.department || 'Unknown Department',
+      companyName: profile.companyName || 'Unknown Company',
+    };
+  } catch (err) {
+    console.error('Graph /me lookup threw an error; using placeholders:', err);
+    return { department: 'Unknown Department', companyName: 'Unknown Company' };
+  }
+}
+

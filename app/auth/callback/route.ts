@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSecret } from '@/server/secrets/gcpSecretManager';
 import { env } from '@/server/config/env';
-import { exchangeCodeForTokens, decodeJwtClaims } from '@/server/entra/oidcClient';
+import { exchangeCodeForTokens, decodeJwtClaims, getDepartmentAndCompany } from '@/server/entra/oidcClient';
+
 import { encryptTokens } from '@/server/session/sessionCrypto';
 import { createSession, generateRandomToken } from '@/server/session/sessionStore';
 import { generateCsrfToken, attachCsrfToken } from '@/server/security/csrf';
@@ -36,6 +37,12 @@ export async function GET(req: NextRequest) {
     // 3. Extract user information claims
     const userClaims = decodeJwtClaims(tokenResponse.id_token);
 
+    // 3a. department/companyName are not real Entra token claims — Entra's optional-claims
+    // picker doesn't offer them (see docs/19-department-companyname-claim-options.md in the
+    // AICOE-Terraform repo). Fetch both from Microsoft Graph /me instead (Option A), using the
+    // access token we just received (requires the User.Read scope — see server/entra/oidcClient.ts).
+    const { department, companyName } = await getDepartmentAndCompany(tokenResponse.access_token);
+
     // 4. Secure tokens with KMS envelope encryption
     const encryptedTokens = await encryptTokens({
       accessToken: tokenResponse.access_token,
@@ -52,10 +59,12 @@ export async function GET(req: NextRequest) {
         email: userClaims.email,
         roles: userClaims.roles,
         oid: userClaims.oid,
-        department: userClaims.department,
+        department,
+        companyName,
       },
       encryptedTokens
     );
+
 
     // 7. Redirect to root, emitting secure opaque session cookie
     const response = NextResponse.redirect(new URL('/', req.url));

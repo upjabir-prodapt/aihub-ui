@@ -34,12 +34,14 @@ export async function GET(req: NextRequest) {
       authenticated: true,
       email: session.email,
       department: session.department,
+      companyName: session.companyName,
       roles: session.roles,
       entitlements: {
         translation: hasTranslation,
         sales: hasSales,
       },
     });
+
   } catch (err) {
     console.error('Session API validation failedclosed with 503 error:', err);
     // Fail closed with 503 Service Unavailable if downstream DB (Firestore) is down

@@ -7,7 +7,10 @@ export interface UserSession {
   roles: string[];
   oid: string;
   department: string;
+  /** Fetched from Microsoft Graph /me alongside department — see server/entra/oidcClient.ts getDepartmentAndCompany(). */
+  companyName: string;
   encryptedTokens: string;
+
   createdAt: string;
   lastSeenAt: string;
   absoluteExpiresAt: string;
@@ -35,7 +38,7 @@ export function generateRandomToken(bytes = 32): string {
  */
 export async function createSession(
   sessionId: string,
-  user: { email: string; roles: string[]; oid: string; department: string },
+  user: { email: string; roles: string[]; oid: string; department: string; companyName: string },
   encryptedTokens: string
 ): Promise<UserSession> {
   const hashedId = hashSessionId(sessionId);
@@ -49,7 +52,9 @@ export async function createSession(
     roles: user.roles,
     oid: user.oid,
     department: user.department,
+    companyName: user.companyName,
     encryptedTokens,
+
     createdAt: now.toISOString(),
     lastSeenAt: now.toISOString(),
     absoluteExpiresAt: absoluteExpiresAt.toISOString(),
