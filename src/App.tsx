@@ -72,8 +72,12 @@ function AppShell() {
     // error/timeout — only an explicit HTTP 200 from the backend counts as entitled.
     if (import.meta.env.DEV) {
       // Local dev without IAP infra — no backend to probe against; unlock both.
-      setEntitlements({ translation: true, sales: true });
-      setEntitlementsLoaded(true);
+      // Deferred via Promise.resolve().then() so setState doesn't run synchronously
+      // within the effect body (react-hooks/set-state-in-effect).
+      Promise.resolve().then(() => {
+        setEntitlements({ translation: true, sales: true });
+        setEntitlementsLoaded(true);
+      });
       return;
     }
 
@@ -95,6 +99,7 @@ function AppShell() {
       })
       .finally(() => setEntitlementsLoaded(true));
   }, []);
+
 
 
   const toggleTheme = () => setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
