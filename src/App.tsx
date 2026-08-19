@@ -7,6 +7,8 @@ import LoginModal from './components/LoginModal';
 import { isHubLoginComplete } from './api/hubAuth';
 import { TRANSLATION_API_BASE } from './api/translationConfig';
 import { SALES_API_BASE } from './api/salesConfig';
+import { probeEntitlement } from './api/iapProbe';
+
 import TranslationPage from './pages/TranslationPage';
 import SalesAgentPage from './pages/SalesAgentPage';
 import './styles/layout.css';
@@ -63,29 +65,37 @@ function AppShell() {
   }, [theme]);
 
   useEffect(() => {
+    // Fail-closed entitlement probe: each backend (Translation, Sales Agent) is an
+    // independently IAP-protected resource, so a per-service login round-trip may be
+    // required even though the hub itself is already authenticated. probeEntitlement()
+    // handles that transparently (silent iframe warmup) and NEVER grants access on
+    // error/timeout — only an explicit HTTP 200 from the backend counts as entitled.
+    if (import.meta.env.DEV) {
+      // Local dev without IAP infra — no backend to probe against; unlock both.
+      setEntitlements({ translation: true, sales: true });
+      setEntitlementsLoaded(true);
+      return;
+    }
+
     Promise.all([
-      fetch(`${TRANSLATION_API_BASE}/auth/whoami`, { credentials: 'include' }).then(async (res) => ({
-        ok: res.ok,
-        data: res.ok ? await res.json() as { email: string } : null,
-      })),
-      fetch(`${SALES_API_BASE}/auth/whoami`, { credentials: 'include' }).then(async (res) => ({
-        ok: res.ok,
-        data: res.ok ? await res.json() as { email: string } : null,
-      })),
+      probeEntitlement(`${TRANSLATION_API_BASE}/auth/whoami`),
+      probeEntitlement(`${SALES_API_BASE}/auth/whoami`),
     ])
       .then(([translation, sales]) => {
         setEntitlements({
-          translation: translation.ok,
-          sales: sales.ok,
+          translation: translation.entitled,
+          sales: sales.entitled,
         });
-        setHubVerifiedEmail(translation.data?.email ?? sales.data?.email ?? null);
+        setHubVerifiedEmail(translation.email ?? sales.email ?? null);
       })
       .catch(() => {
-        // Local dev without IAP — allow both until probe fails
-        setEntitlements({ translation: true, sales: true });
+        // Defensive: probeEntitlement() itself never rejects, but if it somehow
+        // did, fail closed — never grant access on an unexpected error.
+        setEntitlements({ translation: false, sales: false });
       })
       .finally(() => setEntitlementsLoaded(true));
   }, []);
+
 
   const toggleTheme = () => setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
 
