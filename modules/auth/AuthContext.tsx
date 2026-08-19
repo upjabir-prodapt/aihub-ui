@@ -1,29 +1,22 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import {
-  forceRefreshGoogleIdToken,
-} from '@/modules/auth/cloudRunAuth';
-import {
-  forceRefreshSalesGoogleIdToken,
-  SALES_GOOGLE_TOKEN_REFRESH_INTERVAL_MS,
-} from '@/modules/auth/cloudRunAuth';
+import React, { useState, useCallback } from 'react';
 import { hubLogin } from '@/modules/auth/hubAuth';
-import {
-  type AuthUser,
-  clearSession,
-  loadSession,
-} from '@/modules/auth/authStorage';
-import {
-  clearSalesSession,
-  loadSalesSession,
-  type SalesAuthUser,
-} from '@/modules/sales-agent/salesAgentApi';
+import { type AuthUser, clearSession, loadSession } from '@/modules/auth/authStorage';
+import { clearSalesSession, loadSalesSession, type SalesAuthUser } from '@/modules/sales-agent/salesAgentApi';
 import { AuthContext } from '@/modules/auth/authContextValue';
 
 export type { AuthUser, AuthState } from '@/modules/auth/authTypes';
 export type { ServiceEntitlements } from '@/modules/shell/Sidebar';
 
-/** Background refresh interval for Cloud Run invoker token while logged in. */
-const GOOGLE_TOKEN_REFRESH_INTERVAL_MS = 45 * 60 * 1000;
+/**
+ * NOTE: this provider no longer manages Cloud Run identity tokens on a
+ * background refresh loop. Authentication to Translation/Sales Agent is
+ * handled entirely server-side by the Next.js proxy routes (see
+ * app/api/translation/v1/[...path]/route.ts and app/api/sales/v1/[...path]),
+ * which mint their own IAP identity tokens per-request. The browser only
+ * needs to hold the per-service app JWT (from `/auth/token`) plus the
+ * ambient IAP session cookie for the `aihub` resource (`credentials:
+ * 'include'` on every fetch handles that automatically).
+ */
 
 function readInitialSession() {
   return loadSession();
@@ -38,7 +31,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const initialSalesSession = readInitialSalesSession();
   const [user, setUser] = useState<AuthUser | null>(initialSession?.user ?? null);
   const [token, setToken] = useState<string | null>(initialSession?.token ?? null);
-  const [googleIdToken, setGoogleIdToken] = useState<string | null>(initialSession?.googleIdToken ?? null);
   const [iapEmail, setIapEmail] = useState<string | null>(
     initialSession?.user?.email ?? initialSalesSession?.user?.email ?? null,
   );
@@ -46,93 +38,63 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!token) return;
+  const login = useCallback(
+    async (
+      business_unit: string,
+      organization: string,
+      entitlements: { translation: boolean; sales: boolean },
+    ) => {
+      setError(null);
 
-    const refresh = async () => {
-      try {
-        const fresh = await forceRefreshGoogleIdToken();
-        setGoogleIdToken(fresh);
-      } catch (err) {
-        console.warn('Background Google ID token refresh failed:', err);
+      if (!business_unit.trim()) {
+        setError('Business Unit is required.');
+        return;
       }
-    };
-
-    const intervalId = window.setInterval(refresh, GOOGLE_TOKEN_REFRESH_INTERVAL_MS);
-    return () => window.clearInterval(intervalId);
-  }, [token]);
-
-  useEffect(() => {
-    if (!salesUser) return;
-
-    const refresh = async () => {
-      try {
-        await forceRefreshSalesGoogleIdToken();
-      } catch (err) {
-        console.warn('Background Sales Google ID token refresh failed:', err);
+      if (!organization.trim()) {
+        setError('Organization is required.');
+        return;
       }
-    };
-
-    const intervalId = window.setInterval(refresh, SALES_GOOGLE_TOKEN_REFRESH_INTERVAL_MS);
-    return () => window.clearInterval(intervalId);
-  }, [salesUser]);
-
-  const login = useCallback(async (
-    business_unit: string,
-    organization: string,
-    entitlements: { translation: boolean; sales: boolean },
-  ) => {
-    setError(null);
-
-    if (!business_unit.trim()) {
-      setError('Business Unit is required.');
-      return;
-    }
-    if (!organization.trim()) {
-      setError('Organization is required.');
-      return;
-    }
-    if (!entitlements.translation && !entitlements.sales) {
-      setError('You do not have access to any services. Contact your administrator.');
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      const result = await hubLogin(business_unit, organization, entitlements);
-
-      if (result.translation) {
-        setToken(result.translation.token);
-        setGoogleIdToken(result.translation.googleIdToken);
-        setUser(result.translation.user);
-        setIapEmail(result.translation.user.email);
-      }
-
-      if (result.sales) {
-        setSalesUser(result.sales.user);
-        setIapEmail((prev) => prev ?? result.sales!.user.email);
-      }
-
-      if (!result.translation && !result.sales) {
-        setError(result.errors.join(' ') || 'Login failed. Please try again.');
+      if (!entitlements.translation && !entitlements.sales) {
+        setError('You do not have access to any services. Contact your administrator.');
         return;
       }
 
-      if (result.errors.length > 0) {
-        setError(result.errors.join(' '));
+      setIsLoading(true);
+
+      try {
+        const result = await hubLogin(business_unit, organization, entitlements);
+
+        if (result.translation) {
+          setToken(result.translation.token);
+          setUser(result.translation.user);
+          setIapEmail(result.translation.user.email);
+        }
+
+        if (result.sales) {
+          setSalesUser(result.sales.user);
+          setIapEmail((prev) => prev ?? result.sales!.user.email);
+        }
+
+        if (!result.translation && !result.sales) {
+          setError(result.errors.join(' ') || 'Login failed. Please try again.');
+          return;
+        }
+
+        if (result.errors.length > 0) {
+          setError(result.errors.join(' '));
+        }
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Login failed. Please try again.';
+        setError(message);
+      } finally {
+        setIsLoading(false);
       }
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Login failed. Please try again.';
-      setError(message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+    },
+    [],
+  );
 
   const logout = useCallback(() => {
     setToken(null);
-    setGoogleIdToken(null);
     setUser(null);
     setError(null);
     clearSession();
@@ -147,21 +109,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const clearError = useCallback(() => setError(null), []);
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      token,
-      googleIdToken,
-      iapEmail,
-      salesUser,
-      isAuthenticated: !!token,
-      isSalesAuthenticated: !!salesUser,
-      isLoading,
-      error,
-      login,
-      logout,
-      logoutSales,
-      clearError,
-    }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        iapEmail,
+        salesUser,
+        isAuthenticated: !!token,
+        isSalesAuthenticated: !!salesUser,
+        isLoading,
+        error,
+        login,
+        logout,
+        logoutSales,
+        clearError,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

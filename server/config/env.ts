@@ -1,25 +1,42 @@
+/**
+ * Server-side environment configuration.
+ *
+ * This app runs entirely behind GCLB + IAP (Workforce Identity Federation via
+ * Entra ID) — see docs/architecture-iap.md. There is no direct OIDC client of
+ * our own; IAP has already authenticated every request that reaches this
+ * service. The values below are only what's needed to (a) verify IAP JWTs on
+ * inbound requests and (b) mint outbound IAP-authenticated identity tokens
+ * when proxying to the Translation / Sales Agent backends.
+ */
+
 export const env = {
-  // Entra ID
-  ENTRA_TENANT_ID: process.env.ENTRA_TENANT_ID || 'f820f6ca-864c-41c0-b2aa-49527f91cc4a',
-  ENTRA_CLIENT_ID: process.env.ENTRA_CLIENT_ID || 'f82163b4-4b5f-4ce9-86bc-5bb5d2f6280b',
-  ENTRA_REDIRECT_URI: process.env.ENTRA_REDIRECT_URI || 'http://localhost:8080/auth/callback',
-  ENTRA_CLIENT_SECRET_SECRET_NAME: process.env.ENTRA_CLIENT_SECRET_SECRET_NAME || 'entra-bff-client-secret',
+  // GCP project this Cloud Run service runs in (for logging/diagnostics only).
+  GCP_PROJECT_ID: process.env.GCP_PROJECT_ID || '',
 
-  // Google Cloud
-  GCP_PROJECT_ID: process.env.GCP_PROJECT_ID || 'gclt-aicoe-dev-aihub-ui',
-  GCP_PROJECT_NUMBER: process.env.GCP_PROJECT_NUMBER || '482057193026',
-  GCP_KMS_KEY_RING: process.env.GCP_KMS_KEY_RING || 'aihub-ew3',
-  GCP_KMS_KEY_NAME: process.env.GCP_KMS_KEY_NAME || 'session',
-  GCP_KMS_LOCATION: process.env.GCP_KMS_LOCATION || 'europe-west3',
+  // This service's own IAP OAuth client ID(s) — the `aud` claim IAP stamps on
+  // requests to the `aihub` backend service. Accept both the aihub audience
+  // (normal path) for symmetry with the Python backends' HUB_IAP_AUDIENCE.
+  HUB_IAP_AUDIENCE: process.env.HUB_IAP_AUDIENCE || '',
 
-  // Secret Names
-  APIGEE_CLIENT_KEY_SECRET_NAME: process.env.APIGEE_CLIENT_KEY_SECRET_NAME || 'apigee-bff-client-key',
+  // Target IAP OAuth client IDs for the Translation / Sales Agent backend
+  // services — used as the `audience` when this server mints its own
+  // identity token to call them (server-to-server, not via the browser).
+  TRANSLATION_IAP_AUDIENCE: process.env.TRANSLATION_IAP_AUDIENCE || '',
+  SALES_IAP_AUDIENCE: process.env.SALES_IAP_AUDIENCE || '',
 
-  // Apigee Targets
-  TRANSLATION_API_ORIGIN: process.env.TRANSLATION_API_ORIGIN || 'https://apigee-dev.colt.net',
-  SALES_API_ORIGIN: process.env.SALES_API_ORIGIN || 'https://apigee-dev.colt.net',
+  // Backend origins this server proxies /api/translation and /api/sales to.
+  TRANSLATION_API_ORIGIN: process.env.TRANSLATION_API_ORIGIN || '',
+  SALES_API_ORIGIN: process.env.SALES_API_ORIGIN || '',
 
-  // Session Timeouts (minutes)
-  SESSION_IDLE_TIMEOUT_MINUTES: 60,
-  SESSION_ABSOLUTE_TIMEOUT_HOURS: 8,
+  // Entra security groups required for entitlement (mirrors
+  // TRANSLATION_REQUIRED_GROUP / SALES_REQUIRED_GROUP in the Python backends).
+  TRANSLATION_REQUIRED_GROUP: process.env.TRANSLATION_REQUIRED_GROUP || '',
+  SALES_REQUIRED_GROUP: process.env.SALES_REQUIRED_GROUP || '',
+
+  // Secret used to sign the lightweight session cookie that caches verified
+  // IAP claims for the browser session (purely a perf/UX cache — IAP is the
+  // actual authority on every request regardless of this cookie's presence).
+  SESSION_COOKIE_SECRET: process.env.SESSION_COOKIE_SECRET || '',
+  SESSION_COOKIE_NAME: '__Host-AIHUB-SESSION',
+  SESSION_TTL_SECONDS: 60 * 60, // 1 hour — re-derived from IAP JWT on expiry, cheap to refresh.
 };

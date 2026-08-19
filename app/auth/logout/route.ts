@@ -1,34 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { destroySession } from '@/server/session/sessionStore';
-import { validateCsrf } from '@/server/security/csrf';
+import { env } from '@/server/config/env';
 
 /**
- * Log out endpoint. Must be POST-only and CSRF double-submit protected.
- * Destroys the stateful session in Firestore, clears the HTTP cookies,
- * and redirects to GCP IAP clear-session route.
+ * Logout endpoint.
+ *
+ * There's no local session state to destroy beyond the lightweight signed
+ * cookie cache (IAP itself owns the actual authenticated session). Clearing
+ * that cache cookie and redirecting to IAP's own clear-login-cookie endpoint
+ * fully signs the user out, forcing a fresh IAP -> Entra challenge on the
+ * next visit.
  */
 export async function POST(req: NextRequest) {
-  // Anti-CSRF verification
-  if (!validateCsrf(req)) {
-    return NextResponse.json({ error: 'CSRF token mismatch or unauthorized origin.' }, { status: 403 });
-  }
-
-  const sessionId = req.cookies.get('__Host-AISESSION')?.value;
-
-  try {
-    if (sessionId) {
-      await destroySession(sessionId);
-    }
-  } catch (err) {
-    console.warn('Silent issue deleting session document from Firestore during logout:', err);
-  }
-
-  // Clear HTTP opaque cookies and redirect to IAP logout path
-  // redirecting to IAP clear session URI fully destroys federated access
   const response = NextResponse.redirect(new URL('/_gcp_iap/clear_login_cookie', req.url));
-
-  response.cookies.set('__Host-AISESSION', '', { path: '/', maxAge: 0 });
-  response.cookies.set('xsrf-token', '', { path: '/', maxAge: 0 });
-
+  response.cookies.set(env.SESSION_COOKIE_NAME, '', { path: '/', maxAge: 0 });
   return response;
 }

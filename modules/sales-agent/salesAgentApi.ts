@@ -1,9 +1,3 @@
-import {
-  ensureFreshSalesGoogleIdToken,
-  fetchSalesGoogleIdToken,
-  forceRefreshSalesGoogleIdToken,
-  persistSalesGoogleIdToken,
-} from '@/modules/auth/cloudRunAuth';
 import { SALES_API_BASE } from '@/modules/sales-agent/salesConfig';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -73,23 +67,24 @@ function saveSalesAttributionPrefs(business_unit: string, organization: string) 
   localStorage.setItem(SALES_ORG_PREF_KEY, organization);
 }
 
-export function saveSalesSession(
-  token: string,
-  googleIdToken: string,
-  user: SalesAuthUser,
-  expiresInSeconds = 1800,
-) {
+/**
+ * Persists the per-service app JWT issued by Sales Agent's `/auth/token`.
+ *
+ * NOTE: no separate Google/Cloud Run identity token is stored here anymore —
+ * the browser's IAP session (for the `aihub` resource) plus this Next.js
+ * server's own service-account identity handle all backend auth. See
+ * modules/auth/hubAuth.ts and app/api/sales/v1/[...path]/route.ts.
+ */
+export function saveSalesSession(token: string, user: SalesAuthUser, expiresInSeconds = 1800) {
   const expiry = Date.now() + expiresInSeconds * 1000;
   localStorage.setItem(SALES_TOKEN_KEY, token);
-  persistSalesGoogleIdToken(googleIdToken);
   localStorage.setItem(SALES_USER_KEY, JSON.stringify(user));
   localStorage.setItem(SALES_EXPIRY_KEY, String(expiry));
   saveSalesAttributionPrefs(user.business_unit, user.organization);
 }
 
-export function loadSalesSession(): { token: string; googleIdToken: string; user: SalesAuthUser } | null {
+export function loadSalesSession(): { token: string; user: SalesAuthUser } | null {
   const token = localStorage.getItem(SALES_TOKEN_KEY);
-  const googleIdToken = localStorage.getItem('sales_google_id_token') ?? '';
   const userRaw = localStorage.getItem(SALES_USER_KEY);
   const expiryRaw = localStorage.getItem(SALES_EXPIRY_KEY);
 
@@ -101,7 +96,7 @@ export function loadSalesSession(): { token: string; googleIdToken: string; user
 
   try {
     const user: SalesAuthUser = JSON.parse(userRaw);
-    return { token, googleIdToken, user };
+    return { token, user };
   } catch {
     return null;
   }
@@ -109,8 +104,6 @@ export function loadSalesSession(): { token: string; googleIdToken: string; user
 
 export function clearSalesSession() {
   localStorage.removeItem(SALES_TOKEN_KEY);
-  localStorage.removeItem('sales_google_id_token');
-  localStorage.removeItem('sales_google_id_token_fetched_at');
   localStorage.removeItem(SALES_USER_KEY);
   localStorage.removeItem(SALES_EXPIRY_KEY);
 }
@@ -120,37 +113,26 @@ function getStoredSalesToken(): string | null {
 }
 
 /**
- * Authorization: Bearer <Google OIDC> — Cloud Run IAM (nginx → X-Serverless-Authorization).
- * x-app-auth: Bearer <app JWT> — Sales FastAPI (same pattern as Translation security.py).
+ * `credentials: 'include'` carries the browser's IAP session cookie for the
+ * `aihub` resource, which this Next.js server (app/api/sales/v1/[...path])
+ * verifies before proxying to Sales Agent using its own service-account IAP
+ * identity. `x-app-auth` is the per-service app JWT from `/auth/token`.
  */
-async function salesAuthHeaders(
-  extra: Record<string, string> = {},
-): Promise<Record<string, string>> {
+function salesAuthHeaders(extra: Record<string, string> = {}): Record<string, string> {
   const token = getStoredSalesToken();
-  const googleIdToken = await ensureFreshSalesGoogleIdToken();
   return {
     accept: 'application/json',
-    ...(googleIdToken ? { Authorization: `Bearer ${googleIdToken}` } : {}),
     ...(token ? { 'x-app-auth': `Bearer ${token}` } : {}),
     ...extra,
   };
 }
 
 async function fetchSalesWithAuth(url: string, init: RequestInit): Promise<Response> {
-  let response = await fetch(url, {
+  return fetch(url, {
     ...init,
-    headers: { ...(await salesAuthHeaders()), ...init.headers },
+    credentials: 'include',
+    headers: { ...salesAuthHeaders(), ...init.headers },
   });
-
-  if (response.status === 401 || response.status === 403) {
-    await forceRefreshSalesGoogleIdToken();
-    response = await fetch(url, {
-      ...init,
-      headers: { ...(await salesAuthHeaders()), ...init.headers },
-    });
-  }
-
-  return response;
 }
 
 async function parseSalesApiError(response: Response, fallback: string): Promise<string> {
@@ -178,17 +160,11 @@ export async function fetchSalesWhoami(): Promise<{ email: string } | null> {
 export async function salesAuthenticate(
   business_unit: string,
   organization: string,
-): Promise<SalesTokenResponse & { googleIdToken: string }> {
-  const googleIdToken = await fetchSalesGoogleIdToken();
-  persistSalesGoogleIdToken(googleIdToken);
-
+): Promise<SalesTokenResponse> {
   const res = await fetch(`${SALES_API_BASE}/auth/token`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      accept: 'application/json',
-      Authorization: `Bearer ${googleIdToken}`,
-    },
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json', accept: 'application/json' },
     body: JSON.stringify({ business_unit, organization }),
   });
 
@@ -197,8 +173,7 @@ export async function salesAuthenticate(
     throw new Error(err.detail || err.message || `HTTP ${res.status}`);
   }
 
-  const data = await res.json();
-  return { ...data, googleIdToken };
+  return res.json();
 }
 
 /** POST /api/sales/v1/research/initiate */

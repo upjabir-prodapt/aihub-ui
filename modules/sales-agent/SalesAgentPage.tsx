@@ -28,11 +28,8 @@ import {
 } from '@/modules/sales-agent/salesAgentApi';
 import type { ResearchModelCard } from '@/modules/sales-agent/salesAgentApi';
 import { useAuth } from '@/modules/auth/useAuth';
-import {
-  forceRefreshSalesGoogleIdToken,
-  SALES_GOOGLE_TOKEN_REFRESH_INTERVAL_MS,
-} from '@/modules/auth/cloudRunAuth';
 import { Button } from '@/components/ui/button';
+
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
@@ -149,22 +146,8 @@ const SalesAgentPage: React.FC = () => {
   }, [jobId, isSalesAuthenticated, fetchResult]);
 
   useEffect(() => {
-    if (!isSalesAuthenticated) return;
-
-    const refresh = async () => {
-      try {
-        await forceRefreshSalesGoogleIdToken();
-      } catch (err) {
-        console.warn('Background Sales Google ID token refresh failed:', err);
-      }
-    };
-
-    const intervalId = window.setInterval(refresh, SALES_GOOGLE_TOKEN_REFRESH_INTERVAL_MS);
-    return () => window.clearInterval(intervalId);
-  }, [isSalesAuthenticated]);
-
-  useEffect(() => {
     let interval: ReturnType<typeof setInterval> | undefined;
+
     let immediate: ReturnType<typeof setTimeout> | undefined;
     if (IN_PROGRESS.has(status) && jobId && isSalesAuthenticated) {
       immediate = setTimeout(() => void checkStatus(), 0);

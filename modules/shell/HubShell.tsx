@@ -7,9 +7,8 @@ import Sidebar, { type ServiceEntitlements } from '@/modules/shell/Sidebar';
 import Topbar from '@/modules/shell/Topbar';
 import LoginModal from '@/modules/shell/LoginModal';
 import { isHubLoginComplete } from '@/modules/auth/hubAuth';
-import { TRANSLATION_API_BASE } from '@/modules/translation/translationConfig';
-import { SALES_API_BASE } from '@/modules/sales-agent/salesConfig';
 import TranslationPage from '@/modules/translation/TranslationPage';
+
 import SalesAgentPage from '@/modules/sales-agent/SalesAgentPage';
 
 function AccessDenied({ serviceName }: { serviceName: string }) {
@@ -111,30 +110,34 @@ function AppShell() {
     });
   };
 
+  // Single same-origin call to this Next.js server's own /auth/session route.
+  // The server has already verified the IAP JWT (injected by GCLB before the
+  // request even reaches this Cloud Run service) and derives per-service
+  // entitlement from the JWT's `groups` claim — no separate whoami calls
+  // against Translation/Sales are needed, and no cross-resource IAP session
+  // establishment (the browser-side iframe/popup problem) is involved at all.
   useEffect(() => {
-    Promise.all([
-      fetch(`${TRANSLATION_API_BASE}/auth/whoami`, { credentials: 'include' }).then(async (res) => ({
-        ok: res.ok,
-        data: res.ok ? await res.json() as { email: string } : null,
-      })),
-      fetch(`${SALES_API_BASE}/auth/whoami`, { credentials: 'include' }).then(async (res) => ({
-        ok: res.ok,
-        data: res.ok ? await res.json() as { email: string } : null,
-      })),
-    ])
-      .then(([translation, sales]) => {
-        setEntitlements({
-          translation: translation.ok,
-          sales: sales.ok,
-        });
-        setHubVerifiedEmail(translation.data?.email ?? sales.data?.email ?? null);
+    fetch('/auth/session', { credentials: 'include' })
+      .then(async (res) => {
+        if (!res.ok) {
+          setEntitlements({ translation: false, sales: false });
+          setHubVerifiedEmail(null);
+          return;
+        }
+        const data = await res.json() as {
+          email: string;
+          entitlements: { translation: boolean; sales: boolean };
+        };
+        setEntitlements(data.entitlements);
+        setHubVerifiedEmail(data.email ?? null);
       })
       .catch(() => {
-        // Local dev without IAP — allow both until probe fails
-        setEntitlements({ translation: true, sales: true });
+        // Fail closed — never grant access on an unexpected network error.
+        setEntitlements({ translation: false, sales: false });
       })
       .finally(() => setEntitlementsLoaded(true));
   }, []);
+
 
   const toggleTheme = () => setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
 

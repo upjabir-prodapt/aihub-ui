@@ -7,13 +7,9 @@ import type {
   ReviewRequest,
   ReviewResponse,
 } from '@/modules/translation/translation';
-import {
-  ensureFreshGoogleIdToken,
-  forceRefreshGoogleIdToken,
-} from '@/modules/auth/cloudRunAuth';
 import { TRANSLATION_API_BASE, TRANSLATION_API_ORIGIN } from '@/modules/translation/translationConfig';
 
-/** Same-origin `/api/translation/v1` — Vite (dev) or hub ILB (prod) → Translation `/api/v1`. */
+/** Same-origin `/api/translation/v1` — proxied server-side by this Next.js app to Translation. */
 const API_BASE = TRANSLATION_API_BASE;
 
 export { TRANSLATION_API_ORIGIN };
@@ -25,41 +21,30 @@ function getStoredToken(): string | null {
 }
 
 /**
- * Authorization: Bearer <Google OIDC> — Cloud Run IAM (nginx → X-Serverless-Authorization).
- * x-app-auth: Bearer <app JWT> — Translation FastAPI (security.py strips "Bearer " prefix).
+ * `credentials: 'include'` carries the browser's IAP session cookie for the
+ * `aihub` resource. This Next.js server (app/api/translation/v1/[...path])
+ * verifies it and proxies to Translation using its own service-account IAP
+ * identity — there is no separate Google/Cloud Run identity token for the
+ * browser to manage anymore. `x-app-auth` is the per-service app JWT from
+ * `/auth/token`.
  */
-async function authHeaders(
-  extra: Record<string, string> = {},
-): Promise<Record<string, string>> {
+function authHeaders(extra: Record<string, string> = {}): Record<string, string> {
   const token = getStoredToken();
-  const googleIdToken = await ensureFreshGoogleIdToken();
   return {
     accept: 'application/json',
-    ...(googleIdToken ? { Authorization: `Bearer ${googleIdToken}` } : {}),
     ...(token ? { 'x-app-auth': `Bearer ${token}` } : {}),
     ...extra,
   };
 }
 
-async function fetchWithAuth(
-  url: string,
-  init: RequestInit,
-): Promise<Response> {
-  let response = await fetch(url, {
+async function fetchWithAuth(url: string, init: RequestInit): Promise<Response> {
+  return fetch(url, {
     ...init,
-    headers: { ...(await authHeaders()), ...init.headers },
+    credentials: 'include',
+    headers: { ...authHeaders(), ...init.headers },
   });
-
-  if (response.status === 401 || response.status === 403) {
-    await forceRefreshGoogleIdToken();
-    response = await fetch(url, {
-      ...init,
-      headers: { ...(await authHeaders()), ...init.headers },
-    });
-  }
-
-  return response;
 }
+
 
 async function parseApiError(response: Response, fallback: string): Promise<string> {
   try {

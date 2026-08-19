@@ -1,53 +1,60 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/server/session/sessionStore';
+import { verifyIapRequest, hasGroup, IapAuthError, type IapIdentity } from '@/server/iap/verify';
+import { encodeSessionCookie, decodeSessionCookie } from '@/server/session/sessionCookie';
+import { env } from '@/server/config/env';
 
 /**
- * Validates the caller's session.
- * Exposes email, roles, department, and active entitlements to the frontend client.
+ * Returns the caller's verified identity + per-service entitlements.
+ *
+ * Authentication itself is entirely handled by GCLB + IAP before the request
+ * ever reaches this Cloud Run service — there is no separate login flow here.
+ * This endpoint just:
+ *   1. Verifies the `X-Goog-IAP-JWT-Assertion` header IAP injects (or reuses
+ *      a still-fresh cached copy from the signed session cookie).
+ *   2. Derives per-service entitlement from the IAP JWT's `groups` claim
+ *      (populated via the workforce pool's `google.groups: assertion.groups`
+ *      attribute mapping), matching the same TRANSLATION_REQUIRED_GROUP /
+ *      SALES_REQUIRED_GROUP checks enforced server-side in the Translation
+ *      and Sales Agent backends.
  */
 export async function GET(req: NextRequest) {
-  const sessionId = req.cookies.get('__Host-AISESSION')?.value;
+  let identity: IapIdentity | null = decodeSessionCookie(
+    req.cookies.get(env.SESSION_COOKIE_NAME)?.value,
+  );
 
-  if (!sessionId) {
-    return NextResponse.json({ authenticated: false }, { status: 401 });
-  }
+  let shouldRefreshCookie = false;
 
-  try {
-    const sessionResult = await getSession(sessionId);
-
-    if (!sessionResult) {
-      // Session missing or expired
-      const errRes = NextResponse.json({ authenticated: false }, { status: 401 });
-      errRes.cookies.delete('__Host-AISESSION');
-      return errRes;
+  if (!identity) {
+    try {
+      identity = await verifyIapRequest(req.headers, [env.HUB_IAP_AUDIENCE]);
+      shouldRefreshCookie = true;
+    } catch (err) {
+      const status = err instanceof IapAuthError ? err.status : 401;
+      return NextResponse.json({ authenticated: false }, { status });
     }
-
-    const { session } = sessionResult;
-
-    // Check Entra roles for service entitlements
-    // translation: Translation.Translate
-    // sales: Sales.Research
-    const hasTranslation = session.roles.includes('Translation.Translate');
-    const hasSales = session.roles.includes('Sales.Research');
-
-    return NextResponse.json({
-      authenticated: true,
-      email: session.email,
-      department: session.department,
-      companyName: session.companyName,
-      roles: session.roles,
-      entitlements: {
-        translation: hasTranslation,
-        sales: hasSales,
-      },
-    });
-
-  } catch (err) {
-    console.error('Session API validation failedclosed with 503 error:', err);
-    // Fail closed with 503 Service Unavailable if downstream DB (Firestore) is down
-    return NextResponse.json(
-      { error: 'Service temporarily unavailable' },
-      { status: 503 }
-    );
   }
+
+  const entitlements = {
+    translation: hasGroup(identity, env.TRANSLATION_REQUIRED_GROUP),
+    sales: hasGroup(identity, env.SALES_REQUIRED_GROUP),
+  };
+
+  const response = NextResponse.json({
+    authenticated: true,
+    email: identity.email,
+    groups: identity.groups,
+    entitlements,
+  });
+
+  if (shouldRefreshCookie && env.SESSION_COOKIE_SECRET) {
+    response.cookies.set(env.SESSION_COOKIE_NAME, encodeSessionCookie(identity), {
+      path: '/',
+      secure: process.env.NODE_ENV === 'production',
+      httpOnly: true,
+      sameSite: 'lax',
+      maxAge: env.SESSION_TTL_SECONDS,
+    });
+  }
+
+  return response;
 }
