@@ -64,7 +64,7 @@ variables:
   - Shell1
 
 ".docker_runner":
-  image: node:20
+  image: node:22
   tags: []
 
 ".proxy":
@@ -239,7 +239,7 @@ variables:
     export PATH="${PNPM_HOME}:$PATH"
     mkdir -p "$PNPM_HOME" "$PNPM_STORE_DIR" "$XDG_CACHE_HOME" "$TMPDIR"
 
-    command -v node >/dev/null 2>&1 || { echo "ERROR - node not found on runner (need Node 20+)"; exit 1; }
+    command -v node >/dev/null 2>&1 || { echo "ERROR - node not found on runner (need Node 22+ (pnpm 11 requires >=22.13))"; exit 1; }
     node --version
 
     if ! command -v pnpm >/dev/null 2>&1; then
@@ -330,7 +330,7 @@ sast:
 lint-and-typecheck:
   stage: lint
   extends: ".node_ci_base"
-  image: node:20
+  image: node:22
   tags: []
   variables:
     GIT_DEPTH: "0"
@@ -398,7 +398,7 @@ env-scope-check:
 build-verify:
   stage: test
   extends: ".node_ci_base"
-  image: node:20
+  image: node:22
   tags: []
   needs:
   - job: lint-and-typecheck
