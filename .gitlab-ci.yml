@@ -372,6 +372,10 @@ lint-and-typecheck:
     GIT_DEPTH: "0"
   script:
   - |
+    # Running on the real Shell1 host (amsgit02), not a memory-constrained
+    # Docker container — safe to raise V8's old-space ceiling well above the
+    # ~4GB default, which eslint's type-aware-adjacent analysis was hitting.
+    export NODE_OPTIONS="--max-old-space-size=8192"
     pnpm install --frozen-lockfile
     pnpm lint
     pnpm exec tsc --noEmit
