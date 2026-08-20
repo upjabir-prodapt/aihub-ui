@@ -27,17 +27,20 @@ server {
     # already accepts this via the HUB_IAP_AUDIENCE fallback audience — no separate IAP
     # session, iframe, or cross-resource CORS handling is required.
     #
-    # IAP itself is disabled on the translation/sales Cloud Run backend services;
-    # network-level access control is instead standard Cloud Run IAM
-    # (roles/run.invoker granted to this service's own service account), authorized via
-    # the Google ID token minted through /api/metadata/id-token above and attached as
-    # `Authorization: Bearer <token>` by the browser (see cloudRunAuth.ts / cloudRunIdentity.ts).
+    # IMPORTANT: proxy_pass targets the Cloud Run *.run.app URL directly (NOT the
+    # dedicated Translation/Sales-Agent internal-DNS/ILB origin). Those services have
+    # `ingress: internal` (VPC-only) and IAP is disabled on their own dedicated backend
+    # services — routing through the dedicated ILB would never receive a
+    # X-Goog-IAP-JWT-Assertion header at all now that its IAP is off. This Cloud Run
+    # service (nginx/UI) reaches translation-api-service / sales-research-application's
+    # *.run.app URL over Direct VPC egress into the same VPC, which satisfies Cloud
+    # Run's `ingress: internal` requirement without making either service public —
+    # access is still gated by Cloud Run IAM (roles/run.invoker, granted only to this
+    # service's own service account below — no allUsers, satisfying the org policy).
     location /api/translation/v1/ {
-        proxy_pass ${VITE_TRANSLATION_API_ORIGIN}/api/v1/;
+        proxy_pass ${VITE_TRANSLATION_CLOUD_RUN_URL}/api/v1/;
         proxy_ssl_server_name on;
-        proxy_ssl_trusted_certificate /etc/nginx/certs/colt-internal-ca.pem;
-        proxy_ssl_verify on;
-        proxy_set_header Host ${TRANSLATION_API_HOST};
+        proxy_set_header Host ${TRANSLATION_CLOUD_RUN_HOST};
         proxy_pass_request_headers on;
         # Forwarded unchanged from the inbound request — do not strip or rewrite:
         proxy_set_header Authorization $http_authorization;
@@ -48,11 +51,9 @@ server {
     }
 
     location /api/sales/v1/ {
-        proxy_pass ${VITE_SALES_API_ORIGIN}/api/v1/;
+        proxy_pass ${VITE_SALES_CLOUD_RUN_URL}/api/v1/;
         proxy_ssl_server_name on;
-        proxy_ssl_trusted_certificate /etc/nginx/certs/colt-internal-ca.pem;
-        proxy_ssl_verify on;
-        proxy_set_header Host ${SALES_API_HOST};
+        proxy_set_header Host ${SALES_CLOUD_RUN_HOST};
         proxy_pass_request_headers on;
         # Forwarded unchanged from the inbound request — do not strip or rewrite:
         proxy_set_header Authorization $http_authorization;
