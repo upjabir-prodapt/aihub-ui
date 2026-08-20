@@ -1,3 +1,18 @@
 allowBuilds:
   protobufjs: true
   unrs-resolver: false
+
+# GitLab Shell1 runner (amsgit02) has an older glibc than @next/swc-linux-x64-gnu
+# requires ("GLIBC_2.29 not found"), and the WASM fallback download times out
+# behind the corporate proxy. Force pnpm to also resolve/install the
+# statically-linked musl variant of @next/swc — it works on any Linux
+# regardless of glibc version, and Next.js's own binary-loading fallback
+# chain already tries it before giving up.
+supportedArchitectures:
+  os:
+    - current
+  cpu:
+    - current
+  libc:
+    - glibc
+    - musl
