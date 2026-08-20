@@ -17,6 +17,15 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // CI-only tool/cache directories (node, pnpm, gcloud installed under
+    // CI_PROJECT_DIR by .gitlab-ci.yml's .ensure_pnpm/.ensure_gcloud) — these
+    // sit inside the project root but are never our own source code. Without
+    // this, eslint was scanning pnpm's own 300k+ line bundled corepack
+    // artifacts under .cache/xdg/node/corepack/**.
+    ".cache/**",
+    ".tools/**",
+    ".ci-work/**",
+    "node_modules/**",
   ]),
 ]);
 

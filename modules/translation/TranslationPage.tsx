@@ -20,8 +20,8 @@ import {
   FileType,
 } from 'lucide-react';
 import { useTranslation } from '@/modules/translation/useTranslation';
-import { useAuth } from '@/modules/auth/useAuth';
 import ReviewModal from '@/modules/translation/ReviewModal';
+
 import type { JobStatusResponse, TranslationResult } from '@/modules/translation/translation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';

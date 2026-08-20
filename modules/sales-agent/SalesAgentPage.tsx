@@ -9,7 +9,6 @@ import {
   AlertCircle,
   FileText,
   ShieldCheck,
-  Zap,
   Globe,
   PieChart,
   ArrowRight,

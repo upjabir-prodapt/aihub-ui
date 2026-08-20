@@ -58,10 +58,20 @@ function AwaitingHubLogin() {
 
 // ── Inner shell (has access to AuthContext) ──────────────────────────────
 
+// Lazy initializers: compute the initial value once, synchronously, on
+// mount — this reads persisted/viewport state without ever calling
+// setState from inside an effect (react-hooks/set-state-in-effect).
+function getInitialSidebarCollapsed(): boolean {
+  if (typeof window === 'undefined') return false;
+  const BREAKPOINT = 1024; // px — matches Tailwind's `lg` breakpoint
+  if (window.innerWidth < BREAKPOINT) return true;
+  return localStorage.getItem('colt_sidebar_collapsed') === 'true';
+}
+
 function AppShell() {
   const [activeTab, setActiveTab] = useState('translation');
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(getInitialSidebarCollapsed);
   const [entitlements, setEntitlements] = useState<ServiceEntitlements>({
     translation: false,
     sales: false,
@@ -75,20 +85,13 @@ function AppShell() {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
-  // Persist sidebar state
-  useEffect(() => {
-    const stored = localStorage.getItem('colt_sidebar_collapsed');
-    if (stored === 'true') {
-      setSidebarCollapsed(true);
-    }
-  }, []);
-
   // Auto-collapse the sidebar on smaller viewports, auto-expand back on larger ones.
   // Respects any manual toggle the user performs while the viewport stays in the same bucket.
+  // (Initial collapsed state for the current viewport is set synchronously via
+  // getInitialSidebarCollapsed() above — this effect only handles subsequent resizes.)
   useEffect(() => {
     const BREAKPOINT = 1024; // px — matches Tailwind's `lg` breakpoint
     let lastBucketWasSmall = window.innerWidth < BREAKPOINT;
-    if (lastBucketWasSmall) setSidebarCollapsed(true);
 
     const handleResize = () => {
       const isSmall = window.innerWidth < BREAKPOINT;
@@ -101,6 +104,7 @@ function AppShell() {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
 
   const handleToggleSidebar = () => {
     setSidebarCollapsed(prev => {

@@ -10,11 +10,13 @@ function getEnvVar(key: string): string {
   if (!value) {
     try {
       // Try to load from import.meta.env (Vite compatibility)
-      value = (import.meta.env as any)[key];
+      const viteEnv = (import.meta as unknown as { env?: Record<string, string> }).env;
+      value = viteEnv?.[key];
     } catch {
       // Ignore if import.meta.env is not available
     }
   }
+
 
   // Return resolved value or a safe default placeholder instead of throwing a hard runtime crash
   if (!value) {
