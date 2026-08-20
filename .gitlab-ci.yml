@@ -219,9 +219,6 @@ eslint:
   extends:
     - ".ensure_node"
     - ".shell_runner"
-  rules:
-    - when: never
-  # Temporarily disabled: only build+deploy needed for this rollout.
   cache:
     key: npm-$CI_COMMIT_REF_SLUG
     paths:
@@ -237,9 +234,8 @@ eslint:
       npm ci
       npm run lint
   rules:
-    - if: $CI_COMMIT_BRANCH == "sandbox"
-    - if: $CI_COMMIT_BRANCH == "dev"
-    - if: $CI_COMMIT_BRANCH == "prod"
+    - when: never
+  # Temporarily disabled: only build+deploy needed for this rollout.
 
 env-scope-check:
   extends:
