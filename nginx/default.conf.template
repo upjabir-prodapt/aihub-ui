@@ -18,9 +18,20 @@ server {
         proxy_set_header Metadata-Flavor Google;
     }
 
-    # NOTE: In production, /api/translation/* and /api/sales/* are routed at the AI Hub ILB
-    # (path rules → translation/sales IAP backends). Nginx only serves the SPA here.
-    # These proxy blocks are for local dev parity when not behind the hub ILB URL map.
+    # Architecture B: /api/translation/* and /api/sales/* are routed at the GCLB URL map
+    # to THIS backend (aihub-be), not directly to the translation/sales IAP backends.
+    # IAP has already authenticated the inbound request for the `aihub` resource by the
+    # time nginx sees it, so `X-Goog-IAP-JWT-Assertion` on the request nginx received is
+    # scoped to the hub's own IAP audience. A plain proxy_pass forwards that header
+    # unchanged to the upstream Cloud Run service. Translation/Sales-Agent's iap_auth.py
+    # already accepts this via the HUB_IAP_AUDIENCE fallback audience — no separate IAP
+    # session, iframe, or cross-resource CORS handling is required.
+    #
+    # IAP itself is disabled on the translation/sales Cloud Run backend services;
+    # network-level access control is instead standard Cloud Run IAM
+    # (roles/run.invoker granted to this service's own service account), authorized via
+    # the Google ID token minted through /api/metadata/id-token above and attached as
+    # `Authorization: Bearer <token>` by the browser (see cloudRunAuth.ts / cloudRunIdentity.ts).
     location /api/translation/v1/ {
         proxy_pass ${VITE_TRANSLATION_API_ORIGIN}/api/v1/;
         proxy_ssl_server_name on;
@@ -28,6 +39,7 @@ server {
         proxy_ssl_verify on;
         proxy_set_header Host ${TRANSLATION_API_HOST};
         proxy_pass_request_headers on;
+        # Forwarded unchanged from the inbound request — do not strip or rewrite:
         proxy_set_header Authorization $http_authorization;
         proxy_set_header x-app-auth $http_x_app_auth;
         proxy_set_header X-Serverless-Authorization $http_authorization;
@@ -42,6 +54,7 @@ server {
         proxy_ssl_verify on;
         proxy_set_header Host ${SALES_API_HOST};
         proxy_pass_request_headers on;
+        # Forwarded unchanged from the inbound request — do not strip or rewrite:
         proxy_set_header Authorization $http_authorization;
         proxy_set_header x-app-auth $http_x_app_auth;
         proxy_set_header X-Serverless-Authorization $http_authorization;

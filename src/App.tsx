@@ -7,7 +7,6 @@ import LoginModal from './components/LoginModal';
 import { isHubLoginComplete } from './api/hubAuth';
 import { TRANSLATION_API_BASE } from './api/translationConfig';
 import { SALES_API_BASE } from './api/salesConfig';
-import { probeEntitlement } from './api/iapProbe';
 
 import TranslationPage from './pages/TranslationPage';
 import SalesAgentPage from './pages/SalesAgentPage';
@@ -46,6 +45,30 @@ function AwaitingHubLogin() {
   );
 }
 
+/**
+ * Entitlement check for a service proxied same-origin through nginx
+ * (Architecture B: /api/translation/*, /api/sales/* → nginx → Cloud Run,
+ * carrying the hub's own inbound X-Goog-IAP-JWT-Assertion header unchanged).
+ * Fails closed: any network error or non-200 response denies access — only an
+ * explicit HTTP 200 from the backend's /auth/whoami counts as entitled.
+ */
+async function checkWhoami(url: string): Promise<{ entitled: boolean; email: string | null }> {
+  try {
+    const res = await fetch(url, {
+      credentials: 'include',
+      headers: { accept: 'application/json' },
+    });
+    if (!res.ok) return { entitled: false, email: null };
+    const data = (await res.json().catch(() => ({}))) as {
+      email?: string;
+      entitled?: boolean;
+    };
+    return { entitled: data.entitled !== false, email: data.email ?? null };
+  } catch {
+    return { entitled: false, email: null };
+  }
+}
+
 // ── Inner shell (has access to AuthContext) ──────────────────────────────
 
 function AppShell() {
@@ -65,11 +88,12 @@ function AppShell() {
   }, [theme]);
 
   useEffect(() => {
-    // Fail-closed entitlement probe: each backend (Translation, Sales Agent) is an
-    // independently IAP-protected resource, so a per-service login round-trip may be
-    // required even though the hub itself is already authenticated. probeEntitlement()
-    // handles that transparently (silent iframe warmup) and NEVER grants access on
-    // error/timeout — only an explicit HTTP 200 from the backend counts as entitled.
+    // Architecture B: Translation and Sales Agent are same-origin proxied through
+    // nginx directly to their Cloud Run services (IAP disabled on those backends;
+    // nginx forwards the hub's own X-Goog-IAP-JWT-Assertion header unchanged, and
+    // each backend's HUB_IAP_AUDIENCE fallback verifies it). A plain same-origin
+    // fetch is therefore sufficient — no separate per-resource IAP session, iframe
+    // warmup, or cross-resource CORS handling is required.
     if (import.meta.env.DEV) {
       // Local dev without IAP infra — no backend to probe against; unlock both.
       // Deferred via Promise.resolve().then() so setState doesn't run synchronously
@@ -82,8 +106,8 @@ function AppShell() {
     }
 
     Promise.all([
-      probeEntitlement(`${TRANSLATION_API_BASE}/auth/whoami`),
-      probeEntitlement(`${SALES_API_BASE}/auth/whoami`),
+      checkWhoami(`${TRANSLATION_API_BASE}/auth/whoami`),
+      checkWhoami(`${SALES_API_BASE}/auth/whoami`),
     ])
       .then(([translation, sales]) => {
         setEntitlements({
@@ -93,8 +117,7 @@ function AppShell() {
         setHubVerifiedEmail(translation.email ?? sales.email ?? null);
       })
       .catch(() => {
-        // Defensive: probeEntitlement() itself never rejects, but if it somehow
-        // did, fail closed — never grant access on an unexpected error.
+        // Fail closed — never grant access on an unexpected error.
         setEntitlements({ translation: false, sales: false });
       })
       .finally(() => setEntitlementsLoaded(true));
