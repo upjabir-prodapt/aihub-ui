@@ -4,10 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint"
   },
+
   "dependencies": {
     "google-auth-library": "^9.15.0",
     "@radix-ui/react-dropdown-menu": "^2.1.24",
@@ -28,6 +29,7 @@
     "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {
+    "@next/swc-wasm-nodejs": "16.3.1",
     "@tailwindcss/postcss": "^4",
     "@tailwindcss/typography": "^0.5.20",
     "@types/node": "^20",
@@ -38,5 +40,6 @@
     "tailwindcss": "^4",
     "typescript": "^5"
   },
+
   "packageManager": "pnpm@11.22.0"
 }

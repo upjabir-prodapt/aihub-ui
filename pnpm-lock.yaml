@@ -57,6 +57,9 @@ importers:
         specifier: ^3.6.0
         version: 3.6.0
     devDependencies:
+      '@next/swc-wasm-nodejs':
+        specifier: 16.3.1
+        version: 16.3.1
       '@tailwindcss/postcss':
         specifier: ^4
         version: 4.3.3
@@ -479,6 +482,9 @@ packages:
     cpu: [x64]
     os: [linux]
     libc: [musl]
+
+  '@next/swc-wasm-nodejs@16.3.1':
+    resolution: {integrity: sha512-vVVW6GW6a52HfhOb9aVaOde+rKcl4qscER+5KIWbNCcn6u+Op4MXsJfXkNKt8aLyXhP8ptNgga1bnjdJpzVvpw==}
 
   '@next/swc-win32-arm64-msvc@16.3.1':
     resolution: {integrity: sha512-iOoN1QecUoGNZik536U/vtK43YwgyrCsGIkth52yIkl612n+0C9MjSnJbQAikISpb+WYRooBVhaDlUW7iZoKog==}
@@ -3213,6 +3219,8 @@ snapshots:
 
   '@next/swc-linux-x64-musl@16.3.1':
     optional: true
+
+  '@next/swc-wasm-nodejs@16.3.1': {}
 
   '@next/swc-win32-arm64-msvc@16.3.1':
     optional: true
