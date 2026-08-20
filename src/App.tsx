@@ -7,10 +7,13 @@ import LoginModal from './components/LoginModal';
 import { isHubLoginComplete } from './api/hubAuth';
 import { TRANSLATION_API_BASE } from './api/translationConfig';
 import { SALES_API_BASE } from './api/salesConfig';
+import { ensureFreshGoogleIdToken } from './api/cloudRunAuth';
+import { ensureFreshSalesGoogleIdToken } from './api/salesCloudRunAuth';
 
 import TranslationPage from './pages/TranslationPage';
 import SalesAgentPage from './pages/SalesAgentPage';
 import './styles/layout.css';
+
 
 function AccessDenied({ serviceName }: { serviceName: string }) {
   return (
@@ -49,14 +52,29 @@ function AwaitingHubLogin() {
  * Entitlement check for a service proxied same-origin through nginx
  * (Architecture B: /api/translation/*, /api/sales/* → nginx → Cloud Run,
  * carrying the hub's own inbound X-Goog-IAP-JWT-Assertion header unchanged).
+ *
+ * IAP is disabled on the Translation/Sales-Agent Cloud Run backends — access
+ * control there is standard Cloud Run IAM (roles/run.invoker granted to this
+ * UI's own service account). Every request, including this entitlement probe,
+ * must therefore carry a Google-minted identity token (audience = that Cloud
+ * Run service's .run.app URL) as `Authorization: Bearer <token>`, or Cloud Run
+ * itself rejects it with 403 before nginx/the app ever sees it.
+ *
  * Fails closed: any network error or non-200 response denies access — only an
  * explicit HTTP 200 from the backend's /auth/whoami counts as entitled.
  */
-async function checkWhoami(url: string): Promise<{ entitled: boolean; email: string | null }> {
+async function checkWhoami(
+  url: string,
+  getGoogleIdToken: () => Promise<string | null>,
+): Promise<{ entitled: boolean; email: string | null }> {
   try {
+    const googleIdToken = await getGoogleIdToken();
     const res = await fetch(url, {
       credentials: 'include',
-      headers: { accept: 'application/json' },
+      headers: {
+        accept: 'application/json',
+        ...(googleIdToken ? { Authorization: `Bearer ${googleIdToken}` } : {}),
+      },
     });
     if (!res.ok) return { entitled: false, email: null };
     const data = (await res.json().catch(() => ({}))) as {
@@ -68,6 +86,7 @@ async function checkWhoami(url: string): Promise<{ entitled: boolean; email: str
     return { entitled: false, email: null };
   }
 }
+
 
 // ── Inner shell (has access to AuthContext) ──────────────────────────────
 
@@ -106,9 +125,10 @@ function AppShell() {
     }
 
     Promise.all([
-      checkWhoami(`${TRANSLATION_API_BASE}/auth/whoami`),
-      checkWhoami(`${SALES_API_BASE}/auth/whoami`),
+      checkWhoami(`${TRANSLATION_API_BASE}/auth/whoami`, ensureFreshGoogleIdToken),
+      checkWhoami(`${SALES_API_BASE}/auth/whoami`, ensureFreshSalesGoogleIdToken),
     ])
+
       .then(([translation, sales]) => {
         setEntitlements({
           translation: translation.entitled,
