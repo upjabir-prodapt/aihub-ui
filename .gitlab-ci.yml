@@ -338,9 +338,14 @@ lint-and-typecheck:
   - |
     export PNPM_HOME="${PNPM_HOME:-${CI_PROJECT_DIR}/.tools/pnpm}"
     export PATH="${PNPM_HOME}:$PATH"
+    # Cap the V8 heap for eslint/tsc — the default runner container's memory
+    # limit is lower than Node's default heap ceiling, which was causing
+    # "JavaScript heap out of memory" (exit 134) on eslint here.
+    export NODE_OPTIONS="--max-old-space-size=3072"
     pnpm install --frozen-lockfile
     pnpm lint
     pnpm exec tsc --noEmit
+
   rules:
   - if: $CI_COMMIT_BRANCH == "sandbox"
   - if: $CI_COMMIT_BRANCH == "dev"
