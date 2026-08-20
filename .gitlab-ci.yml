@@ -329,27 +329,23 @@ sast:
 
 lint-and-typecheck:
   stage: lint
-  extends: ".node_ci_base"
-  image: node:22
-  tags: []
+  extends:
+  - ".node_ci_base"
+  - ".shell_runner"
   variables:
     GIT_DEPTH: "0"
   script:
   - |
     export PNPM_HOME="${PNPM_HOME:-${CI_PROJECT_DIR}/.tools/pnpm}"
     export PATH="${PNPM_HOME}:$PATH"
-    # Cap the V8 heap for eslint/tsc — the default runner container's memory
-    # limit is lower than Node's default heap ceiling, which was causing
-    # "JavaScript heap out of memory" (exit 134) on eslint here.
-    export NODE_OPTIONS="--max-old-space-size=3072"
     pnpm install --frozen-lockfile
     pnpm lint
     pnpm exec tsc --noEmit
-
   rules:
   - if: $CI_COMMIT_BRANCH == "sandbox"
   - if: $CI_COMMIT_BRANCH == "dev"
   - if: $CI_COMMIT_BRANCH == "prod"
+
 
 env-scope-check:
   extends:
@@ -402,10 +398,11 @@ env-scope-check:
 
 build-verify:
   stage: test
-  extends: ".node_ci_base"
-  image: node:22
-  tags: []
+  extends:
+  - ".node_ci_base"
+  - ".shell_runner"
   needs:
+
   - job: lint-and-typecheck
     artifacts: false
   script:
