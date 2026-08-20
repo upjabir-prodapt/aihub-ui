@@ -48,9 +48,12 @@ variables:
   GCLOUD_ARCHIVE_URL: "https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz"
   # Shell runner tag: Shell1 (shell executor on amsgit02)
   # Avoid ~/.cache/* and ~/.local/share/pnpm under $HOME — home partition is often full
+  NODE_VERSION: "22.14.0"
+  NODE_INSTALL_DIR: "${CI_PROJECT_DIR}/.tools/node-v22.14.0"
   PNPM_HOME: "${CI_PROJECT_DIR}/.tools/pnpm"
   PNPM_STORE_DIR: "${CI_PROJECT_DIR}/.cache/pnpm-store"
   XDG_CACHE_HOME: "${CI_PROJECT_DIR}/.cache/xdg"
+
   # Keep gcloud state off $HOME — shell runners often have a full home partition
   CLOUDSDK_CONFIG: "${CI_PROJECT_DIR}/.cache/gcloud-config"
   CLOUDSDK_CORE_DISABLE_PROMPTS: "1"
@@ -232,24 +235,53 @@ variables:
   - !reference [".proxy", before_script]
   - |
     set -e
+    NODE_VERSION="${NODE_VERSION:-22.14.0}"
+    NODE_INSTALL_DIR="${NODE_INSTALL_DIR:-${CI_PROJECT_DIR}/.tools/node-v${NODE_VERSION}}"
+    NODE_DIST="node-v${NODE_VERSION}-linux-x64"
+
     export PNPM_HOME="${PNPM_HOME:-${CI_PROJECT_DIR}/.tools/pnpm}"
     export PNPM_STORE_DIR="${PNPM_STORE_DIR:-${CI_PROJECT_DIR}/.cache/pnpm-store}"
     export XDG_CACHE_HOME="${XDG_CACHE_HOME:-${CI_PROJECT_DIR}/.cache/xdg}"
     export TMPDIR="${CI_WORK_TMP:-${CI_PROJECT_DIR}/.ci-work}"
-    export PATH="${PNPM_HOME}:$PATH"
     mkdir -p "$PNPM_HOME" "$PNPM_STORE_DIR" "$XDG_CACHE_HOME" "$TMPDIR"
 
-    command -v node >/dev/null 2>&1 || { echo "ERROR - node not found on runner (need Node 22+ (pnpm 11 requires >=22.13))"; exit 1; }
-    node --version
+    # Shared shell runner: system Node is old (v16) and we have no write access to
+    # /usr/*, so corepack/system pnpm install fails with EACCES. Install a
+    # project-local Node 22 (pnpm 11 requires >=22.13) instead — same pattern as
+    # gitlab-ci.yml's own gcloud/uv installers, entirely under CI_PROJECT_DIR.
+    if [ ! -x "${NODE_INSTALL_DIR}/bin/node" ]; then
+      echo "Installing Node.js ${NODE_VERSION} to ${NODE_INSTALL_DIR}..."
+      mkdir -p "${CI_PROJECT_DIR}/.tools" "$TMPDIR"
+      tmp="$(mktemp -d "${TMPDIR}/node-install.XXXXXX")"
+      curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/${NODE_DIST}.tar.gz" -o "${tmp}/node.tar.gz"
+      tar -xzf "${tmp}/node.tar.gz" -C "${CI_PROJECT_DIR}/.tools"
+      rm -rf "${NODE_INSTALL_DIR}"
+      mv "${CI_PROJECT_DIR}/.tools/${NODE_DIST}" "${NODE_INSTALL_DIR}"
+      rm -rf "$tmp"
+    fi
+
+    # Prefer project-local Node over any system globals (avoids the runner's
+    # old Node 16 + broken npm "prefix"/nvm interplay entirely).
+    export PATH="${NODE_INSTALL_DIR}/bin:${PNPM_HOME}:$PATH"
+    unset NPM_CONFIG_PREFIX
+    hash -r
+
+    node_major="$(node -p 'parseInt(process.versions.node.split(".")[0], 10)')"
+    if [ "$node_major" -lt 22 ]; then
+      echo "ERROR - Node >=22 required for pnpm 11 (found $(node -v))"
+      exit 1
+    fi
+    echo "OK - node $(node -v)"
 
     if ! command -v pnpm >/dev/null 2>&1; then
-      echo "Enabling corepack + preparing pnpm..."
-      corepack enable
+      echo "Enabling corepack + preparing pnpm (project-local Node, no system writes)..."
+      corepack enable --install-directory "${PNPM_HOME}"
       corepack prepare pnpm@latest --activate
     fi
     pnpm config set store-dir "$PNPM_STORE_DIR"
     pnpm --version
     echo "OK - pnpm ready"
+
 
 ".node_ci_base":
   extends: ".ensure_pnpm"
@@ -257,8 +289,12 @@ variables:
     key:
       files:
       - pnpm-lock.yaml
+      prefix: pnpm-v1-$CI_COMMIT_REF_SLUG
     paths:
+    - ".tools/node-v22.14.0/"
+    - ".tools/pnpm/"
     - ".cache/pnpm-store/"
+
 
 # Security scanners: docker executor runners (template runs /analyzer in analyzer image).
 # App build/test/deploy jobs use Shell1 — do not route DS/SAST/secret jobs to shell tags.
@@ -336,8 +372,6 @@ lint-and-typecheck:
     GIT_DEPTH: "0"
   script:
   - |
-    export PNPM_HOME="${PNPM_HOME:-${CI_PROJECT_DIR}/.tools/pnpm}"
-    export PATH="${PNPM_HOME}:$PATH"
     pnpm install --frozen-lockfile
     pnpm lint
     pnpm exec tsc --noEmit
@@ -345,6 +379,7 @@ lint-and-typecheck:
   - if: $CI_COMMIT_BRANCH == "sandbox"
   - if: $CI_COMMIT_BRANCH == "dev"
   - if: $CI_COMMIT_BRANCH == "prod"
+
 
 
 env-scope-check:
@@ -402,15 +437,13 @@ build-verify:
   - ".node_ci_base"
   - ".shell_runner"
   needs:
-
   - job: lint-and-typecheck
     artifacts: false
   script:
   - |
-    export PNPM_HOME="${PNPM_HOME:-${CI_PROJECT_DIR}/.tools/pnpm}"
-    export PATH="${PNPM_HOME}:$PATH"
     pnpm install --frozen-lockfile
     pnpm build
+
   artifacts:
     when: always
     paths:
