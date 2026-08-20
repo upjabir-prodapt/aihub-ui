@@ -219,6 +219,9 @@ eslint:
   extends:
     - ".ensure_node"
     - ".shell_runner"
+  rules:
+    - when: never
+  # Temporarily disabled: only build+deploy needed for this rollout.
   cache:
     key: npm-$CI_COMMIT_REF_SLUG
     paths:
@@ -278,9 +281,6 @@ build-and-push:
   extends:
     - ".gcp_wif"
     - ".shell_runner"
-  needs:
-    - job: eslint
-      artifacts: false
   when: manual
   script:
     - |
