@@ -4,6 +4,14 @@ server {
     charset utf-8;
     charset_types text/css text/plain text/javascript application/javascript application/json application/manifest+json image/svg+xml;
 
+    # aicoeprod-subnet is IPv4-only (privateIpv6GoogleAccess: DISABLE_GOOGLE_ACCESS).
+    # Without this, nginx resolves Cloud Run's dual-stack .run.app hostnames and wastes
+    # a full connect-timeout retrying each unreachable IPv6 address before falling back
+    # to a working IPv4 one — real added latency per request, confirmed in prod logs
+    # (multiple "Network unreachable" errors per request before success).
+    resolver 169.254.169.254 ipv6=off;
+
+
     # Security headers for SPA responses (not forced onto upstream API proxies).
     # Intentionally omit X-XSS-Protection (deprecated / can cause issues).
     # CSP kept minimal (frame-ancestors only) so Vite-built assets and inline styles keep working.
@@ -37,6 +45,17 @@ server {
     # Run's `ingress: internal` requirement without making either service public —
     # access is still gated by Cloud Run IAM (roles/run.invoker, granted only to this
     # service's own service account below — no allUsers, satisfying the org policy).
+    #
+    # CRITICAL: Google Front End (GFE) strips inbound X-Goog-* / X-Google-* request
+    # headers at EVERY Cloud Run service's own public ingress edge as an anti-spoofing
+    # measure — only IAP itself (sitting directly in front of a given backend) is
+    # trusted to set those headers for that backend. Since nginx's outbound call to
+    # translation-api-service / sales-research-application looks like an ordinary
+    # external request from GFE's perspective at THEIR edge, any X-Goog-IAP-JWT-Assertion
+    # header nginx sets gets silently stripped before reaching the FastAPI container —
+    # confirmed via prod logs (app-level 401 "Missing X-Goog-IAP-JWT-Assertion header").
+    # Fix: relay the same JWT value under a non-reserved custom header name that GFE
+    # does not strip; iap_auth.py on both services checks this as a fallback.
     location /api/translation/v1/ {
         proxy_pass ${VITE_TRANSLATION_CLOUD_RUN_URL}/api/v1/;
         proxy_ssl_server_name on;
@@ -48,6 +67,8 @@ server {
         proxy_set_header X-Serverless-Authorization $http_authorization;
         proxy_set_header X-Goog-IAP-JWT-Assertion $http_x_goog_iap_jwt_assertion;
         proxy_set_header X-Goog-Authenticated-User-Email $http_x_goog_authenticated_user_email;
+        # GFE-safe relay of the same JWT (see note above) — not an X-Goog-* name:
+        proxy_set_header X-Colt-Hub-IAP-Assertion $http_x_goog_iap_jwt_assertion;
     }
 
     location /api/sales/v1/ {
@@ -61,7 +82,10 @@ server {
         proxy_set_header X-Serverless-Authorization $http_authorization;
         proxy_set_header X-Goog-IAP-JWT-Assertion $http_x_goog_iap_jwt_assertion;
         proxy_set_header X-Goog-Authenticated-User-Email $http_x_goog_authenticated_user_email;
+        # GFE-safe relay of the same JWT (see note above) — not an X-Goog-* name:
+        proxy_set_header X-Colt-Hub-IAP-Assertion $http_x_goog_iap_jwt_assertion;
     }
+
 
     # Hashed Vite build assets — long cache + security headers
     location /assets/ {
