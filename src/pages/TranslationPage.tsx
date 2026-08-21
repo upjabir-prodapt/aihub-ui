@@ -176,9 +176,13 @@ const TranslationPage: React.FC = () => {
   const [sourceLang, setSourceLang] = useState('en');
   const [targetLangs, setTargetLangs] = useState<string[]>(['de']);
   const [domain, setDomain] = useState('legal');
-  const [enableDlp, setEnableDlp] = useState(true);
-  const [enableChunking, setEnableChunking] = useState(true);
-  const [priority, setPriority] = useState('standard');
+  // enable_dlp, enable_chunking, and priority are no longer surfaced in the
+  // UI -- the backend (Translation service) already applies these exact
+  // defaults (enable_dlp=True, enable_chunking=True, priority="standard")
+  // when the fields are omitted from the request, so there is nothing to
+  // send here. See Translation/src/api/routes/v1/translate.py and
+  // Translation/src/api/schemas/requests.py.
+
 
   const {
     status,
@@ -275,10 +279,11 @@ const TranslationPage: React.FC = () => {
       targetLangs.forEach((lang) => fd.append('target_languages', lang));
       if (sourceLang) fd.append('source_language', sourceLang);
       fd.append('domain', domain);
-      fd.append('enable_dlp', String(enableDlp));
-      fd.append('enable_chunking', String(enableChunking));
-      fd.append('priority', priority);
+      // enable_dlp, enable_chunking, and priority are intentionally omitted --
+      // the backend applies enable_dlp=True, enable_chunking=True, and
+      // priority="standard" by default when these fields are absent.
       fd.append('file', file);
+
       return fd;
     };
 
@@ -521,31 +526,6 @@ const TranslationPage: React.FC = () => {
                     })}
                   </ul>
                 )}
-              </div>
-            </div>
-
-            {/* Advanced Settings */}
-            <div className="form-grid">
-              <div className="form-field">
-                <label className="field-label" htmlFor="tr-enable-dlp">Enable DLP</label>
-                <select id="tr-enable-dlp" name="enable_dlp" className="field-select" value={String(enableDlp)} onChange={(e) => setEnableDlp(e.target.value === 'true')}>
-                  <option value="true">True</option>
-                  <option value="false">False</option>
-                </select>
-              </div>
-              <div className="form-field">
-                <label className="field-label" htmlFor="tr-enable-chunking">Enable Chunking</label>
-                <select id="tr-enable-chunking" name="enable_chunking" className="field-select" value={String(enableChunking)} onChange={(e) => setEnableChunking(e.target.value === 'true')}>
-                  <option value="true">True</option>
-                  <option value="false">False</option>
-                </select>
-              </div>
-              <div className="form-field">
-                <label className="field-label" htmlFor="tr-priority">Priority</label>
-                <select id="tr-priority" name="priority" className="field-select" value={priority} onChange={(e) => setPriority(e.target.value)}>
-                  <option value="standard">Standard</option>
-                  <option value="high">High</option>
-                </select>
               </div>
             </div>
 
