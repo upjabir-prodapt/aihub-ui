@@ -6,7 +6,6 @@ export type { AuthUser };
 
 export interface AuthState {
   user: AuthUser | null;
-  token: string | null;
   googleIdToken: string | null;
   iapEmail: string | null;
   salesUser: SalesAuthUser | null;

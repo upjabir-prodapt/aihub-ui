@@ -11,13 +11,11 @@ import type { ServiceEntitlements } from '../components/Sidebar';
 export interface HubLoginResult {
   translation?: {
     user: AuthUser;
-    token: string;
     googleIdToken: string;
     expiresIn: number;
   };
   sales?: {
     user: SalesAuthUser;
-    token: string;
     googleIdToken: string;
     expiresIn: number;
   };
@@ -53,8 +51,13 @@ export async function hubLogin(
         const googleIdToken = await fetchGoogleIdToken();
         persistGoogleIdToken(googleIdToken);
 
+        // credentials: 'include' — the response sets the httpOnly
+        // `colt_session` cookie (Set-Cookie), which the browser stores
+        // automatically; we never read the JWT out of the response body
+        // for storage purposes (see authStorage.ts).
         const response = await fetch(`${TRANSLATION_API_BASE}/auth/token`, {
           method: 'POST',
+          credentials: 'include',
           headers: {
             'Content-Type': 'application/json',
             accept: 'application/json',
@@ -75,10 +78,9 @@ export async function hubLogin(
           organization: org,
         };
         const expiresIn = data.expires_in ?? 3600;
-        saveSession(data.access_token, googleIdToken, user, expiresIn);
+        saveSession(googleIdToken, user, expiresIn);
         result.translation = {
           user,
-          token: data.access_token,
           googleIdToken,
           expiresIn,
         };
@@ -99,10 +101,9 @@ export async function hubLogin(
           organization: org,
         };
         const expiresIn = 3600;
-        saveSalesSession(data.access_token, data.googleIdToken, user, expiresIn);
+        saveSalesSession(data.googleIdToken, user, expiresIn);
         result.sales = {
           user,
-          token: data.access_token,
           googleIdToken: data.googleIdToken,
           expiresIn,
         };

@@ -37,7 +37,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const initialSession = readInitialSession();
   const initialSalesSession = readInitialSalesSession();
   const [user, setUser] = useState<AuthUser | null>(initialSession?.user ?? null);
-  const [token, setToken] = useState<string | null>(initialSession?.token ?? null);
   const [googleIdToken, setGoogleIdToken] = useState<string | null>(initialSession?.googleIdToken ?? null);
   const [iapEmail, setIapEmail] = useState<string | null>(
     initialSession?.user?.email ?? initialSalesSession?.user?.email ?? null,
@@ -46,8 +45,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Session identity now lives in the httpOnly `colt_session` cookie (not
+  // JS-readable), so "is the user logged in" is derived from the presence of
+  // the (non-sensitive) locally-cached user record rather than a JWT we hold
+  // in memory/localStorage. The cookie itself is validated server-side on
+  // every API call; an expired/invalid cookie simply causes the next request
+  // to 401, at which point the app re-prompts for login.
   useEffect(() => {
-    if (!token) return;
+    if (!user) return;
 
     const refresh = async () => {
       try {
@@ -60,7 +65,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const intervalId = window.setInterval(refresh, GOOGLE_TOKEN_REFRESH_INTERVAL_MS);
     return () => window.clearInterval(intervalId);
-  }, [token]);
+  }, [user]);
 
   useEffect(() => {
     if (!salesUser) return;
@@ -103,7 +108,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const result = await hubLogin(business_unit, organization, entitlements);
 
       if (result.translation) {
-        setToken(result.translation.token);
         setGoogleIdToken(result.translation.googleIdToken);
         setUser(result.translation.user);
         setIapEmail(result.translation.user.email);
@@ -131,7 +135,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const logout = useCallback(() => {
-    setToken(null);
     setGoogleIdToken(null);
     setUser(null);
     setError(null);
@@ -149,11 +152,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   return (
     <AuthContext.Provider value={{
       user,
-      token,
       googleIdToken,
       iapEmail,
       salesUser,
-      isAuthenticated: !!token,
+      isAuthenticated: !!user,
       isSalesAuthenticated: !!salesUser,
       isLoading,
       error,

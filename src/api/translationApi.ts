@@ -18,25 +18,24 @@ const API_BASE = TRANSLATION_API_BASE;
 
 export { TRANSLATION_API_ORIGIN };
 
-// ── Token helpers ──────────────────────────────────────────────────────────
-
-function getStoredToken(): string | null {
-  return localStorage.getItem('colt_auth_token');
-}
+// ── Auth headers ─────────────────────────────────────────────────────────
+//
+// The app-session JWT is no longer read from localStorage and attached as
+// `x-app-auth` here — it now travels automatically via the httpOnly
+// `colt_session` cookie set by POST /auth/token, as long as the fetch call
+// includes `credentials: 'include'` (see fetchWithAuth below). This closes
+// the XSS-exfiltration risk of a JS-readable bearer token in localStorage.
 
 /**
  * Authorization: Bearer <Google OIDC> — Cloud Run IAM (nginx → X-Serverless-Authorization).
- * x-app-auth: Bearer <app JWT> — Translation FastAPI (security.py strips "Bearer " prefix).
  */
 async function authHeaders(
   extra: Record<string, string> = {},
 ): Promise<Record<string, string>> {
-  const token = getStoredToken();
   const googleIdToken = await ensureFreshGoogleIdToken();
   return {
     accept: 'application/json',
     ...(googleIdToken ? { Authorization: `Bearer ${googleIdToken}` } : {}),
-    ...(token ? { 'x-app-auth': `Bearer ${token}` } : {}),
     ...extra,
   };
 }
@@ -47,6 +46,7 @@ async function fetchWithAuth(
 ): Promise<Response> {
   let response = await fetch(url, {
     ...init,
+    credentials: 'include',
     headers: { ...(await authHeaders()), ...init.headers },
   });
 
@@ -54,6 +54,7 @@ async function fetchWithAuth(
     await forceRefreshGoogleIdToken();
     response = await fetch(url, {
       ...init,
+      credentials: 'include',
       headers: { ...(await authHeaders()), ...init.headers },
     });
   }

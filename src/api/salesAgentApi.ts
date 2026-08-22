@@ -54,8 +54,12 @@ export interface ResearchResultResponse {
 }
 
 // ── Session storage (isolated from Translation) ────────────────────────────
+//
+// NOTE: the app-session JWT is NO LONGER stored here (or anywhere in
+// localStorage) — it now lives exclusively in the httpOnly `colt_session`
+// cookie set by POST /auth/token, mirroring the Translation service's
+// hardening fix. Only non-sensitive UI state (email/BU/org, expiry) remains.
 
-const SALES_TOKEN_KEY = 'sales_auth_token';
 const SALES_USER_KEY = 'sales_auth_user';
 const SALES_EXPIRY_KEY = 'sales_auth_expiry';
 const SALES_BU_PREF_KEY = 'sales_auth_bu';
@@ -74,26 +78,23 @@ function saveSalesAttributionPrefs(business_unit: string, organization: string) 
 }
 
 export function saveSalesSession(
-  token: string,
   googleIdToken: string,
   user: SalesAuthUser,
   expiresInSeconds = 1800,
 ) {
   const expiry = Date.now() + expiresInSeconds * 1000;
-  localStorage.setItem(SALES_TOKEN_KEY, token);
   persistSalesGoogleIdToken(googleIdToken);
   localStorage.setItem(SALES_USER_KEY, JSON.stringify(user));
   localStorage.setItem(SALES_EXPIRY_KEY, String(expiry));
   saveSalesAttributionPrefs(user.business_unit, user.organization);
 }
 
-export function loadSalesSession(): { token: string; googleIdToken: string; user: SalesAuthUser } | null {
-  const token = localStorage.getItem(SALES_TOKEN_KEY);
+export function loadSalesSession(): { googleIdToken: string; user: SalesAuthUser } | null {
   const googleIdToken = localStorage.getItem('sales_google_id_token') ?? '';
   const userRaw = localStorage.getItem(SALES_USER_KEY);
   const expiryRaw = localStorage.getItem(SALES_EXPIRY_KEY);
 
-  if (!token || !userRaw || !expiryRaw) return null;
+  if (!userRaw || !expiryRaw) return null;
   if (Date.now() > parseInt(expiryRaw, 10)) {
     clearSalesSession();
     return null;
@@ -101,37 +102,32 @@ export function loadSalesSession(): { token: string; googleIdToken: string; user
 
   try {
     const user: SalesAuthUser = JSON.parse(userRaw);
-    return { token, googleIdToken, user };
+    return { googleIdToken, user };
   } catch {
     return null;
   }
 }
 
 export function clearSalesSession() {
-  localStorage.removeItem(SALES_TOKEN_KEY);
   localStorage.removeItem('sales_google_id_token');
   localStorage.removeItem('sales_google_id_token_fetched_at');
   localStorage.removeItem(SALES_USER_KEY);
   localStorage.removeItem(SALES_EXPIRY_KEY);
 }
 
-function getStoredSalesToken(): string | null {
-  return localStorage.getItem(SALES_TOKEN_KEY);
-}
-
 /**
  * Authorization: Bearer <Google OIDC> — Cloud Run IAM (nginx → X-Serverless-Authorization).
- * x-app-auth: Bearer <app JWT> — Sales FastAPI (same pattern as Translation security.py).
+ * The app-session JWT is no longer attached manually here — it travels via
+ * the httpOnly `colt_session` cookie automatically once `credentials: 'include'`
+ * is set on the fetch call (see fetchSalesWithAuth below).
  */
 async function salesAuthHeaders(
   extra: Record<string, string> = {},
 ): Promise<Record<string, string>> {
-  const token = getStoredSalesToken();
   const googleIdToken = await ensureFreshSalesGoogleIdToken();
   return {
     accept: 'application/json',
     ...(googleIdToken ? { Authorization: `Bearer ${googleIdToken}` } : {}),
-    ...(token ? { 'x-app-auth': `Bearer ${token}` } : {}),
     ...extra,
   };
 }
@@ -139,6 +135,7 @@ async function salesAuthHeaders(
 async function fetchSalesWithAuth(url: string, init: RequestInit): Promise<Response> {
   let response = await fetch(url, {
     ...init,
+    credentials: 'include',
     headers: { ...(await salesAuthHeaders()), ...init.headers },
   });
 
@@ -146,6 +143,7 @@ async function fetchSalesWithAuth(url: string, init: RequestInit): Promise<Respo
     await forceRefreshSalesGoogleIdToken();
     response = await fetch(url, {
       ...init,
+      credentials: 'include',
       headers: { ...(await salesAuthHeaders()), ...init.headers },
     });
   }
@@ -184,6 +182,7 @@ export async function salesAuthenticate(
 
   const res = await fetch(`${SALES_API_BASE}/auth/token`, {
     method: 'POST',
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
       accept: 'application/json',
