@@ -1,4 +1,5 @@
 import React from 'react';
+import UserMenu from './UserMenu';
 
 const TAB_LABELS: Record<string, string> = {
   translation: 'Translation',
@@ -42,7 +43,9 @@ const Topbar: React.FC<TopbarProps> = ({ activeTab, theme, onToggleTheme }) => {
           All Systems Operational
         </div>
 
-        {/* Auth functionality is now handled by the page-specific session bars */}
+        {/* Centralized user menu: identity, active translation jobs, sign out.
+            Replaces the previously duplicated per-page session bars. */}
+        <UserMenu />
       </div>
     </header>
   );

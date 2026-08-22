@@ -4,6 +4,7 @@ import type {
   JobStatusResponse,
   DownloadUrlResponse,
   MultiTranslateResponse,
+  MultiJobStatusItem,
 } from '../types/translation';
 
 export type TranslationStatus =
@@ -290,6 +291,48 @@ export const useTranslation = () => {
   }, [clearPolling, startPolling]);
 
   /**
+   * Rehydrate a previously-submitted batch (e.g. after a page refresh) from
+   * a live status snapshot already fetched by the caller, then resume
+   * polling any non-terminal jobs. Used by TranslationJobsProvider's
+   * resume-on-mount flow -- the caller is responsible for having already
+   * re-validated the batch against the backend (ownership + freshness);
+   * this function only rehydrates local state and (re)starts polling.
+   */
+  const resumeBatch = useCallback((
+    resumedBatchId: string,
+    order: string[],
+    statusItems: MultiJobStatusItem[],
+  ) => {
+    if (!isMountedRef.current) return;
+
+    const rehydratedJobs: Record<string, JobStatusResponse> = {};
+    for (const item of statusItems) {
+      rehydratedJobs[item.job_id] = {
+        job_id: item.job_id,
+        status: item.status,
+        submitted_at: '',
+        completed_at: item.status === 'completed' ? new Date().toISOString() : null,
+        error_message: item.error_message ?? null,
+      };
+    }
+
+    setBatchId(resumedBatchId);
+    setJobs(rehydratedJobs);
+    setJobOrder(order);
+    setError(null);
+
+    const nonTerminal = statusItems
+      .filter((item) => !['completed', 'failed', 'cancelled'].includes(item.status))
+      .map((item) => item.job_id);
+
+    if (nonTerminal.length > 0) {
+      startPolling(nonTerminal);
+    } else {
+      setStatus(deriveOverallStatus(rehydratedJobs));
+    }
+  }, [startPolling, deriveOverallStatus]);
+
+  /**
    * Retry: if a batch exists, resume polling any non-terminal jobs.
    * Otherwise reset to idle for a fresh submit.
    */
@@ -340,6 +383,7 @@ export const useTranslation = () => {
     downloadInfo,
     error,
     startTranslation,
+    resumeBatch,
     retryOrReset,
     reset,
     getValidDownloadUrl,

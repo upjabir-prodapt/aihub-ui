@@ -12,8 +12,6 @@ import {
   PieChart,
   ArrowRight,
   Download,
-  LogOut,
-  User,
   Hash,
   Sparkles,
   Cpu,
@@ -111,7 +109,7 @@ function formatCost(card: ResearchModelCard | null): string {
 // ══════════════════════════════════════════════════════════════════════════════
 
 const SalesAgentPage: React.FC = () => {
-  const { isSalesAuthenticated, salesUser, logoutSales } = useAuth();
+  const { isSalesAuthenticated } = useAuth();
 
   // ── Research state ─────────────────────────────────────────────────────────
   const [company,    setCompany]    = useState('');
@@ -200,11 +198,6 @@ const SalesAgentPage: React.FC = () => {
     setCompletedAt(null);
   };
 
-  const handleLogout = () => {
-    logoutSales();
-    resetResearch();
-  };
-
   const startResearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!company.trim() || !accountId.trim() || !isSalesAuthenticated) return;
@@ -268,21 +261,6 @@ const SalesAgentPage: React.FC = () => {
               <span className="sa-stat-value">10+</span>
               <span className="sa-stat-label">Sub-agents</span>
             </div>
-          </div>
-          <div className="sa-session">
-            <span className="sa-session-user" title={salesUser?.email}>
-              <User size={13} />
-              <span className="sa-session-email">{salesUser?.email}</span>
-            </span>
-            <button
-              className="sa-session-logout"
-              onClick={handleLogout}
-              title="Sign out"
-              id="sales-logout-btn"
-              aria-label="Sign out"
-            >
-              <LogOut size={15} />
-            </button>
           </div>
         </div>
       </header>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { AuthProvider } from './context/AuthContext';
 import { useAuth } from './context/useAuth';
+import { TranslationJobsProvider } from './context/TranslationJobsContext';
 import Sidebar, { type ServiceEntitlements } from './components/Sidebar';
 import Topbar from './components/Topbar';
 import LoginModal from './components/LoginModal';
@@ -215,7 +216,9 @@ function AppShell() {
 function App() {
   return (
     <AuthProvider>
-      <AppShell />
+      <TranslationJobsProvider>
+        <AppShell />
+      </TranslationJobsProvider>
     </AuthProvider>
   );
 }

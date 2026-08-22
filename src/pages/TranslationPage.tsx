@@ -1,8 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { User, LogOut } from 'lucide-react';
-import { useTranslation } from '../hooks/useTranslation';
-import { useAuth } from '../context/useAuth';
+import { useTranslationJobs } from '../context/useTranslationJobs';
 import ReviewModal from '../components/ReviewModal';
 import type { JobStatusResponse, TranslationResult } from '../types/translation';
 import '../styles/translation.css';
@@ -169,7 +167,6 @@ const TranslationResultCard: React.FC<TranslationResultCardProps> = ({
 
 // ΓöÇΓöÇΓöÇ Main Component ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 const TranslationPage: React.FC = () => {
-  const { user, logout } = useAuth();
   const [file, setFile] = useState<File | null>(null);
 
   // Multi-target language selection
@@ -195,7 +192,7 @@ const TranslationPage: React.FC = () => {
     retryOrReset,
     reset,
     getValidDownloadUrl,
-  } = useTranslation();
+  } = useTranslationJobs();
 
   const [copiedJobId, setCopiedJobId] = useState<string | null>(null);
   const [reviewJobId, setReviewJobId] = useState<string | null>(null);
@@ -389,16 +386,6 @@ const TranslationPage: React.FC = () => {
               <div className="stat-value">PDF/Word</div>
               <div className="stat-label">Formats</div>
             </div>
-          </div>
-          {/* Session info + logout */}
-          <div className="sales-session-bar">
-            <div className="session-user">
-              <User size={13} />
-              <span>{user?.email}</span>
-            </div>
-            <button className="session-logout-btn" onClick={logout} title="Sign out" id="translation-logout-btn">
-              <LogOut size={14} />
-            </button>
           </div>
         </div>
       </div>
