@@ -80,6 +80,7 @@ export interface JobStatusResponse {
 }
 
 // GET /api/v1/jobs/{job_id} → 200  (legacy/alternative endpoint)
+// Also used for items from the GET /jobs history list.
 export interface LegacyJobStatusResponse {
   job_id: string;
   status: string;
@@ -92,6 +93,15 @@ export interface LegacyJobStatusResponse {
   completed_at: string | null;
   download_url: string | null;
   error_message: string | null;
+  // Optional display fields. The exact history payload wasn't confirmed
+  // against the live service, so the source filename is probed across the
+  // plausible key names rather than assumed (see normalizeTranslationHistoryItem).
+  filename?: string | null;
+  file_name?: string | null;
+  original_filename?: string | null;
+  document_name?: string | null;
+  source_language?: string | null;
+  target_language?: string | null;
 }
 
 // GET /api/v1/jobs/{job_id}/download → 200

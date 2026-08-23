@@ -302,15 +302,23 @@ export const useTranslation = () => {
     resumedBatchId: string,
     order: string[],
     statusItems: MultiJobStatusItem[],
+    /**
+     * When the batch was originally submitted, from the persisted record.
+     * Without it these jobs carry no timestamp and sort to the bottom of any
+     * newest-first list — putting a still-running job below finished history.
+     */
+    submittedAt?: string,
   ) => {
     if (!isMountedRef.current) return;
+
+    const resumedSubmittedAt = submittedAt ?? new Date().toISOString();
 
     const rehydratedJobs: Record<string, JobStatusResponse> = {};
     for (const item of statusItems) {
       rehydratedJobs[item.job_id] = {
         job_id: item.job_id,
         status: item.status,
-        submitted_at: '',
+        submitted_at: resumedSubmittedAt,
         completed_at: item.status === 'completed' ? new Date().toISOString() : null,
         error_message: item.error_message ?? null,
       };
@@ -357,6 +365,28 @@ export const useTranslation = () => {
     }
   }, [jobs, startPolling, clearPolling]);
 
+  /**
+   * Cancel a single job (Job Tracker's Cancel action). Calls the backend's
+   * DELETE /jobs/{id} and reflects the cancellation locally so the UI updates
+   * immediately without waiting for the next poll tick.
+   */
+  const cancelJob = useCallback(async (jobId: string) => {
+    await translationApi.cancelJob(jobId);
+    if (!isMountedRef.current) return;
+    setJobs((prev) => {
+      const existing = prev[jobId];
+      if (!existing) return prev;
+      return {
+        ...prev,
+        [jobId]: {
+          ...existing,
+          status: 'cancelled',
+          completed_at: existing.completed_at ?? new Date().toISOString(),
+        },
+      };
+    });
+  }, []);
+
   /** Full reset — clears all state and cancels any in-flight work. */
   const reset = useCallback(() => {
     sessionGenRef.current += 1;
@@ -387,5 +417,6 @@ export const useTranslation = () => {
     retryOrReset,
     reset,
     getValidDownloadUrl,
+    cancelJob,
   };
 };

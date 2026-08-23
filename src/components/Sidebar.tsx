@@ -1,4 +1,5 @@
 import React from 'react';
+import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 
 export interface ServiceEntitlements {
   translation: boolean;
@@ -18,9 +19,30 @@ interface SidebarProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
   entitlements?: ServiceEntitlements;
+  collapsed?: boolean;
+  /** Omit to hide the collapse control entirely. */
+  onToggleCollapsed?: () => void;
 }
 
 const NAV_ITEMS: Omit<SidebarItem, 'disabled' | 'locked'>[] = [
+  {
+    id: 'hub',
+    label: 'Colt AI Hub',
+    icon: (
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>
+      </svg>
+    ),
+  },
+  {
+    id: 'tracker',
+    label: 'Job Tracker',
+    icon: (
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+      </svg>
+    ),
+  },
   {
     id: 'translation',
     label: 'Translation',
@@ -78,21 +100,41 @@ function resolveItemState(
   return { disabled: false, locked: false, title: item.label };
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, entitlements }) => {
+const Sidebar: React.FC<SidebarProps> = ({
+  activeTab,
+  onTabChange,
+  entitlements,
+  collapsed = false,
+  onToggleCollapsed,
+}) => {
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${collapsed ? 'sidebar--collapsed' : ''}`}>
       <div className="sidebar-logo">
         <div className="logo-mark">
           <div className="logo-chevron" />
         </div>
-        <div className="logo-text-block">
-          <div className="logo-company">Colt</div>
-          <div className="logo-product">AI Hub</div>
-        </div>
+        {!collapsed && (
+          <div className="logo-text-block">
+            <div className="logo-company">Colt</div>
+            <div className="logo-product">AI Hub</div>
+          </div>
+        )}
+        {onToggleCollapsed && (
+          <button
+            type="button"
+            className="sidebar-collapse-btn"
+            onClick={onToggleCollapsed}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-expanded={!collapsed}
+          >
+            {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+          </button>
+        )}
       </div>
 
       <nav className="sidebar-nav">
-        <div className="nav-section-label">Services</div>
+        {!collapsed && <div className="nav-section-label">Services</div>}
 
         {NAV_ITEMS.map((item) => {
           const { disabled, locked, title } = resolveItemState(item, entitlements);
@@ -102,24 +144,21 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, entitlements 
               className={`nav-item ${activeTab === item.id ? 'active' : ''} ${disabled ? 'disabled' : ''}`}
               onClick={() => !disabled && onTabChange(item.id)}
               aria-disabled={disabled}
-              title={title}
+              // When collapsed the label is hidden, so the tooltip carries it.
+              title={collapsed ? `${item.label}${title !== item.label ? ` — ${title}` : ''}` : title}
             >
               <span className="nav-icon">{item.icon}</span>
-              <span className="nav-label">{item.label}</span>
-              {item.badge && <span style={{ marginLeft: 'auto', fontSize: '10px', opacity: 0.6 }}>{item.badge}</span>}
-              {locked && <span style={{ marginLeft: 'auto', fontSize: '10px', opacity: 0.6 }}>Locked</span>}
+              {!collapsed && (
+                <>
+                  <span className="nav-label">{item.label}</span>
+                  {item.badge && <span className="nav-item-tag">{item.badge}</span>}
+                  {locked && <span className="nav-item-tag">Locked</span>}
+                </>
+              )}
             </button>
           );
         })}
       </nav>
-
-      <div className="sidebar-footer">
-        <div className="user-avatar">CT</div>
-        <div>
-          <div className="user-name">Colt Team</div>
-          <div className="user-role">Internal Platform</div>
-        </div>
-      </div>
     </aside>
   );
 };

@@ -120,7 +120,9 @@ export const TranslationJobsProvider: React.FC<{ children: React.ReactNode }> = 
 
         // Rehydrate minimal job state and resume polling via the hook's
         // public API (mirrors what startTranslation does on submit).
-        value.resumeBatch(stored.batchId, stored.jobOrder, statusItems);
+        // Pass the persisted submit time through so resumed jobs keep their
+        // real position in newest-first lists (Job Tracker / Recent runs).
+        value.resumeBatch(stored.batchId, stored.jobOrder, statusItems, stored.savedAt);
       } catch {
         // Job IDs no longer valid, ownership mismatch, or network error --
         // fail closed by dropping the stale local entry rather than

@@ -1,7 +1,12 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { useTranslationJobs } from '../context/useTranslationJobs';
+import { useServiceJobs } from '../hooks/useServiceJobs';
 import ReviewModal from '../components/ReviewModal';
+import RecentRuns from '../components/RecentRuns';
+import RunJobModal from '../components/RunJobModal';
+import ServiceLanding from '../components/ServiceLanding';
+import '../styles/service-detail.css';
 import type { JobStatusResponse, TranslationResult } from '../types/translation';
 import '../styles/translation.css';
 
@@ -16,6 +21,18 @@ const LANGUAGES = [
 ];
 
 const SOURCE_LANGUAGES = LANGUAGES;
+
+/** Filename given to pasted text when it's wrapped into an uploadable .txt file. */
+const TEXT_INPUT_FILENAME = 'pasted-text.txt';
+
+/** Upper bound on pasted text. Longer sources should be uploaded as a file. */
+const MAX_TEXT_WORDS = 1000;
+
+function countWords(text: string): number {
+  const trimmed = text.trim();
+  if (!trimmed) return 0;
+  return trimmed.split(/\s+/).length;
+}
 
 const langLabel = (code: string) => LANGUAGES.find((l) => l.code === code)?.label ?? code.toUpperCase();
 
@@ -56,15 +73,6 @@ function formatModel(meta: TranslationResult['metadata']): string {
 
 
 // ΓöÇΓöÇΓöÇ Sub-components ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
-
-const SkeletonLoader: React.FC = () => (
-  <div className="output-loading">
-    {[100, 85, 92, 70, 95].map((w, i) => (
-      <div key={i} className="skeleton" style={{ height: 14, width: `${w}%` }} />
-    ))}
-    <div className="skeleton" style={{ height: 14, width: '60%' }} />
-  </div>
-);
 
 interface TranslationResultCardProps {
   job: JobStatusResponse;
@@ -166,8 +174,45 @@ const TranslationResultCard: React.FC<TranslationResultCardProps> = ({
 };
 
 // ΓöÇΓöÇΓöÇ Main Component ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
-const TranslationPage: React.FC = () => {
+const TRANSLATION_ICON = (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="m5 8 6 6" /><path d="m4 14 6-6 2-3" /><path d="M2 5h12" /><path d="M7 2h1" />
+    <path d="m22 22-5-10-5 10" /><path d="M14 18h6" />
+  </svg>
+);
+
+const TRANSLATION_FEATURES = [
+  {
+    title: 'DLP and anonymization',
+    description: 'Sensitive data is detected and masked before anything leaves Colt, per Colt Security Policy.',
+  },
+  {
+    title: 'Layout preservation',
+    description: 'Word and PDF structure survives the round trip — tables, footnotes and inline styling stay intact.',
+  },
+  {
+    title: 'Domain-tuned output',
+    description: 'Pick the domain (legal, finance, HR…) and the model adapts terminology to match it.',
+  },
+];
+
+interface TranslationPageProps {
+  /** Optional "view all" link into the shared Job Tracker page. */
+  onOpenTracker?: () => void;
+  /** Optional back link to the hub. */
+  onBack?: () => void;
+}
+
+const TranslationPage: React.FC<TranslationPageProps> = ({ onOpenTracker, onBack }) => {
   const [file, setFile] = useState<File | null>(null);
+  /**
+   * Paste-text alternative to uploading a file. The two inputs are mutually
+   * exclusive — whichever one is in use disables the other — because the
+   * backend accepts exactly one source document per job.
+   */
+  const [sourceText, setSourceText] = useState('');
+  /** One-shot notice shown the moment pasted text crosses the word limit. */
+  const [showWordLimitNotice, setShowWordLimitNotice] = useState(false);
 
   // Multi-target language selection
   const [sourceLang, setSourceLang] = useState('en');
@@ -194,6 +239,9 @@ const TranslationPage: React.FC = () => {
     getValidDownloadUrl,
   } = useTranslationJobs();
 
+  const serviceJobs = useServiceJobs('translation');
+  const [runOpen, setRunOpen] = useState(false);
+
   const [copiedJobId, setCopiedJobId] = useState<string | null>(null);
   const [reviewJobId, setReviewJobId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ ok: boolean; message: string } | null>(null);
@@ -218,16 +266,21 @@ const TranslationPage: React.FC = () => {
     if (accepted.length > 0) setFile(accepted[0]);
   }, []);
 
+  const hasText = sourceText.trim().length > 0;
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: { 
-      'text/plain': ['.txt'], 
+    accept: {
+      'text/plain': ['.txt'],
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
       'application/pdf': ['.pdf']
     },
     maxFiles: 1,
     maxSize: 10 * 1024 * 1024,
     noClick: false,
+    // Typing into the text box takes over as the source, so uploading is
+    // switched off until the box is cleared.
+    disabled: hasText,
   });
 
   // ΓöÇΓöÇ Clear ΓöÇΓöÇ
@@ -235,6 +288,21 @@ const TranslationPage: React.FC = () => {
   const clearFile = () => {
     setFile(null);
     reset();
+  };
+
+  const clearText = () => {
+    setSourceText('');
+    setShowWordLimitNotice(false);
+    reset();
+  };
+
+  // Fires the notice only on the transition into over-limit, so it doesn't
+  // reappear on every keystroke once the text is already too long.
+  const handleTextChange = (value: string) => {
+    const wasOver = countWords(sourceText) > MAX_TEXT_WORDS;
+    const isOver = countWords(value) > MAX_TEXT_WORDS;
+    setSourceText(value);
+    if (isOver && !wasOver) setShowWordLimitNotice(true);
   };
 
   // ── Target language multi-select ──
@@ -253,7 +321,7 @@ const TranslationPage: React.FC = () => {
 
   // ΓöÇΓöÇ Translate ΓöÇΓöÇ
   const handleTranslate = async () => {
-    if (!file) return;
+    if (!file && !hasText) return;
 
     if (targetLangs.length === 0) {
       alert('Please select at least one target language.');
@@ -279,10 +347,21 @@ const TranslationPage: React.FC = () => {
       // enable_dlp, enable_chunking, and priority are intentionally omitted --
       // the backend applies enable_dlp=True, enable_chunking=True, and
       // priority="standard" by default when these fields are absent.
-      fd.append('file', file);
+      //
+      // The API only accepts a file upload, so pasted text is wrapped in a
+      // .txt File. That also makes the result come back as a text file, since
+      // the service returns output in the same format it was given.
+      fd.append(
+        'file',
+        file ?? new File([sourceText], TEXT_INPUT_FILENAME, { type: 'text/plain' }),
+      );
 
       return fd;
     };
+
+    // Close the run dialog immediately — progress and results are shown on
+    // the page itself (Output panel + Recent runs) once the batch is in flight.
+    setRunOpen(false);
 
     await startTranslation(buildFormData);
 
@@ -341,8 +420,12 @@ const TranslationPage: React.FC = () => {
     toastTimer.current = setTimeout(() => setToast(null), 4500);
   };
 
+  const wordCount = countWords(sourceText);
+  const textTooLong = wordCount > MAX_TEXT_WORDS;
+
   const canTranslate =
-    !!file &&
+    (!!file || hasText) &&
+    !textTooLong &&
     targetLangs.length > 0 &&
     targetLangs.length <= 5 &&
     !targetLangs.includes(sourceLang);
@@ -352,95 +435,132 @@ const TranslationPage: React.FC = () => {
 
   return (
     <div className="page-content">
-      {/* Hero */}
-      <div className="hero-banner">
-        <div className="hero-banner-glow" />
-        <div className="hero-left">
-          <div className="hero-icon-wrap">
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/>
-              <path d="m22 22-5-10-5 10"/><path d="M14 18h6"/>
-            </svg>
-          </div>
-          <div>
-            <h1 className="hero-title">AI Translation Service</h1>
-            <p className="hero-subtitle">
-              Enterprise translation with automated DLP and anonymization. 
-              Integrated with Colt's Security Policy for structure-preserving Word & PDF conversion.
+      <ServiceLanding
+        category="Language"
+        name="Translation"
+        description="Enterprise document translation with automated DLP and anonymization, integrated with Colt's Security Policy. Word and PDF structure is preserved end to end."
+        icon={TRANSLATION_ICON}
+        runLabel="Run translation"
+        onRun={() => setRunOpen(true)}
+        onOpenTracker={onOpenTracker}
+        onBack={onBack}
+        stats={serviceJobs.stats}
+        features={TRANSLATION_FEATURES}
+        returns={['txt', 'docx', 'pdf']}
+      />
+
+
+      {/* Run dialog — the input/config form lives here, not on the page. */}
+      <RunJobModal
+        isOpen={runOpen}
+        onClose={() => setRunOpen(false)}
+        serviceName="Translation"
+        serviceIcon={TRANSLATION_ICON}
+        submitLabel={`Start job${targetLangs.length > 1 ? ` (${targetLangs.length} languages)` : ''}`}
+        submitting={isLoading}
+        canSubmit={canTranslate}
+        onSubmit={handleTranslate}
+      >
+        {/* Source: upload a file OR paste text — never both. */}
+        {!file ? (
+          <div
+            {...getRootProps()}
+            className={`drop-zone ${isDragActive ? 'drag-over' : ''} ${hasText ? 'drop-zone--disabled' : ''}`}
+            aria-disabled={hasText}
+            title={hasText ? 'Clear the text box to upload a file instead' : undefined}
+          >
+            {/* `disabled` is set explicitly as well as via useDropzone —
+                react-dropzone doesn't forward it to the input, and
+                pointer-events alone wouldn't block keyboard access. */}
+            <input
+              {...getInputProps({
+                'aria-label': 'Upload translation file',
+                name: 'translation_file',
+                disabled: hasText,
+              })}
+            />
+            <div className="drop-zone-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17,8 12,3 7,8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+            </div>
+            <p className="drop-zone-title">
+              {hasText ? 'Upload disabled' : isDragActive ? 'Drop it here!' : 'Drop your file here'}
             </p>
+            <p className="drop-zone-sub">
+              {hasText ? (
+                'Clear the text below to upload a file instead'
+              ) : (
+                <>or <span className="drop-zone-link">browse to upload</span></>
+              )}
+            </p>
+            {!hasText && <p className="drop-zone-types">Supports .txt, .docx and .pdf · Max 10 MB</p>}
           </div>
-        </div>
-        <div className="hero-right">
-          <div className="hero-stats">
-            <div className="stat-item">
-              <div className="stat-value">6</div>
-              <div className="stat-label">Core Languages</div>
+        ) : (
+          <div className="file-preview">
+            <div className="file-preview-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14,2 14,8 20,8"/>
+              </svg>
             </div>
-            <div className="stat-divider" />
-            <div className="stat-item">
-              <div className="stat-value">DLP</div>
-              <div className="stat-label">Secure API</div>
+            <div className="file-preview-info">
+              <div className="file-preview-name">{file.name}</div>
+              <div className="file-preview-size">{formatBytes(file.size)}</div>
             </div>
-            <div className="stat-divider" />
-            <div className="stat-item">
-              <div className="stat-value">PDF/Word</div>
-              <div className="stat-label">Formats</div>
-            </div>
+            <button type="button" className="file-remove-btn" onClick={clearFile} title="Remove file">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
           </div>
-        </div>
-      </div>
+        )}
 
+        <div className="source-divider"><span>or</span></div>
 
-      {/* Workspace */}
-      <div className="workspace">
-
-        {/* ΓöÇΓöÇ Input Panel ΓöÇΓöÇ */}
-        <div className="panel">
-          <div className="panel-header">
-            <h2 className="panel-title">Input & Configuration</h2>
-          </div>
-
-          <div className="panel-body">
-            {/* File Upload Mode */}
-            {!file ? (
-              <div {...getRootProps()} className={`drop-zone ${isDragActive ? 'drag-over' : ''}`}>
-                <input {...getInputProps({ 'aria-label': 'Upload translation file', name: 'translation_file' })} />
-                <div className="drop-zone-icon">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                    <polyline points="17,8 12,3 7,8"/>
-                    <line x1="12" y1="3" x2="12" y2="15"/>
-                  </svg>
-                </div>
-                <p className="drop-zone-title">
-                  {isDragActive ? 'Drop it here!' : 'Drop your file here'}
-                </p>
-                <p className="drop-zone-sub">
-                  or <span className="drop-zone-link">browse to upload</span>
-                </p>
-                <p className="drop-zone-types">Supports .txt, .docx and .pdf ┬╖ Max 10 MB</p>
-
-              </div>
-            ) : (
-              <div className="file-preview">
-                <div className="file-preview-icon">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                    <polyline points="14,2 14,8 20,8"/>
-                  </svg>
-                </div>
-                <div className="file-preview-info">
-                  <div className="file-preview-name">{file.name}</div>
-                  <div className="file-preview-size">{formatBytes(file.size)}</div>
-                </div>
-                <button className="file-remove-btn" onClick={clearFile} title="Remove file">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18"/>
-                    <line x1="6" y1="6" x2="18" y2="18"/>
-                  </svg>
-                </button>
-              </div>
+        {/* Paste-text source */}
+        <div className="form-field">
+          <div className="field-label-row">
+            <label className="field-label" htmlFor="tr-source-text">
+              Paste text <span className="field-label-muted">(max {MAX_TEXT_WORDS} words)</span>
+            </label>
+            {hasText && (
+              <button type="button" className="field-label-action" onClick={clearText}>
+                Clear
+              </button>
             )}
+          </div>
+          <textarea
+            id="tr-source-text"
+            name="source_text"
+            className={`field-textarea ${textTooLong ? 'field-textarea--error' : ''}`}
+            rows={5}
+            placeholder={
+              file
+                ? 'Remove the uploaded file to paste text instead'
+                : `Paste up to ${MAX_TEXT_WORDS} words…`
+            }
+            value={sourceText}
+            onChange={(e) => handleTextChange(e.target.value)}
+            disabled={!!file}
+            aria-invalid={textTooLong}
+          />
+          <div className="field-hint-row">
+            <p className={`field-hint ${textTooLong ? 'field-hint--error' : ''}`}>
+              {textTooLong
+                ? `Too long by ${wordCount - MAX_TEXT_WORDS} word${wordCount - MAX_TEXT_WORDS === 1 ? '' : 's'} — shorten it or upload a file instead.`
+                : 'Translated as a .txt file, returned the same way.'}
+            </p>
+            {!file && (
+              <span className={`field-counter ${textTooLong ? 'field-counter--error' : ''}`}>
+                {wordCount} / {MAX_TEXT_WORDS}
+              </span>
+            )}
+          </div>
+        </div>
 
             {/* Domain field */}
             <div className="form-field">
@@ -516,84 +636,66 @@ const TranslationPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Translate Button */}
+      </RunJobModal>
+
+      {/* Word-limit notice. Rendered as a sibling of the run dialog rather
+          than inside it: the dialog panel animates with a transform, which
+          would become the containing block for a position:fixed child and
+          trap this overlay inside the panel. */}
+      {showWordLimitNotice && (
+        <div
+          className="notice-backdrop"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="word-limit-title"
+          onClick={() => setShowWordLimitNotice(false)}
+        >
+          <div className="notice-panel" onClick={(e) => e.stopPropagation()}>
+            <div className="notice-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+            </div>
+            <h3 className="notice-title" id="word-limit-title">
+              Text is limited to {MAX_TEXT_WORDS} words
+            </h3>
+            <p className="notice-body">
+              You've pasted {wordCount.toLocaleString()} words. Shorten it to{' '}
+              {MAX_TEXT_WORDS} or fewer, or upload the full document as a file
+              instead — uploads have no word limit.
+            </p>
             <button
-              className="translate-btn"
-              onClick={handleTranslate}
-              disabled={!canTranslate || isLoading}
+              type="button"
+              className="notice-btn"
+              onClick={() => setShowWordLimitNotice(false)}
+              autoFocus
             >
-              {isLoading ? (
-                <>
-                  <span className="spinner" />
-                  {status === 'submitting'
-                    ? 'Submitting...'
-                    : `Processing ${Object.values(jobs).filter((j) => j.status === 'completed').length}/${jobOrder.length} languages`}
-                </>
-              ) : (
-                <>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/>
-                    <path d="m22 22-5-10-5 10"/><path d="M14 18h6"/>
-                  </svg>
-                  Translate{targetLangs.length > 1 ? ` (${targetLangs.length} languages)` : ''}
-                </>
-              )}
+              Got it
             </button>
           </div>
         </div>
+      )}
 
-        {/* ΓöÇΓöÇ Output Panel ΓöÇΓöÇ */}
-        <div className="panel" ref={resultRef}>
-          <div className="panel-header">
-            <h2 className="panel-title">Output</h2>
-            {batchId && (
-              <span className="batch-id" title={batchId}>
-                Batch {batchId.substring(0, 8)}ΓÇª
-              </span>
-            )}
-          </div>
-
-          {/* Idle */}
-          {status === 'idle' && (
-            <div className="output-placeholder">
-              <div className="output-placeholder-icon">
-                <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/>
-                  <path d="m22 22-5-10-5 10"/><path d="M14 18h6"/>
-                </svg>
-              </div>
-              <p className="output-placeholder-title">No translation yet</p>
-              <p className="output-placeholder-sub">
-                Fill in the details and click <strong>Translate</strong> to start a job.
-              </p>
-            </div>
-          )}
-
-          {/* Loading / Polling */}
-          {isLoading && (
-            <div className="polling-container">
-              <SkeletonLoader />
-              <div className="polling-status">
-                <span className="pulse-dot"></span>
-                <span>
-                  Batch Status:{' '}
-                  <strong>
-                    {jobOrder.length > 0
-                      ? `${Object.values(jobs).filter((j) => j.status === 'completed').length}/${jobOrder.length} completed`
-                      : (status ?? 'queued').toUpperCase()}
-                  </strong>
+      {/* Latest result — only rendered once a run has actually produced
+          something. Idle and in-progress states are deliberately absent: the
+          Recent runs panel below already reports live status, so an empty
+          "Output" panel would just duplicate it. What lives here is the part
+          Recent runs can't show — the translated text, cost/model metadata,
+          copy, and the rating flow. */}
+      {(status === 'completed' || status === 'partial') && jobOrder.length > 0 && (
+        <div className="workspace workspace--output">
+          <div className="panel" ref={resultRef}>
+            <div className="panel-header">
+              <h2 className="panel-title">Latest result</h2>
+              {batchId && (
+                <span className="batch-id" title={batchId}>
+                  Batch {batchId.substring(0, 8)}…
                 </span>
-                {jobOrder.length > 0 && (
-                  <span className="job-time">
-                    {Object.values(jobs).filter((j) => j.status === 'failed' || j.status === 'cancelled').length} failed
-                  </span>
-                )}
-              </div>
+              )}
             </div>
-          )}
 
-          {/* Success / Partial results */}
-          {(status === 'completed' || status === 'partial') && jobOrder.length > 0 && (
             <div className="batch-result-list">
               {jobOrder.map((jobId) => {
                 const job = jobs[jobId];
@@ -610,10 +712,15 @@ const TranslationPage: React.FC = () => {
                 );
               })}
             </div>
-          )}
+          </div>
+        </div>
+      )}
 
-          {/* Error */}
-          {status === 'failed' && (
+      {/* Batch-level failure — kept because it carries retry/reset actions
+          that the per-run list has no equivalent for. */}
+      {status === 'failed' && (
+        <div className="workspace workspace--output">
+          <div className="panel">
             <div className="output-error">
               <div className="error-icon">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -635,10 +742,21 @@ const TranslationPage: React.FC = () => {
                 )}
               </div>
             </div>
-          )}
+          </div>
         </div>
+      )}
 
-      </div>
+      <RecentRuns
+        jobs={serviceJobs.jobs}
+        loading={serviceJobs.loading}
+        loadError={serviceJobs.loadError}
+        actionError={serviceJobs.actionError}
+        busyKey={serviceJobs.busyKey}
+        onRefresh={serviceJobs.refresh}
+        onCancel={serviceJobs.cancelJob}
+        onDownload={serviceJobs.downloadJob}
+        onOpenTracker={onOpenTracker}
+      />
 
       {reviewJobId && (
         <ReviewModal

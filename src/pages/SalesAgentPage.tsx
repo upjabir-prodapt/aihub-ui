@@ -10,10 +10,8 @@ import {
   Zap,
   Globe,
   PieChart,
-  ArrowRight,
   Download,
   Hash,
-  Sparkles,
   Cpu,
   Clock,
   Coins,
@@ -26,6 +24,12 @@ import {
 } from '../api/salesAgentApi';
 import type { ResearchModelCard } from '../api/salesAgentApi';
 import { useAuth } from '../context/useAuth';
+import { useSalesJobs } from '../context/useSalesJobs';
+import { useServiceJobs } from '../hooks/useServiceJobs';
+import RecentRuns from '../components/RecentRuns';
+import RunJobModal from '../components/RunJobModal';
+import ServiceLanding from '../components/ServiceLanding';
+import '../styles/service-detail.css';
 import {
   forceRefreshSalesGoogleIdToken,
   SALES_GOOGLE_TOKEN_REFRESH_INTERVAL_MS,
@@ -108,8 +112,35 @@ function formatCost(card: ResearchModelCard | null): string {
 // Main Sales Agent Page
 // ══════════════════════════════════════════════════════════════════════════════
 
-const SalesAgentPage: React.FC = () => {
+const SALES_ICON = <Zap size={24} />;
+
+const SALES_FEATURES = [
+  {
+    title: 'Parallel agent research',
+    description: '10+ specialized sub-agents gather public company signals concurrently.',
+  },
+  {
+    title: 'Sales alignment brief',
+    description: 'Findings are compiled into a deep-dive report covering compliance, market strategy and tech stack.',
+  },
+  {
+    title: 'Cost and model transparency',
+    description: 'Every completed run reports the model used, elapsed time, tokens consumed and estimated cost.',
+  },
+];
+
+interface SalesAgentPageProps {
+  /** Optional "view all" link into the shared Job Tracker page. */
+  onOpenTracker?: () => void;
+  /** Optional back link to the hub. */
+  onBack?: () => void;
+}
+
+const SalesAgentPage: React.FC<SalesAgentPageProps> = ({ onOpenTracker, onBack }) => {
   const { isSalesAuthenticated } = useAuth();
+  const { registerJob } = useSalesJobs();
+  const serviceJobs = useServiceJobs('sales');
+  const [runOpen, setRunOpen] = useState(false);
 
   // ── Research state ─────────────────────────────────────────────────────────
   const [company,    setCompany]    = useState('');
@@ -198,10 +229,13 @@ const SalesAgentPage: React.FC = () => {
     setCompletedAt(null);
   };
 
-  const startResearch = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Invoked by RunJobModal's form submit, which already calls preventDefault.
+  const startResearch = async () => {
     if (!company.trim() || !accountId.trim() || !isSalesAuthenticated) return;
 
+    // Close the run dialog immediately — progress and the report render on
+    // the page itself once the job is in flight.
+    setRunOpen(false);
     setStatus('PENDING');
     setError(null);
     setReport(null);
@@ -214,6 +248,9 @@ const SalesAgentPage: React.FC = () => {
       const res = await initiateResearch(accountId.trim(), company.trim());
       setJobId(res.job_id);
       setStatus((res.status as Status) || 'PENDING');
+      // Register with the shared registry so Service Hub / Job Tracker can
+      // see this run too (see hooks/useSalesJobsState.ts).
+      registerJob(res.job_id, company.trim(), accountId.trim());
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to start research.';
       setError(msg);
@@ -237,103 +274,70 @@ const SalesAgentPage: React.FC = () => {
   // ── Authenticated app (hub middleware guarantees sales session) ────────────
   return (
     <div className="sa-page">
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <header className="sa-header">
-        <div className="sa-header-brand">
-          <div className="sa-header-icon">
-            <Zap size={22} />
-          </div>
-          <div className="sa-header-copy">
-            <h1 className="sa-header-title">Research Intelligence Agent</h1>
-            <p className="sa-header-sub">
-              Automated company research &amp; sales alignment · powered by 10+ specialized agents
-            </p>
-          </div>
-        </div>
+      <ServiceLanding
+        category="Revenue"
+        name="Sales Agent"
+        description="Automated company research and sales alignment, powered by 10+ specialized agents. Enter an account and company, and it returns a deep-dive brief built from public signals."
+        icon={SALES_ICON}
+        runLabel="Run research"
+        onRun={() => setRunOpen(true)}
+        onOpenTracker={onOpenTracker}
+        onBack={onBack}
+        stats={serviceJobs.stats}
+        features={SALES_FEATURES}
+        returns={['brief', 'pdf']}
+      />
 
-        <div className="sa-header-side">
-          <div className="sa-stats">
-            <div className="sa-stat">
-              <span className="sa-stat-value"><Cpu size={13} /> Gemini 2.5</span>
-              <span className="sa-stat-label">Model</span>
-            </div>
-            <div className="sa-stat">
-              <span className="sa-stat-value">10+</span>
-              <span className="sa-stat-label">Sub-agents</span>
-            </div>
-          </div>
+      {/* Run dialog — the research console lives here, not on the page. */}
+      <RunJobModal
+        isOpen={runOpen}
+        onClose={() => setRunOpen(false)}
+        serviceName="Sales Agent"
+        serviceIcon={SALES_ICON}
+        submitLabel="Start job"
+        submitting={IN_PROGRESS.has(status)}
+        canSubmit={!!company.trim() && !!accountId.trim()}
+        onSubmit={startResearch}
+      >
+        <div className="sa-field">
+          <label className="sa-field-label" htmlFor="res-account-id">
+            <Hash size={13} /> Account ID <span className="required">*</span>
+          </label>
+          <input
+            id="res-account-id"
+            name="account_id"
+            type="text"
+            className="sa-input"
+            placeholder="e.g. ACC-123"
+            value={accountId}
+            onChange={(e) => setAccountId(e.target.value)}
+            autoComplete="off"
+          />
         </div>
-      </header>
+        <div className="sa-field">
+          <label className="sa-field-label" htmlFor="res-company-name">
+            <Search size={13} /> Company name <span className="required">*</span>
+          </label>
+          <input
+            id="res-company-name"
+            name="company_name"
+            type="text"
+            className="sa-input"
+            placeholder="e.g. Acme Corp, OpenAI…"
+            value={company}
+            onChange={(e) => setCompany(e.target.value)}
+            autoComplete="off"
+          />
+        </div>
+        <div className="sa-capabilities">
+          <div className="sa-cap"><ShieldCheck size={16} /> Compliance audit</div>
+          <div className="sa-cap"><Globe size={16} /> Market strategy</div>
+          <div className="sa-cap"><PieChart size={16} /> Tech stack</div>
+        </div>
+      </RunJobModal>
 
       {/* ── Body ───────────────────────────────────────────────────────────── */}
       <main className="sa-body">
-        {/* ── IDLE: Research console ──────────────────────────────────────── */}
-        {status === 'IDLE' && (
-          <section className="sa-hero">
-            <div className="sa-hero-glow" aria-hidden="true" />
-            <div className="sa-hero-head">
-              <div className="sa-badge">
-                <Sparkles size={12} /> Agentic research engine
-              </div>
-              <h2 className="sa-hero-title">Who are we researching today?</h2>
-              <p className="sa-hero-sub">
-                Enter an account ID and company name to generate a deep-dive sales
-                alignment report.
-              </p>
-            </div>
-
-            <form className="sa-console" onSubmit={startResearch}>
-              <div className="sa-console-fields">
-                <div className="sa-field">
-                  <label className="sa-field-label" htmlFor="res-account-id">
-                    <Hash size={13} /> Account ID <span className="required">*</span>
-                  </label>
-                  <input
-                    id="res-account-id"
-                    name="account_id"
-                    type="text"
-                    className="sa-input"
-                    placeholder="e.g. ACC-123"
-                    value={accountId}
-                    onChange={(e) => setAccountId(e.target.value)}
-                    autoComplete="off"
-                  />
-                </div>
-                <div className="sa-field sa-field--grow">
-                  <label className="sa-field-label" htmlFor="res-company-name">
-                    <Search size={13} /> Company name <span className="required">*</span>
-                  </label>
-                  <input
-                    id="res-company-name"
-                    name="company_name"
-                    type="text"
-                    className="sa-input"
-                    placeholder="e.g. Acme Corp, OpenAI…"
-                    value={company}
-                    onChange={(e) => setCompany(e.target.value)}
-                    autoComplete="off"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                id="res-start-btn"
-                className="sa-cta"
-                disabled={!company.trim() || !accountId.trim()}
-              >
-                Generate research report <ArrowRight size={18} />
-              </button>
-            </form>
-
-            <div className="sa-capabilities">
-              <div className="sa-cap"><ShieldCheck size={16} /> Compliance audit</div>
-              <div className="sa-cap"><Globe size={16} /> Market strategy</div>
-              <div className="sa-cap"><PieChart size={16} /> Tech stack</div>
-            </div>
-          </section>
-        )}
-
         {/* ── PENDING / QUEUED / PROCESSING: Status tracker ───────────────── */}
         {IN_PROGRESS.has(status) && (
           <section className="sa-tracker">
@@ -444,6 +448,18 @@ const SalesAgentPage: React.FC = () => {
           </section>
         )}
       </main>
+
+      <RecentRuns
+        jobs={serviceJobs.jobs}
+        loading={serviceJobs.loading}
+        loadError={serviceJobs.loadError}
+        actionError={serviceJobs.actionError}
+        busyKey={serviceJobs.busyKey}
+        onRefresh={serviceJobs.refresh}
+        onCancel={serviceJobs.cancelJob}
+        onDownload={serviceJobs.downloadJob}
+        onOpenTracker={onOpenTracker}
+      />
     </div>
   );
 };

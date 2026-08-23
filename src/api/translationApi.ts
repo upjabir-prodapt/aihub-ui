@@ -6,6 +6,7 @@ import type {
   DownloadUrlResponse,
   ReviewRequest,
   ReviewResponse,
+  LegacyJobStatusResponse,
 } from '../types/translation';
 import {
   ensureFreshGoogleIdToken,
@@ -127,6 +128,28 @@ export const translationApi = {
     }
 
     return response.json();
+  },
+
+  /**
+   * GET /api/v1/jobs — this user's job history (queued/processing/completed/
+   * failed), for the Job Tracker page. Accepts either a bare array or a
+   * `{ jobs: [...] }` envelope from the backend, since the exact response
+   * shape wasn't confirmed against the live service at the time this was
+   * written — adjust the parsing below if the real shape differs.
+   */
+  async listJobs(): Promise<LegacyJobStatusResponse[]> {
+    const response = await fetchWithAuth(`${API_BASE}/jobs`, {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      throw new Error(await parseApiError(response, 'Failed to fetch job history'));
+    }
+
+    const data = await response.json();
+    if (Array.isArray(data)) return data as LegacyJobStatusResponse[];
+    if (Array.isArray(data?.jobs)) return data.jobs as LegacyJobStatusResponse[];
+    return [];
   },
 
   async cancelJob(jobId: string, reason?: string): Promise<{ message: string }> {

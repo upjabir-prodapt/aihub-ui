@@ -11,10 +11,12 @@ import {
   type AuthUser,
   clearSession,
   loadSession,
+  saveSession,
 } from './authStorage';
 import {
   clearSalesSession,
   loadSalesSession,
+  saveSalesSession,
   type SalesAuthUser,
 } from '../api/salesAgentApi';
 import { AuthContext } from './authContextValue';
@@ -103,6 +105,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     setIsLoading(true);
+
+    // Local dev has no reachable Colt backend, VPN, or GCE metadata server —
+    // mock a successful sign-in instead of calling the real hub/auth
+    // endpoints, so the UI shell (Service Hub, Job Tracker, page layouts) can
+    // be exercised offline. import.meta.env.DEV is false in any built
+    // artifact (vite build / preview / prod), so this never runs outside
+    // `npm run dev`.
+    if (import.meta.env.DEV) {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      const bu = business_unit.trim();
+      const org = organization.trim();
+      const mockEmail = 'dev@colt.net';
+      const mockToken = 'dev-mock-google-id-token';
+
+      if (entitlements.translation) {
+        const mockUser: AuthUser = { email: mockEmail, business_unit: bu, organization: org };
+        saveSession(mockToken, mockUser, 3600);
+        setGoogleIdToken(mockToken);
+        setUser(mockUser);
+        setIapEmail(mockEmail);
+      }
+      if (entitlements.sales) {
+        const mockSalesUser: SalesAuthUser = { email: mockEmail, business_unit: bu, organization: org };
+        saveSalesSession(mockToken, mockSalesUser, 3600);
+        setSalesUser(mockSalesUser);
+        setIapEmail((prev) => prev ?? mockEmail);
+      }
+      setIsLoading(false);
+      return;
+    }
 
     try {
       const result = await hubLogin(business_unit, organization, entitlements);

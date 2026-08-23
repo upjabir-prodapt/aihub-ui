@@ -1,0 +1,217 @@
+/* ===== RECENT RUNS (embedded per-service panel) ===== */
+.recent-runs {
+  margin-top: 24px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: 14px;
+  padding: 18px 20px;
+}
+
+.recent-runs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.recent-runs-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.recent-runs-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.recent-runs-refresh {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-default);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  transition: all var(--transition-fast);
+}
+
+.recent-runs-refresh:hover:not(:disabled) {
+  border-color: var(--colt-teal);
+  color: var(--colt-teal);
+}
+
+.recent-runs-refresh:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.recent-runs-refresh .spin {
+  animation: spin 0.8s linear infinite;
+}
+
+.recent-runs-viewall {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  color: var(--colt-teal);
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.recent-runs-viewall:hover {
+  filter: brightness(1.15);
+}
+
+.recent-runs-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: 9px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+
+.recent-runs-empty {
+  padding: 14px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  border: 1px dashed var(--border-default);
+  border-radius: 10px;
+}
+
+.recent-runs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.recent-run-row {
+  padding: 11px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-hover);
+}
+
+.recent-run-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+
+.recent-run-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.recent-run-badge {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 5px;
+  flex-shrink: 0;
+}
+
+.recent-run-badge--running { background: var(--colt-teal-light); color: var(--colt-teal); }
+.recent-run-badge--queued { background: rgba(234, 179, 8, 0.12); color: #eab308; }
+.recent-run-badge--completed { background: var(--bg-active); color: var(--text-muted); }
+.recent-run-badge--failed,
+.recent-run-badge--cancelled { background: rgba(239, 68, 68, 0.12); color: #ef4444; }
+
+.recent-run-sub {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.recent-run-progress-track {
+  height: 3px;
+  background: var(--bg-active);
+  border-radius: 99px;
+  overflow: hidden;
+  margin-top: 8px;
+}
+
+.recent-run-progress-fill {
+  height: 100%;
+  background: var(--colt-teal);
+  transition: width 400ms ease;
+}
+
+.recent-run-progress-fill.indeterminate {
+  width: 40%;
+  animation: recent-run-indeterminate 1.4s ease-in-out infinite;
+}
+
+@keyframes recent-run-indeterminate {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(350%); }
+}
+
+.recent-run-error-msg {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.recent-run-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 9px;
+}
+
+.recent-run-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 7px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 11.5px;
+  font-weight: 500;
+  transition: all var(--transition-fast);
+}
+
+.recent-run-action-btn:hover:not(:disabled) {
+  border-color: var(--colt-teal);
+  color: var(--colt-teal);
+}
+
+.recent-run-action-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.recent-run-action-btn--danger:hover:not(:disabled) {
+  border-color: #ef4444;
+  color: #ef4444;
+}

@@ -2,6 +2,8 @@ import React from 'react';
 import UserMenu from './UserMenu';
 
 const TAB_LABELS: Record<string, string> = {
+  hub: 'Colt AI Hub',
+  tracker: 'Job Tracker',
   translation: 'Translation',
   contracts: 'Contract Management',
   sales: 'Sales Agent',
@@ -12,15 +14,32 @@ interface TopbarProps {
   activeTab: string;
   theme: 'dark' | 'light';
   onToggleTheme: () => void;
+  /** Navigate back to the hub from the breadcrumb root. */
+  onNavigateHome?: () => void;
 }
 
-const Topbar: React.FC<TopbarProps> = ({ activeTab, theme, onToggleTheme }) => {
+const Topbar: React.FC<TopbarProps> = ({ activeTab, theme, onToggleTheme, onNavigateHome }) => {
   return (
     <header className="topbar">
       <div className="breadcrumb">
-        <span className="breadcrumb-root">Colt AI Hub</span>
-        <span className="breadcrumb-sep">›</span>
-        <span className="breadcrumb-current">{TAB_LABELS[activeTab] ?? activeTab}</span>
+        {activeTab === 'hub' ? (
+          <span className="breadcrumb-root breadcrumb-root--current">Colt AI Hub</span>
+        ) : (
+          <button
+            type="button"
+            className="breadcrumb-root breadcrumb-root--link"
+            onClick={onNavigateHome}
+            title="Back to Colt AI Hub"
+          >
+            Colt AI Hub
+          </button>
+        )}
+        {activeTab !== 'hub' && (
+          <>
+            <span className="breadcrumb-sep">›</span>
+            <span className="breadcrumb-current">{TAB_LABELS[activeTab] ?? activeTab}</span>
+          </>
+        )}
       </div>
 
       <div className="topbar-right">

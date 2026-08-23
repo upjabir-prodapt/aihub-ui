@@ -244,6 +244,58 @@ export async function getResearchResult(job_id: string): Promise<ResearchResultR
   return res.json();
 }
 
+/**
+ * One entry from the research job history. The exact payload wasn't confirmed
+ * against the live service, so everything beyond job_id/status is optional and
+ * probed defensively where it's displayed.
+ */
+export interface ResearchJobListItem {
+  job_id: string;
+  status: string;
+  company_name?: string | null;
+  company?: string | null;
+  account_id?: string | null;
+  created_at?: string | null;
+  completed_at?: string | null;
+  error_message?: string | null;
+  progress?: number | null;
+}
+
+/**
+ * GET /api/sales/v1/research/jobs — this user's research runs.
+ *
+ * The backend only retains the last 7 days (older runs and their generated
+ * output files are purged), so this is inherently a rolling window; the UI
+ * does not filter by date on top of it.
+ */
+export async function listResearchJobs(): Promise<ResearchJobListItem[]> {
+  const res = await fetchSalesWithAuth(`${SALES_API_BASE}/research/jobs`, {
+    method: 'GET',
+  });
+
+  if (!res.ok) {
+    throw new Error(await parseSalesApiError(res, 'Failed to fetch research history'));
+  }
+
+  const data = await res.json();
+  if (Array.isArray(data)) return data as ResearchJobListItem[];
+  if (Array.isArray(data?.jobs)) return data.jobs as ResearchJobListItem[];
+  return [];
+}
+
+/** DELETE /api/sales/v1/research/{job_id} — cancel a running research job. */
+export async function cancelResearch(job_id: string): Promise<{ message: string }> {
+  const res = await fetchSalesWithAuth(`${SALES_API_BASE}/research/${job_id}`, {
+    method: 'DELETE',
+  });
+
+  if (!res.ok) {
+    throw new Error(await parseSalesApiError(res, 'Failed to cancel research job'));
+  }
+
+  return res.json().catch(() => ({ message: 'Cancelled' }));
+}
+
 /** GET /api/sales/v1/research/download/{job_id} */
 export async function downloadResearchFile(job_id: string): Promise<void> {
   const res = await fetchSalesWithAuth(`${SALES_API_BASE}/research/download/${job_id}`, {

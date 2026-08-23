@@ -1,24 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { User, LogOut, ChevronDown } from 'lucide-react';
 import { useAuth } from '../context/useAuth';
-import { useTranslationJobs } from '../context/useTranslationJobs';
-
-const STATUS_LABELS: Record<string, string> = {
-  queued: 'Queued',
-  processing: 'Processing',
-  completed: 'Completed',
-  failed: 'Failed',
-  cancelled: 'Cancelled',
-};
 
 /**
- * Centralized user identity + active-jobs control, shared across every page
- * via Topbar. Replaces the previously duplicated per-page session bars
- * (Translation's .sales-session-bar and Sales Agent's .sa-session).
+ * Centralized user identity control, shared across every page via Topbar.
+ *
+ * Job state deliberately does NOT live here — running jobs are surfaced by
+ * the Job Tracker page and by each service page's Recent runs panel, which
+ * show far more (progress, cancel, download) than a dropdown list could.
  */
 const UserMenu: React.FC = () => {
   const { user, salesUser, isAuthenticated, isSalesAuthenticated, logout, logoutSales } = useAuth();
-  const { batchId, jobs, jobOrder, status } = useTranslationJobs();
 
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -41,14 +33,6 @@ const UserMenu: React.FC = () => {
     setOpen(false);
   };
 
-  const activeJobs = jobOrder
-    .map((id) => jobs[id])
-    .filter((job): job is NonNullable<typeof job> => !!job);
-
-  const inProgressCount = activeJobs.filter(
-    (job) => job.status !== 'completed' && job.status !== 'failed' && job.status !== 'cancelled',
-  ).length;
-
   if (!email) return null;
 
   return (
@@ -65,11 +49,6 @@ const UserMenu: React.FC = () => {
           <User size={14} />
         </span>
         <span className="user-menu-email">{email}</span>
-        {inProgressCount > 0 && (
-          <span className="user-menu-badge" title={`${inProgressCount} job(s) in progress`}>
-            {inProgressCount}
-          </span>
-        )}
         <ChevronDown size={14} className={`user-menu-chevron ${open ? 'rotated' : ''}`} />
       </button>
 
@@ -77,38 +56,6 @@ const UserMenu: React.FC = () => {
         <div className="user-menu-dropdown" role="menu">
           <div className="user-menu-header">
             <div className="user-menu-header-email">{email}</div>
-          </div>
-
-          <div className="user-menu-section">
-            <div className="user-menu-section-title">
-              Translation Jobs
-              {batchId && (
-                <span className="user-menu-batch-id" title={batchId}>
-                  Batch {batchId.substring(0, 8)}…
-                </span>
-              )}
-            </div>
-
-            {activeJobs.length === 0 ? (
-              <div className="user-menu-empty">No jobs running right now.</div>
-            ) : (
-              <ul className="user-menu-job-list">
-                {activeJobs.map((job) => (
-                  <li key={job.job_id} className="user-menu-job-item">
-                    <span className={`user-menu-job-status user-menu-job-status--${job.status}`}>
-                      {STATUS_LABELS[job.status] ?? job.status}
-                    </span>
-                    <span className="user-menu-job-id" title={job.job_id}>
-                      {job.job_id.substring(0, 8)}…
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            {status === 'failed' && (
-              <div className="user-menu-error">There was a problem checking job status.</div>
-            )}
           </div>
 
           <button className="user-menu-logout" onClick={handleLogout} id="user-menu-logout-btn">

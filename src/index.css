@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 /* ===== CSS RESET & BASE ===== */
 *, *::before, *::after {
@@ -14,18 +14,33 @@
   --colt-teal-light: #00d7bd1a;
   --colt-teal-mid: #00d7bd33;
 
+  /* Typography — Instrument Sans (body/UI) + Fraunces (headings) + JetBrains
+     Mono (eyebrows/labels/tags), matching the Service Hub mockup's type
+     system. Colors stay Colt's own tokens below — only the typefaces change. */
+  --font-sans: 'Instrument Sans', system-ui, -apple-system, sans-serif;
+  --font-serif: 'Fraunces', Georgia, serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
   /* Sizes */
   --sidebar-width: 256px;
+  --sidebar-width-collapsed: 64px;
   --topbar-height: 60px;
 
   /* Transitions */
   --transition-fast: 150ms ease;
   --transition-mid: 250ms ease;
 
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: var(--font-sans);
   font-size: 14px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Headings default to the serif display face app-wide; any page that already
+   sets its own font-family on a heading class (e.g. .hero-title) keeps that
+   choice, since a class selector always outranks this bare tag selector. */
+h1, h2, h3 {
+  font-family: var(--font-serif);
 }
 
 /* Default Dark Theme */

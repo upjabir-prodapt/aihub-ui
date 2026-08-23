@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { AuthProvider } from './context/AuthContext';
 import { useAuth } from './context/useAuth';
 import { TranslationJobsProvider } from './context/TranslationJobsContext';
+import { SalesJobsProvider } from './context/SalesJobsContext';
 import Sidebar, { type ServiceEntitlements } from './components/Sidebar';
 import Topbar from './components/Topbar';
 import LoginModal from './components/LoginModal';
@@ -11,6 +12,8 @@ import { SALES_API_BASE } from './api/salesConfig';
 import { ensureFreshGoogleIdToken } from './api/cloudRunAuth';
 import { ensureFreshSalesGoogleIdToken } from './api/salesCloudRunAuth';
 
+import ServiceHubPage from './pages/ServiceHubPage';
+import JobTrackerPage from './pages/JobTrackerPage';
 import TranslationPage from './pages/TranslationPage';
 import SalesAgentPage from './pages/SalesAgentPage';
 import './styles/layout.css';
@@ -89,10 +92,21 @@ async function checkWhoami(
 }
 
 
+const SIDEBAR_COLLAPSED_KEY = 'colt_sidebar_collapsed';
+
+function readStoredSidebarCollapsed(): boolean {
+  try {
+    return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1';
+  } catch {
+    // localStorage unavailable (private mode / quota) — default to expanded.
+    return false;
+  }
+}
+
 // ── Inner shell (has access to AuthContext) ──────────────────────────────
 
 function AppShell() {
-  const [activeTab, setActiveTab] = useState('translation');
+  const [activeTab, setActiveTab] = useState('hub');
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [entitlements, setEntitlements] = useState<ServiceEntitlements>({
     translation: false,
@@ -100,6 +114,9 @@ function AppShell() {
   });
   const [hubVerifiedEmail, setHubVerifiedEmail] = useState<string | null>(null);
   const [entitlementsLoaded, setEntitlementsLoaded] = useState(false);
+  /** Pre-selected service on the Job Tracker, set by a service page's "All jobs". */
+  const [trackerServiceFilter, setTrackerServiceFilter] = useState<'all' | 'translation' | 'sales'>('all');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(readStoredSidebarCollapsed);
 
   const { isAuthenticated, isSalesAuthenticated } = useAuth();
 
@@ -120,6 +137,9 @@ function AppShell() {
       // within the effect body (react-hooks/set-state-in-effect).
       Promise.resolve().then(() => {
         setEntitlements({ translation: true, sales: true });
+        // Mock verified email so LoginModal's Continue button isn't stuck
+        // disabled locally (see AuthContext.login's dev mock branch).
+        setHubVerifiedEmail('dev@colt.net');
         setEntitlementsLoaded(true);
       });
       return;
@@ -148,10 +168,31 @@ function AppShell() {
 
   const toggleTheme = () => setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
 
+  const toggleSidebar = () => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? '1' : '0');
+      } catch {
+        // Non-fatal — the preference just won't survive a reload.
+      }
+      return next;
+    });
+  };
+
   const handleTabChange = (tab: string) => {
     if (tab === 'translation' && entitlementsLoaded && !entitlements.translation) return;
     if (tab === 'sales' && entitlementsLoaded && !entitlements.sales) return;
+    // Reaching the tracker from the sidebar shows every service; a service
+    // page's "All jobs" pre-filters via openTrackerFor below.
+    if (tab === 'tracker') setTrackerServiceFilter('all');
     setActiveTab(tab);
+  };
+
+  /** "All jobs" on a service page — open the tracker scoped to that service. */
+  const openTrackerFor = (service: 'translation' | 'sales') => {
+    setTrackerServiceFilter(service);
+    setActiveTab('tracker');
   };
 
   const hasAnyEntitlement = entitlements.translation || entitlements.sales;
@@ -167,13 +208,31 @@ function AppShell() {
         activeTab={activeTab}
         onTabChange={handleTabChange}
         entitlements={entitlementsLoaded ? entitlements : undefined}
+        collapsed={sidebarCollapsed}
+        onToggleCollapsed={toggleSidebar}
       />
       <div className="main-content">
         <Topbar
           activeTab={activeTab}
           theme={theme}
           onToggleTheme={toggleTheme}
+          onNavigateHome={() => handleTabChange('hub')}
         />
+        <div
+          className="main-pane"
+          style={{ display: activeTab === 'hub' ? 'flex' : 'none' }}
+        >
+          <ServiceHubPage
+            entitlements={entitlementsLoaded ? entitlements : undefined}
+            onNavigate={handleTabChange}
+          />
+        </div>
+        <div
+          className="main-pane"
+          style={{ display: activeTab === 'tracker' ? 'flex' : 'none' }}
+        >
+          <JobTrackerPage serviceFilter={trackerServiceFilter} />
+        </div>
         <div
           className="main-pane"
           style={{ display: activeTab === 'translation' ? 'flex' : 'none' }}
@@ -183,7 +242,10 @@ function AppShell() {
           ) : hubLoginRequired || !isAuthenticated ? (
             <AwaitingHubLogin />
           ) : (
-            <TranslationPage />
+            <TranslationPage
+              onOpenTracker={() => openTrackerFor('translation')}
+              onBack={() => handleTabChange('hub')}
+            />
           )}
         </div>
         <div
@@ -195,7 +257,10 @@ function AppShell() {
           ) : hubLoginRequired || !isSalesAuthenticated ? (
             <AwaitingHubLogin />
           ) : (
-            <SalesAgentPage />
+            <SalesAgentPage
+              onOpenTracker={() => openTrackerFor('sales')}
+              onBack={() => handleTabChange('hub')}
+            />
           )}
         </div>
       </div>
@@ -217,7 +282,9 @@ function App() {
   return (
     <AuthProvider>
       <TranslationJobsProvider>
-        <AppShell />
+        <SalesJobsProvider>
+          <AppShell />
+        </SalesJobsProvider>
       </TranslationJobsProvider>
     </AuthProvider>
   );
