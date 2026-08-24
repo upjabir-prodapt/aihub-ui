@@ -9,6 +9,7 @@ import {
   normalizeSalesHistoryItem,
   normalizeSalesJob,
   mergeJobLists,
+  loadJobDetail,
 } from '../utils/jobs';
 import type { UnifiedJob } from '../types/jobs';
 
@@ -17,6 +18,9 @@ export interface ServiceJobStats {
   completed: number;
   failed: number;
 }
+
+/** How often to silently re-pull server-side history while a run is in flight. */
+const AUTO_REFRESH_INTERVAL_MS = 20_000;
 
 /**
  * All known runs for a single service, merged from that service's server-side
@@ -65,6 +69,35 @@ export function useServiceJobs(service: 'translation' | 'sales') {
       void loadHistory();
     });
   }, [loadHistory]);
+
+  // Keep server-side history current without a manual refresh, so every tab
+  // reflects live progress — but only while something is actually in flight,
+  // and paused while the tab is hidden so a backgrounded browser tab doesn't
+  // keep hammering the API.
+  const hasInFlight = history.some((j) => j.status === 'queued' || j.status === 'running');
+  useEffect(() => {
+    if (!hasInFlight) return undefined;
+
+    const tick = () => {
+      if (document.visibilityState === 'visible') void loadHistory();
+    };
+    const intervalId = setInterval(tick, AUTO_REFRESH_INTERVAL_MS);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') void loadHistory();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [hasInFlight, loadHistory]);
+
+  /** Lazily fetches cost/tokens/time/model for a completed translation job, on row expand. */
+  const loadDetail = useCallback((job: UnifiedJob) => {
+    void loadJobDetail(job, setHistory);
+  }, []);
 
   const activeItems = useMemo(() => {
     if (service === 'translation') {
@@ -152,5 +185,6 @@ export function useServiceJobs(service: 'translation' | 'sales') {
     refresh,
     cancelJob,
     downloadJob,
+    loadDetail,
   };
 }

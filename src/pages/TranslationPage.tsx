@@ -7,7 +7,6 @@ import RecentRuns from '../components/RecentRuns';
 import RunJobModal from '../components/RunJobModal';
 import ServiceLanding from '../components/ServiceLanding';
 import '../styles/service-detail.css';
-import type { JobStatusResponse, TranslationResult } from '../types/translation';
 import '../styles/translation.css';
 
 // ΓöÇΓöÇΓöÇ Constants ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
@@ -37,141 +36,12 @@ function countWords(text: string): number {
 const langLabel = (code: string) => LANGUAGES.find((l) => l.code === code)?.label ?? code.toUpperCase();
 
 
-// ΓöÇΓöÇΓöÇ Helpers ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ── Helpers ──────────────────────────────────────────────────────────────
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
-
-// Human-readable duration from a number of seconds.
-function formatDuration(seconds: number): string {
-  if (seconds < 60) return `${seconds.toFixed(1)}s`;
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.round(seconds % 60);
-  return `${mins}m ${secs}s`;
-}
-
-// Translation often leaves labels.processing_time_seconds null, so always derive
-// elapsed time from submitted_at ΓåÆ completed_at.
-function getElapsedTime(job: JobStatusResponse): string {
-  if (job.submitted_at && job.completed_at) {
-    const diffMs =
-      new Date(job.completed_at).getTime() - new Date(job.submitted_at).getTime();
-    if (diffMs > 0) return formatDuration(diffMs / 1000);
-  }
-  return 'N/A';
-}
-
-// The model that produced the translation, e.g. "gemini-2.5-flash (v1.2)".
-function formatModel(meta: TranslationResult['metadata']): string {
-  const name = meta?.model_used?.trim();
-  if (!name) return 'Unknown';
-  const version = meta?.model_version?.trim();
-  return version ? `${name} (${version})` : name;
-}
-
-
-// ΓöÇΓöÇΓöÇ Sub-components ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
-
-interface TranslationResultCardProps {
-  job: JobStatusResponse;
-  copied: boolean;
-  onCopy: () => void;
-  onDownload: () => void;
-  onRate: () => void;
-}
-
-const TranslationResultCard: React.FC<TranslationResultCardProps> = ({
-  job,
-  copied,
-  onCopy,
-  onDownload,
-  onRate,
-}) => {
-  const isCompleted = job.status === 'completed';
-  const isFailed = job.status === 'failed' || job.status === 'cancelled';
-  const result = job.result;
-
-  return (
-    <div className={`batch-result-card ${isFailed ? 'batch-result-card--failed' : ''}`}>
-      <div className="batch-result-header">
-        <div className="result-meta">
-          <span className="meta-chip">{result?.metadata.source_language ?? job.job_id.substring(0, 8)}</span>
-          <span className="meta-arrow">ΓåÆ</span>
-          <span className="meta-chip teal">{result?.metadata.target_language ?? 'ΓÇª'}</span>
-        </div>
-        <div className="batch-result-status">
-          <span className={`status-badge status-badge--${job.status}`}>{job.status}</span>
-        </div>
-      </div>
-
-      {isFailed ? (
-        <div className="batch-result-error">
-          {job.error_message || 'This language translation failed.'}
-        </div>
-      ) : (
-        <div className="result-text-container">
-          <p className="result-text">
-            {result?.translated_document?.content || 'Document translated successfully. Use the download button to retrieve it.'}
-          </p>
-        </div>
-      )}
-
-      {result && (
-        <div className="result-details">
-          {result.labels && (
-            <>
-              <div className="detail-item">
-                <span className="detail-label">Cost:</span>
-                <span className="detail-value">{typeof result.labels.cost_usd === 'number' ? `$${result.labels.cost_usd.toFixed(4)}` : '—'}</span>
-              </div>
-              <div className="detail-item">
-                <span className="detail-label">Tokens:</span>
-                <span className="detail-value">{result.labels.token_count ?? '—'}</span>
-              </div>
-            </>
-          )}
-          <div className="detail-item">
-            <span className="detail-label">Time:</span>
-            <span className="detail-value">{getElapsedTime(job)}</span>
-          </div>
-          <div className="detail-item">
-            <span className="detail-label">Model:</span>
-            <span className="detail-value">{formatModel(result.metadata)}</span>
-          </div>
-        </div>
-      )}
-
-      {isCompleted && (
-        <div className="batch-result-actions">
-          {result?.translated_document?.content && (
-            <button className={`output-action-btn ${copied ? 'copied' : ''}`} onClick={onCopy}>
-              {copied ? 'Copied!' : 'Copy'}
-            </button>
-          )}
-          <button
-            className="output-action-btn primary icon-only download-btn"
-            onClick={onDownload}
-            title="Download translation"
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-              <polyline points="7 10 12 15 17 10"/>
-              <line x1="12" y1="15" x2="12" y2="3"/>
-            </svg>
-          </button>
-          <button className="output-action-btn icon-only rate-btn" onClick={onRate} title="Rate this translation">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-            </svg>
-            <span className="btn-label">Rate</span>
-          </button>
-        </div>
-      )}
-    </div>
-  );
-};
 
 // ΓöÇΓöÇΓöÇ Main Component ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 const TRANSLATION_ICON = (
@@ -228,26 +98,22 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onOpenTracker, onBack
 
   const {
     status,
-    batchId,
-    jobs,
     jobOrder,
-    downloadInfo,
     error,
     startTranslation,
     retryOrReset,
     reset,
-    getValidDownloadUrl,
   } = useTranslationJobs();
 
   const serviceJobs = useServiceJobs('translation');
   const [runOpen, setRunOpen] = useState(false);
 
-  const [copiedJobId, setCopiedJobId] = useState<string | null>(null);
   const [reviewJobId, setReviewJobId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ ok: boolean; message: string } | null>(null);
   const [targetDropdownOpen, setTargetDropdownOpen] = useState(false);
   const targetDropdownRef = useRef<HTMLDivElement>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Recent runs is scrolled into view after submit — it's now the only place progress/results show. */
   const resultRef = useRef<HTMLDivElement>(null);
 
   // Close target-language dropdown on outside click
@@ -345,8 +211,10 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onOpenTracker, onBack
       if (sourceLang) fd.append('source_language', sourceLang);
       fd.append('domain', domain);
       // enable_dlp, enable_chunking, and priority are intentionally omitted --
-      // the backend applies enable_dlp=True, enable_chunking=True, and
-      // priority="standard" by default when these fields are absent.
+      // the backend applies enable_dlp=True, enable_chunking=True, and decides
+      // priority server-side based on document format (pasted .txt files are
+      // automatically routed to the high-priority queue). Users cannot promote
+      // their own work manually.
       //
       // The API only accepts a file upload, so pasted text is wrapped in a
       // .txt File. That also makes the result come back as a text file, since
@@ -370,47 +238,6 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onOpenTracker, onBack
         resultRef.current.scrollIntoView({ behavior: 'smooth' });
       }
     }, 500);
-  };
-
-  // ΓöÇΓöÇ Copy ΓöÇΓöÇ
-  const handleCopy = async (jobId: string) => {
-    const translatedText = jobs[jobId]?.result?.translated_document?.content;
-    if (!translatedText) return;
-    await navigator.clipboard.writeText(translatedText);
-    setCopiedJobId(jobId);
-    setTimeout(() => setCopiedJobId(null), 2000);
-  };
-
-  // ΓöÇΓöÇ Download ΓöÇΓöÇ
-  const handleDownload = async (jobId: string) => {
-    const signedUrl = await getValidDownloadUrl(jobId)
-      ?? jobs[jobId]?.result?.translated_document?.download_url;
-
-    if (signedUrl) {
-      const filename =
-        downloadInfo[jobId]?.filename ??
-        jobs[jobId]?.result?.translated_document?.filename ??
-        `translated_${jobId}.pdf`;
-      const anchor = document.createElement('a');
-      anchor.href = signedUrl;
-      anchor.download = filename;
-      anchor.target = '_blank';
-      anchor.rel = 'noopener noreferrer';
-      anchor.click();
-    } else {
-      const translatedText = jobs[jobId]?.result?.translated_document?.content;
-      if (!translatedText) {
-        console.warn('No download URL or inline content available.');
-        return;
-      }
-      const blob = new Blob([translatedText], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `translated_${jobId}.txt`;
-      a.click();
-      URL.revokeObjectURL(url);
-    }
   };
 
   // ΓöÇΓöÇ Review toast ΓöÇΓöÇ
@@ -678,44 +505,6 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onOpenTracker, onBack
         </div>
       )}
 
-      {/* Latest result — only rendered once a run has actually produced
-          something. Idle and in-progress states are deliberately absent: the
-          Recent runs panel below already reports live status, so an empty
-          "Output" panel would just duplicate it. What lives here is the part
-          Recent runs can't show — the translated text, cost/model metadata,
-          copy, and the rating flow. */}
-      {(status === 'completed' || status === 'partial') && jobOrder.length > 0 && (
-        <div className="workspace workspace--output">
-          <div className="panel" ref={resultRef}>
-            <div className="panel-header">
-              <h2 className="panel-title">Latest result</h2>
-              {batchId && (
-                <span className="batch-id" title={batchId}>
-                  Batch {batchId.substring(0, 8)}…
-                </span>
-              )}
-            </div>
-
-            <div className="batch-result-list">
-              {jobOrder.map((jobId) => {
-                const job = jobs[jobId];
-                if (!job) return null;
-                return (
-                  <TranslationResultCard
-                    key={jobId}
-                    job={job}
-                    copied={copiedJobId === jobId}
-                    onCopy={() => handleCopy(jobId)}
-                    onDownload={() => handleDownload(jobId)}
-                    onRate={() => setReviewJobId(jobId)}
-                  />
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Batch-level failure — kept because it carries retry/reset actions
           that the per-run list has no equivalent for. */}
       {status === 'failed' && (
@@ -746,17 +535,21 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onOpenTracker, onBack
         </div>
       )}
 
-      <RecentRuns
-        jobs={serviceJobs.jobs}
-        loading={serviceJobs.loading}
-        loadError={serviceJobs.loadError}
-        actionError={serviceJobs.actionError}
-        busyKey={serviceJobs.busyKey}
-        onRefresh={serviceJobs.refresh}
-        onCancel={serviceJobs.cancelJob}
-        onDownload={serviceJobs.downloadJob}
-        onOpenTracker={onOpenTracker}
-      />
+      <div ref={resultRef}>
+        <RecentRuns
+          jobs={serviceJobs.jobs}
+          loading={serviceJobs.loading}
+          loadError={serviceJobs.loadError}
+          actionError={serviceJobs.actionError}
+          busyKey={serviceJobs.busyKey}
+          onRefresh={serviceJobs.refresh}
+          onCancel={serviceJobs.cancelJob}
+          onDownload={serviceJobs.downloadJob}
+          onLoadDetail={serviceJobs.loadDetail}
+          onFeedback={(job) => setReviewJobId(job.id)}
+          onOpenTracker={onOpenTracker}
+        />
+      </div>
 
       {reviewJobId && (
         <ReviewModal

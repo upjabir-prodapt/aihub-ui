@@ -1,12 +1,75 @@
+import type { Dispatch, SetStateAction } from 'react';
 import type { JobStatusResponse, LegacyJobStatusResponse } from '../types/translation';
 import type { ResearchJobListItem } from '../api/salesAgentApi';
 import type { SalesJobRecord } from '../hooks/useSalesJobsState';
-import type { UnifiedJob, UnifiedJobStatus } from '../types/jobs';
+import type { UnifiedJob, UnifiedJobDetail, UnifiedJobStatus } from '../types/jobs';
+import { translationApi } from '../api/translationApi';
+
+// ── Shared formatting helpers (cost/tokens/time/model), used anywhere a job's
+//    full detail is rendered — Recent runs and Job Tracker expanded rows. ──
+
+/** Human-readable duration from a number of seconds. */
+export function formatDuration(seconds: number): string {
+  if (seconds < 60) return `${seconds.toFixed(1)}s`;
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.round(seconds % 60);
+  return `${mins}m ${secs}s`;
+}
+
+/** The model that produced a result, e.g. "gemini-2.5-flash (v1.2)". */
+export function formatModel(modelUsed: string | null, modelVersion: string | null): string {
+  const name = modelUsed?.trim();
+  if (!name) return 'Unknown';
+  const version = modelVersion?.trim();
+  return version ? `${name} (${version})` : name;
+}
+
+/** Formats a job's cost in USD, or an em dash when unavailable. */
+export function formatCost(costUsd: number | null): string {
+  return typeof costUsd === 'number' ? `$${costUsd.toFixed(4)}` : '—';
+}
+
+/**
+ * Builds the lazily-fetched detail fields from a translation job's full
+ * detail response (`GET /translate/{job_id}`) — the only endpoint that
+ * carries cost/tokens/model metadata.
+ */
+export function extractTranslationDetail(job: JobStatusResponse): UnifiedJobDetail {
+  const result = job.result;
+  const labels = result?.labels;
+  const meta = result?.metadata;
+
+  // The backend often leaves labels.processing_time_seconds null, so fall
+  // back to deriving elapsed time from submitted_at → completed_at.
+  let processingTimeSeconds = typeof labels?.processing_time_seconds === 'number'
+    ? labels.processing_time_seconds
+    : null;
+  if (processingTimeSeconds === null && job.submitted_at && job.completed_at) {
+    const diffMs = new Date(job.completed_at).getTime() - new Date(job.submitted_at).getTime();
+    if (diffMs > 0) processingTimeSeconds = diffMs / 1000;
+  }
+
+  return {
+    costUsd: typeof labels?.cost_usd === 'number' ? labels.cost_usd : null,
+    tokenCount: typeof labels?.token_count === 'number' ? labels.token_count : null,
+    processingTimeSeconds,
+    modelUsed: meta?.model_used ?? null,
+    modelVersion: meta?.model_version ?? null,
+    qualityScore: typeof meta?.quality_score === 'number' ? meta.quality_score : null,
+  };
+}
 
 function toFinitePercent(value: unknown): number | null {
   const n = typeof value === 'number' ? value : Number(value);
   if (!Number.isFinite(n)) return null;
   return Math.max(0, Math.min(100, n));
+}
+
+/** Converts the backend's 0.0–1.0 progress fraction to a 0–100 percentage. */
+function fractionToPercent(value: unknown): number | null {
+  const n = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(n)) return null;
+  return Math.max(0, Math.min(100, n * 100));
 }
 
 const TRANSLATION_STATUS_MAP: Record<string, UnifiedJobStatus> = {
@@ -28,15 +91,9 @@ function shortRunLabel(jobId: string): string {
 export function normalizeTranslationHistoryItem(item: LegacyJobStatusResponse): UnifiedJob {
   const status = TRANSLATION_STATUS_MAP[item.status?.toLowerCase?.() ?? ''] ?? 'queued';
 
-  // Prefer a real source filename; the key it arrives under is unconfirmed, so
-  // try the plausible names before falling back to a truncated run id (a full
-  // UUID as the row title is unreadable).
-  const filename =
-    item.filename?.trim() ||
-    item.file_name?.trim() ||
-    item.original_filename?.trim() ||
-    item.document_name?.trim() ||
-    '';
+  // Prefer the real source filename returned by the backend; fall back to a
+  // truncated run id (a full UUID as the row title is unreadable) when absent.
+  const filename = item.filename?.trim() || '';
 
   const languagePair =
     item.source_language && item.target_language
@@ -57,12 +114,13 @@ export function normalizeTranslationHistoryItem(item: LegacyJobStatusResponse): 
     title: filename || shortRunLabel(item.job_id),
     subtitle,
     status,
-    progress: toFinitePercent(item.progress),
+    progress: fractionToPercent(item.progress),
     createdAt: item.created_at ?? null,
     completedAt: item.completed_at ?? null,
     errorMessage: item.error_message ?? null,
     canCancel: status === 'queued' || status === 'running',
     canDownload: status === 'completed',
+    canReview: status === 'completed',
     startedBy: item.user ?? null,
   };
 }
@@ -88,7 +146,10 @@ export function normalizeTranslationActiveItem(item: JobStatusResponse): Unified
     errorMessage: item.error_message ?? null,
     canCancel: status === 'queued' || status === 'running',
     canDownload: status === 'completed',
+    canReview: status === 'completed',
     startedBy: null,
+    detail: item.result ? extractTranslationDetail(item) : undefined,
+    detailStatus: item.result ? 'loaded' : undefined,
   };
 }
 
@@ -126,6 +187,7 @@ export function normalizeSalesHistoryItem(item: ResearchJobListItem): UnifiedJob
     errorMessage: item.error_message ?? null,
     canCancel: status === 'queued' || status === 'running',
     canDownload: status === 'completed',
+    canReview: false,
     startedBy: null,
   };
 }
@@ -147,8 +209,40 @@ export function normalizeSalesJob(item: SalesJobRecord): UnifiedJob {
     errorMessage: item.errorMessage,
     canCancel: status === 'queued' || status === 'running',
     canDownload: status === 'completed',
+    canReview: false,
     startedBy: null,
   };
+}
+
+/**
+ * Lazily fetches and merges a translation job's cost/tokens/time/model detail
+ * into whichever state array (Recent runs' local list, Job Tracker's history)
+ * holds it — called on row expand, and cached so repeat expands are free.
+ * No-op for sales jobs or jobs whose detail is already loaded/loading, since
+ * the sales research history endpoint has no equivalent per-job detail call.
+ */
+export async function loadJobDetail(
+  job: UnifiedJob,
+  setJobs: Dispatch<SetStateAction<UnifiedJob[]>>,
+): Promise<void> {
+  if (job.service !== 'translation') return;
+  if (job.detailStatus === 'loading' || job.detailStatus === 'loaded') return;
+
+  setJobs((prev) =>
+    prev.map((j) => (j.key === job.key ? { ...j, detailStatus: 'loading' } : j)),
+  );
+
+  try {
+    const data = await translationApi.getJobStatus(job.id);
+    const detail = extractTranslationDetail(data);
+    setJobs((prev) =>
+      prev.map((j) => (j.key === job.key ? { ...j, detail, detailStatus: 'loaded' } : j)),
+    );
+  } catch {
+    setJobs((prev) =>
+      prev.map((j) => (j.key === job.key ? { ...j, detailStatus: 'error' } : j)),
+    );
+  }
 }
 
 /** Merges job lists by key; later lists win over earlier ones for the same job, then sorts newest-first. */

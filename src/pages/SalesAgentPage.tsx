@@ -459,6 +459,8 @@ const SalesAgentPage: React.FC<SalesAgentPageProps> = ({ onOpenTracker, onBack }
         onCancel={serviceJobs.cancelJob}
         onDownload={serviceJobs.downloadJob}
         onOpenTracker={onOpenTracker}
+        // Sales research jobs have no per-job detail endpoint or review flow
+        // yet — onLoadDetail/onRate are intentionally omitted.
       />
     </div>
   );

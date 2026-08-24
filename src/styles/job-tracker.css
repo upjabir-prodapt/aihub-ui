@@ -245,6 +245,21 @@
   gap: 8px;
 }
 
+.tracker-show-all-btn {
+  margin-top: 10px;
+  padding: 6px 0;
+  background: none;
+  border: none;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--colt-teal);
+  cursor: pointer;
+}
+
+.tracker-show-all-btn:hover {
+  text-decoration: underline;
+}
+
 .tracker-row {
   background: var(--bg-card);
   border: 1px solid var(--border-default);
@@ -371,6 +386,13 @@
   font-size: 12.5px;
   line-height: 1.5;
   margin-bottom: 12px;
+}
+
+/* Lazily-loaded cost/tokens/time/model — reuses .tracker-detail-error's
+   placement but as plain muted text while a completed job's detail loads. */
+.tracker-detail-loading {
+  font-size: 11.5px;
+  color: var(--text-muted);
 }
 
 .tracker-detail-grid {

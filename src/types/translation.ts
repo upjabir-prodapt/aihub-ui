@@ -6,7 +6,7 @@ export interface TranslateRequest {
   domain: string;             // "commercial" | "legal" | "finance" | "hr" | "operations"
   enable_dlp?: boolean;
   enable_chunking?: boolean;
-  priority?: string;          // "standard" | "high"
+  priority?: string;          // "standard" | "high" (server-controlled; auto-promoted for .txt)
 }
 
 // Hub browser path: /api/translation/v1/* → Translation backend /api/v1/*
@@ -84,6 +84,7 @@ export interface JobStatusResponse {
 export interface LegacyJobStatusResponse {
   job_id: string;
   status: string;
+  /** 0.0–1.0 fraction, as emitted by JobStatusResponse.progress on the backend. */
   progress: number;
   current_stage: string;
   user: string;
@@ -93,13 +94,9 @@ export interface LegacyJobStatusResponse {
   completed_at: string | null;
   download_url: string | null;
   error_message: string | null;
-  // Optional display fields. The exact history payload wasn't confirmed
-  // against the live service, so the source filename is probed across the
-  // plausible key names rather than assumed (see normalizeTranslationHistoryItem).
+  // Confirmed fields returned by GET /jobs (JobStatusResponse), sourced from
+  // the job's source_document / translation_config records.
   filename?: string | null;
-  file_name?: string | null;
-  original_filename?: string | null;
-  document_name?: string | null;
   source_language?: string | null;
   target_language?: string | null;
 }

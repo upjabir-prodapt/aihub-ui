@@ -113,6 +113,15 @@
   margin-bottom: 3px;
 }
 
+.recent-run-main--clickable {
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
 .recent-run-title {
   font-size: 13px;
   font-weight: 600;
@@ -214,4 +223,43 @@
 .recent-run-action-btn--danger:hover:not(:disabled) {
   border-color: #ef4444;
   color: #ef4444;
+}
+
+/* --- Expanded detail (cost/tokens/time/model), mirrors .tracker-detail --- */
+.recent-run-detail {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.recent-run-detail-loading,
+.recent-run-detail-error {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.recent-run-detail-error {
+  color: #f87171;
+}
+
+.recent-run-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 12px;
+}
+
+.recent-run-detail-label {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 3px;
+}
+
+.recent-run-detail-value {
+  font-size: 12.5px;
+  color: var(--text-primary);
+  word-break: break-word;
 }

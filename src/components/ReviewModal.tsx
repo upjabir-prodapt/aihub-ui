@@ -41,6 +41,27 @@ const RATING_CLASSES: Record<number, string> = {
   5: 'rating-excellent',
 };
 
+interface FeedbackExampleItem {
+  topic: string;
+  example: string;
+}
+
+/** Illustrative examples to guide users on framing clear, actionable feedback. */
+const EXAMPLE_FEEDBACK_ITEMS: FeedbackExampleItem[] = [
+  {
+    topic: 'Translation accuracy',
+    example: 'Section 3.1 — "Clause termination" was translated literally and lost its legal context.',
+  },
+  {
+    topic: 'Tone & domain fit',
+    example: 'The executive summary is too informal for a formal commercial contract.',
+  },
+  {
+    topic: 'Technical terminology',
+    example: 'Network terms like "Optical Add-Drop Multiplexer (OADM)" should remain in English.',
+  },
+];
+
 const ReviewModal: React.FC<ReviewModalProps> = ({ isOpen, jobId, onClose, onSubmitted }) => {
   if (!isOpen) return null;
   return (
@@ -82,9 +103,9 @@ const ReviewModalPanel: React.FC<Omit<ReviewModalProps, 'isOpen'>> = ({ jobId, o
         ...(comment.trim() ? { comment: comment.trim() } : {}),
       });
       onClose();
-      onSubmitted(true, `Your ${rating}-star review was submitted. Thank you!`);
+      onSubmitted(true, 'Your feedback was submitted. Thank you!');
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to submit review. Please try again.';
+      const msg = err instanceof Error ? err.message : 'Failed to submit feedback. Please try again.';
       onClose();
       onSubmitted(false, msg);
     }
@@ -98,7 +119,7 @@ const ReviewModalPanel: React.FC<Omit<ReviewModalProps, 'isOpen'>> = ({ jobId, o
       onClick={() => { if (!submitting) onClose(); }}
       role="dialog"
       aria-modal="true"
-      aria-label="Rate Translation"
+      aria-label="Translation Feedback"
     >
       <div className="modal-panel review-modal-panel" onClick={(e) => e.stopPropagation()}>
         <div className="modal-glow" />
@@ -110,11 +131,11 @@ const ReviewModalPanel: React.FC<Omit<ReviewModalProps, 'isOpen'>> = ({ jobId, o
                 <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
               </svg>
             </div>
-            <span className="review-modal-heading">Rate this Translation</span>
+            <span className="review-modal-heading">Translation Feedback</span>
           </div>
           {!submitting && (
             <button className="modal-close-btn" onClick={onClose} aria-label="Close">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
               </svg>
             </button>
@@ -153,6 +174,19 @@ const ReviewModalPanel: React.FC<Omit<ReviewModalProps, 'isOpen'>> = ({ jobId, o
               }
             </div>
 
+            {/* Example Feedback Guidance */}
+            <div className="review-guidance">
+              <span className="review-guidance-heading">Example feedback:</span>
+              <ul className="review-guidance-list">
+                {EXAMPLE_FEEDBACK_ITEMS.map((item, idx) => (
+                  <li key={idx} className="review-guidance-item">
+                    <span className="review-guidance-topic">{item.topic}:</span>{' '}
+                    <span className="review-guidance-text">"{item.example}"</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
             {/* Comment */}
             <div className="login-field">
               <label className="login-label" htmlFor="review-comment">
@@ -174,16 +208,8 @@ const ReviewModalPanel: React.FC<Omit<ReviewModalProps, 'isOpen'>> = ({ jobId, o
 
             <div className="review-actions">
               <button
-                type="button"
-                className="retry-btn"
-                onClick={onClose}
-                disabled={submitting}
-              >
-                Cancel
-              </button>
-              <button
                 type="submit"
-                className="login-btn review-submit-btn"
+                className="review-submit-btn"
                 disabled={rating === 0 || submitting}
               >
                 {submitting ? (
@@ -196,7 +222,7 @@ const ReviewModalPanel: React.FC<Omit<ReviewModalProps, 'isOpen'>> = ({ jobId, o
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                       <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
                     </svg>
-                    Submit Review
+                    Submit Feedback
                   </>
                 )}
               </button>

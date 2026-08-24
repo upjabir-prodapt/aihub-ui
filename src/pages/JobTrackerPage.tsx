@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { RefreshCw, Download, XCircle, AlertTriangle } from 'lucide-react';
+import { RefreshCw, Download, XCircle, AlertTriangle, MessageSquare } from 'lucide-react';
 import { useAuth } from '../context/useAuth';
 import { useTranslationJobs } from '../context/useTranslationJobs';
 import { useSalesJobs } from '../context/useSalesJobs';
@@ -11,12 +11,24 @@ import {
   normalizeSalesHistoryItem,
   normalizeSalesJob,
   mergeJobLists,
+  loadJobDetail,
+  formatDuration,
+  formatModel,
+  formatCost,
 } from '../utils/jobs';
+import ReviewModal from '../components/ReviewModal';
 import type { ResearchJobListItem } from '../api/salesAgentApi';
 import type { LegacyJobStatusResponse } from '../types/translation';
 import type { UnifiedJob, UnifiedJobStatus } from '../types/jobs';
 import { timeAgo, dayBucket } from '../utils/time';
 import '../styles/job-tracker.css';
+// ReviewModal and the review toast styles live in translation.css (shared with
+// TranslationPage) — imported here too since this page can be the first to
+// mount them if a user opens Job Tracker before ever visiting Translation.
+import '../styles/translation.css';
+
+/** How often to silently re-pull server-side history while a run is in flight. */
+const AUTO_REFRESH_INTERVAL_MS = 20_000;
 
 type StatusFilter = 'all' | UnifiedJobStatus;
 type ServiceFilter = 'all' | 'translation' | 'sales';
@@ -58,6 +70,12 @@ const JobTrackerPage: React.FC<JobTrackerPageProps> = ({ serviceFilter: initialS
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  // "Today" is capped to the 3 most recent runs by default to keep the top of
+  // the list scannable; older-day buckets are small enough to show in full.
+  const TODAY_BUCKET_LIMIT = 3;
+  const [showAllToday, setShowAllToday] = useState(false);
+  const [reviewJobId, setReviewJobId] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ ok: boolean; message: string } | null>(null);
 
   /**
    * Pulls both services' histories. Each backend retains only the last 7 days
@@ -111,6 +129,35 @@ const JobTrackerPage: React.FC<JobTrackerPageProps> = ({ serviceFilter: initialS
       void loadHistory();
     });
   }, [loadHistory]);
+
+  // Keep server-side history current without a manual refresh, so this tab
+  // reflects live progress even when it isn't the one that started a run —
+  // but only while something is actually in flight, and paused while the tab
+  // is hidden so a backgrounded browser tab doesn't keep hammering the API.
+  const hasInFlight = history.some((j) => j.status === 'queued' || j.status === 'running');
+  useEffect(() => {
+    if (!hasInFlight) return undefined;
+
+    const tick = () => {
+      if (document.visibilityState === 'visible') void loadHistory();
+    };
+    const intervalId = setInterval(tick, AUTO_REFRESH_INTERVAL_MS);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') void loadHistory();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [hasInFlight, loadHistory]);
+
+  /** Lazily fetches cost/tokens/time/model for a completed translation job, on row expand. */
+  const loadDetail = useCallback((job: UnifiedJob) => {
+    void loadJobDetail(job, setHistory);
+  }, []);
 
   // Memoized so `allJobs` below actually caches — a fresh array here would
   // change the dependency identity on every render.
@@ -167,6 +214,13 @@ const JobTrackerPage: React.FC<JobTrackerPageProps> = ({ serviceFilter: initialS
   const handleRefresh = () => {
     void loadHistory();
     void salesCtx.refreshAll();
+  };
+
+  const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleReviewSubmitted = (ok: boolean, message: string) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast({ ok, message });
+    toastTimerRef.current = setTimeout(() => setToast(null), 4500);
   };
 
   const handleCancel = async (job: UnifiedJob) => {
@@ -309,11 +363,16 @@ const JobTrackerPage: React.FC<JobTrackerPageProps> = ({ serviceFilter: initialS
               : 'No jobs match these filters.'}
           </div>
         ) : (
-          grouped.map(([bucket, jobsInBucket]) => (
+          grouped.map(([bucket, jobsInBucket]) => {
+            const isToday = bucket === 'Today';
+            const visibleJobs =
+              isToday && !showAllToday ? jobsInBucket.slice(0, TODAY_BUCKET_LIMIT) : jobsInBucket;
+            const hiddenCount = jobsInBucket.length - visibleJobs.length;
+            return (
             <div key={bucket} className="tracker-group">
               <div className="tracker-group-label">{bucket}</div>
               <div className="tracker-list">
-                {jobsInBucket.map((job) => {
+                {visibleJobs.map((job) => {
                   const expanded = expandedKey === job.key;
                   const busy = busyKey === job.key;
                   return (
@@ -321,7 +380,11 @@ const JobTrackerPage: React.FC<JobTrackerPageProps> = ({ serviceFilter: initialS
                       <button
                         type="button"
                         className="tracker-row-main"
-                        onClick={() => setExpandedKey(expanded ? null : job.key)}
+                        onClick={() => {
+                          const next = expanded ? null : job.key;
+                          setExpandedKey(next);
+                          if (next && job.status === 'completed') loadDetail(job);
+                        }}
                       >
                         <span className="tracker-row-icon">{job.service === 'translation' ? 'T' : 'S'}</span>
                         <span className="tracker-row-body">
@@ -367,6 +430,38 @@ const JobTrackerPage: React.FC<JobTrackerPageProps> = ({ serviceFilter: initialS
                                 <div className="tracker-detail-value">{job.startedBy}</div>
                               </div>
                             )}
+                            {job.status === 'completed' && job.detailStatus === 'loading' && (
+                              <div className="tracker-detail-loading">Loading details…</div>
+                            )}
+                            {job.status === 'completed' && job.detailStatus === 'error' && (
+                              <div className="tracker-detail-error">Couldn't load run details.</div>
+                            )}
+                            {job.status === 'completed' && job.detail && (
+                              <>
+                                <div>
+                                  <div className="tracker-detail-label">Cost</div>
+                                  <div className="tracker-detail-value">{formatCost(job.detail.costUsd)}</div>
+                                </div>
+                                <div>
+                                  <div className="tracker-detail-label">Tokens</div>
+                                  <div className="tracker-detail-value">{job.detail.tokenCount ?? '—'}</div>
+                                </div>
+                                <div>
+                                  <div className="tracker-detail-label">Time</div>
+                                  <div className="tracker-detail-value">
+                                    {job.detail.processingTimeSeconds !== null
+                                      ? formatDuration(job.detail.processingTimeSeconds)
+                                      : 'N/A'}
+                                  </div>
+                                </div>
+                                <div>
+                                  <div className="tracker-detail-label">Model</div>
+                                  <div className="tracker-detail-value">
+                                    {formatModel(job.detail.modelUsed, job.detail.modelVersion)}
+                                  </div>
+                                </div>
+                              </>
+                            )}
                           </div>
                           <div className="tracker-detail-actions">
                             {job.canCancel && (
@@ -389,6 +484,16 @@ const JobTrackerPage: React.FC<JobTrackerPageProps> = ({ serviceFilter: initialS
                                 <Download size={13} /> Download output
                               </button>
                             )}
+                            {job.canReview && (
+                              <button
+                                type="button"
+                                className="tracker-action-btn"
+                                disabled={busy}
+                                onClick={() => setReviewJobId(job.id)}
+                              >
+                                <MessageSquare size={13} /> Feedback
+                              </button>
+                            )}
                             {job.status === 'failed' && (
                               <span className="tracker-detail-hint">
                                 Fix the issue above, then start a similar job with the same settings.
@@ -401,10 +506,63 @@ const JobTrackerPage: React.FC<JobTrackerPageProps> = ({ serviceFilter: initialS
                   );
                 })}
               </div>
+              {isToday && hiddenCount > 0 && (
+                <button
+                  type="button"
+                  className="tracker-show-all-btn"
+                  onClick={() => setShowAllToday(true)}
+                >
+                  Show all {jobsInBucket.length} today
+                </button>
+              )}
+              {isToday && showAllToday && jobsInBucket.length > TODAY_BUCKET_LIMIT && (
+                <button
+                  type="button"
+                  className="tracker-show-all-btn"
+                  onClick={() => setShowAllToday(false)}
+                >
+                  Show fewer
+                </button>
+              )}
             </div>
-          ))
+            );
+          })
         )}
       </div>
+
+      {reviewJobId && (
+        <ReviewModal
+          isOpen={!!reviewJobId}
+          jobId={reviewJobId}
+          onClose={() => setReviewJobId(null)}
+          onSubmitted={handleReviewSubmitted}
+        />
+      )}
+
+      {toast && (
+        <div className={`review-toast ${toast.ok ? 'review-toast--success' : 'review-toast--error'}`} role="status" aria-live="polite">
+          <div className="review-toast-icon">
+            {toast.ok ? (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+            )}
+          </div>
+          <span className="review-toast-message">{toast.message}</span>
+          <button className="review-toast-close" onClick={() => setToast(null)} aria-label="Dismiss">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+      )}
     </div>
   );
 };
