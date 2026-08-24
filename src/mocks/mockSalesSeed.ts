@@ -1,4 +1,4 @@
-import type { ResearchModelCard } from '../api/salesAgentApi.ts';
+import type { ResearchModelCard } from '../types/sales.ts';
 import { VODAFONE_REPORT, DEUTSCHE_TELEKOM_REPORT } from './mockReports.ts';
 
 

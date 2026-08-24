@@ -67,11 +67,14 @@ export async function hubLogin(
         });
 
         if (!response.ok) {
-          const err = await response.json().catch(() => ({ detail: 'Authentication failed.' }));
+          const err = (await response.json().catch(() => ({ detail: 'Authentication failed.' }))) as {
+            detail?: string;
+            message?: string;
+          };
           throw new Error(err.detail || err.message || `HTTP ${response.status}`);
         }
 
-        const data = await response.json();
+        const data = (await response.json()) as { email: string; expires_in?: number };
         const user: AuthUser = {
           email: data.email,
           business_unit: bu,

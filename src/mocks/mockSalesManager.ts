@@ -1,4 +1,4 @@
-import type { ResearchJobListItem, ResearchResultResponse } from '../api/salesAgentApi.ts';
+import type { ResearchJobListItem, ResearchResultResponse } from '../types/sales.ts';
 import { INITIAL_SALES_JOBS, type MockSalesJob } from './mockSalesSeed.ts';
 import { generateCustomReport } from './mockReports.ts';
 

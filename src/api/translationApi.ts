@@ -65,7 +65,11 @@ async function fetchWithAuth(
 
 async function parseApiError(response: Response, fallback: string): Promise<string> {
   try {
-    const body = await response.json();
+    const body = (await response.json()) as {
+      error?: { message?: string };
+      detail?: string;
+      message?: string;
+    };
     if (body?.error?.message) return body.error.message;
     if (body?.detail) return body.detail;
     if (body?.message) return body.message;
@@ -88,7 +92,7 @@ export const translationApi = {
       throw new Error(await parseApiError(response, 'Failed to submit translation job'));
     }
 
-    return response.json();
+    return (await response.json()) as MultiTranslateResponse;
   },
 
   async getMultipleJobStatuses(jobIds: string[]): Promise<MultiJobStatusResponse> {
@@ -103,7 +107,7 @@ export const translationApi = {
       throw new Error(await parseApiError(response, 'Failed to fetch job statuses'));
     }
 
-    return response.json();
+    return (await response.json()) as MultiJobStatusResponse;
   },
 
   async getJobStatus(jobId: string): Promise<JobStatusResponse> {
@@ -115,7 +119,7 @@ export const translationApi = {
       throw new Error(await parseApiError(response, 'Failed to fetch job status'));
     }
 
-    return response.json();
+    return (await response.json()) as JobStatusResponse;
   },
 
   async getDownloadUrl(jobId: string): Promise<DownloadUrlResponse> {
@@ -127,7 +131,7 @@ export const translationApi = {
       throw new Error(await parseApiError(response, 'Failed to get download URL'));
     }
 
-    return response.json();
+    return (await response.json()) as DownloadUrlResponse;
   },
 
   /**
@@ -146,7 +150,7 @@ export const translationApi = {
       throw new Error(await parseApiError(response, 'Failed to fetch job history'));
     }
 
-    const data = await response.json();
+    const data = (await response.json()) as { jobs?: LegacyJobStatusResponse[] } | LegacyJobStatusResponse[];
     if (Array.isArray(data)) return data as LegacyJobStatusResponse[];
     if (Array.isArray(data?.jobs)) return data.jobs as LegacyJobStatusResponse[];
     return [];
@@ -163,7 +167,7 @@ export const translationApi = {
       throw new Error(await parseApiError(response, 'Failed to cancel job'));
     }
 
-    return response.json();
+    return (await response.json()) as { message: string };
   },
 
   async submitReview(jobId: string, review: ReviewRequest): Promise<ReviewResponse> {
@@ -177,6 +181,6 @@ export const translationApi = {
       throw new Error(await parseApiError(response, 'Failed to submit review'));
     }
 
-    return response.json();
+    return (await response.json()) as ReviewResponse;
   },
 };

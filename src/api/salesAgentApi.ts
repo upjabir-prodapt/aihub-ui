@@ -1,3 +1,12 @@
+import type {
+  SalesAuthUser,
+  SalesTokenResponse,
+  InitiateResearchResponse,
+  ResearchStatusResponse,
+  ResearchModelCard,
+  ResearchResultResponse,
+  ResearchJobListItem,
+} from '../types/sales';
 import {
   ensureFreshSalesGoogleIdToken,
   fetchSalesGoogleIdToken,
@@ -6,52 +15,17 @@ import {
 } from './salesCloudRunAuth';
 import { SALES_API_BASE } from './salesConfig';
 
-// ── Types ──────────────────────────────────────────────────────────────────
+// ── Re-export Types ────────────────────────────────────────────────────────
 
-export interface SalesAuthUser {
-  email: string;
-  business_unit: string;
-  organization: string;
-}
-
-export interface SalesTokenResponse {
-  access_token: string;
-  token_type: string;
-  email: string;
-}
-
-export interface InitiateResearchResponse {
-  job_id: string;
-  status: string;
-  [key: string]: unknown;
-}
-
-export interface ResearchStatusResponse {
-  job_id: string;
-  status: 'PENDING' | 'QUEUED' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
-  [key: string]: unknown;
-}
-
-/** Cost & model metadata for a completed research run (backend `model_card`). */
-export interface ResearchModelCard {
-  model_version?: string | null;
-  tokens_used?: number | null;
-  latency_seconds?: number | null;
-  cost_usd?: number | null;
-}
-
-export interface ResearchResultResponse {
-  job_id: string;
-  /** Backend uses `request_id`; kept alongside job_id for compatibility. */
-  request_id?: string;
-  status: string;
-  /** Canonical field returned by the backend (FastAPI `ResearchResultResponse`). */
-  report_content?: string;
-  /** Legacy alias — no longer emitted by the backend; kept for compatibility. */
-  report_markdown?: string;
-  model_card?: ResearchModelCard | null;
-  [key: string]: unknown;
-}
+export type {
+  SalesAuthUser,
+  SalesTokenResponse,
+  InitiateResearchResponse,
+  ResearchStatusResponse,
+  ResearchModelCard,
+  ResearchResultResponse,
+  ResearchJobListItem,
+};
 
 // ── Session storage (isolated from Translation) ────────────────────────────
 //
@@ -153,7 +127,11 @@ async function fetchSalesWithAuth(url: string, init: RequestInit): Promise<Respo
 
 async function parseSalesApiError(response: Response, fallback: string): Promise<string> {
   try {
-    const body = await response.json();
+    const body = (await response.json()) as {
+      error?: { message?: string };
+      detail?: string;
+      message?: string;
+    };
     if (body?.error?.message) return body.error.message;
     if (body?.detail) return body.detail;
     if (body?.message) return body.message;
@@ -169,7 +147,7 @@ async function parseSalesApiError(response: Response, fallback: string): Promise
 export async function fetchSalesWhoami(): Promise<{ email: string } | null> {
   const res = await fetch(`${SALES_API_BASE}/auth/whoami`, { credentials: 'include' });
   if (!res.ok) return null;
-  return res.json();
+  return (await res.json()) as { email: string };
 }
 
 /** POST /api/sales/v1/auth/token */
@@ -192,11 +170,14 @@ export async function salesAuthenticate(
   });
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: 'Authentication failed.' }));
+    const err = (await res.json().catch(() => ({ detail: 'Authentication failed.' }))) as {
+      detail?: string;
+      message?: string;
+    };
     throw new Error(err.detail || err.message || `HTTP ${res.status}`);
   }
 
-  const data = await res.json();
+  const data = (await res.json()) as SalesTokenResponse;
   return { ...data, googleIdToken };
 }
 
@@ -215,7 +196,7 @@ export async function initiateResearch(
     throw new Error(await parseSalesApiError(res, 'Failed to initiate research'));
   }
 
-  return res.json();
+  return (await res.json()) as InitiateResearchResponse;
 }
 
 /** GET /api/sales/v1/research/status/{job_id} */
@@ -228,7 +209,7 @@ export async function getResearchStatus(job_id: string): Promise<ResearchStatusR
     throw new Error(await parseSalesApiError(res, 'Failed to fetch status'));
   }
 
-  return res.json();
+  return (await res.json()) as ResearchStatusResponse;
 }
 
 /** GET /api/sales/v1/research/result/{job_id} */
@@ -241,24 +222,7 @@ export async function getResearchResult(job_id: string): Promise<ResearchResultR
     throw new Error(await parseSalesApiError(res, 'Failed to fetch result'));
   }
 
-  return res.json();
-}
-
-/**
- * One entry from the research job history. The exact payload wasn't confirmed
- * against the live service, so everything beyond job_id/status is optional and
- * probed defensively where it's displayed.
- */
-export interface ResearchJobListItem {
-  job_id: string;
-  status: string;
-  company_name?: string | null;
-  company?: string | null;
-  account_id?: string | null;
-  created_at?: string | null;
-  completed_at?: string | null;
-  error_message?: string | null;
-  progress?: number | null;
+  return (await res.json()) as ResearchResultResponse;
 }
 
 /**
@@ -277,9 +241,9 @@ export async function listResearchJobs(): Promise<ResearchJobListItem[]> {
     throw new Error(await parseSalesApiError(res, 'Failed to fetch research history'));
   }
 
-  const data = await res.json();
-  if (Array.isArray(data)) return data as ResearchJobListItem[];
-  if (Array.isArray(data?.jobs)) return data.jobs as ResearchJobListItem[];
+  const data = (await res.json()) as { jobs?: ResearchJobListItem[] } | ResearchJobListItem[];
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.jobs)) return data.jobs;
   return [];
 }
 
@@ -293,7 +257,7 @@ export async function cancelResearch(job_id: string): Promise<{ message: string 
     throw new Error(await parseSalesApiError(res, 'Failed to cancel research job'));
   }
 
-  return res.json().catch(() => ({ message: 'Cancelled' }));
+  return (await res.json().catch(() => ({ message: 'Cancelled' }))) as { message: string };
 }
 
 /** GET /api/sales/v1/research/download/{job_id} */
