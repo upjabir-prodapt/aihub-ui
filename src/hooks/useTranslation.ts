@@ -52,13 +52,17 @@ export const useTranslation = () => {
   const [downloadInfo, setDownloadInfo] = useState<Record<string, DownloadUrlResponse>>({});
   const [error, setError] = useState<string | null>(null);
 
+  const jobsRef = useRef<Record<string, JobStatusResponse>>({});
+  useEffect(() => {
+    jobsRef.current = jobs;
+  }, [jobs]);
+
   const pollingIntervalRef = useRef<number | null>(null);
   /** Number of consecutive polling failures; resets to 0 on a successful poll. */
   const pollErrorCountRef = useRef<number>(0);
   /**
-   * Session generation counter. Incremented on every new polling session.
-   * In-flight callbacks from previous sessions check their captured generation
-   * against this ref and bail if stale.
+   * Session generation counter. Incremented on explicit full reset to invalidate
+   * previous polling callbacks.
    */
   const sessionGenRef = useRef<number>(0);
   /** Mounted flag to prevent setState after unmount. */
@@ -74,7 +78,7 @@ export const useTranslation = () => {
   }, []);
 
   const clearPolling = useCallback(() => {
-    if (pollingIntervalRef.current) {
+    if (pollingIntervalRef.current !== null) {
       window.clearInterval(pollingIntervalRef.current);
       pollingIntervalRef.current = null;
     }
@@ -87,7 +91,12 @@ export const useTranslation = () => {
     jobMap: Record<string, JobStatusResponse>,
   ): TranslationStatus => {
     const values = Object.values(jobMap);
-    if (values.length === 0) return 'polling';
+    if (values.length === 0) return 'idle';
+
+    const hasActive = values.some(
+      (j) => j.status === 'queued' || j.status === 'processing',
+    );
+    if (hasActive) return 'polling';
 
     const allCompleted = values.every((j) => j.status === 'completed');
     if (allCompleted) return 'completed';
@@ -160,13 +169,27 @@ export const useTranslation = () => {
   }, [downloadInfo, jobs]);
 
   /**
-   * Single batch poll tick.
+   * Single active-jobs poll tick. Polls the union of all active (queued/processing)
+   * jobs across all batches submitted during this session.
    */
-  const pollBatchStatus = useCallback(async (jobIds: string[], myGen: number) => {
+  const pollActiveJobs = useCallback(async (myGen: number) => {
     if (!isMountedRef.current || myGen !== sessionGenRef.current) return;
 
+    const currentJobs = jobsRef.current;
+    const activeJobIds = Object.values(currentJobs)
+      .filter((j) => j.status === 'queued' || j.status === 'processing')
+      .map((j) => j.job_id);
+
+    if (activeJobIds.length === 0) {
+      clearPolling();
+      if (isMountedRef.current) {
+        setStatus(deriveOverallStatus(currentJobs));
+      }
+      return;
+    }
+
     try {
-      const { jobs: statusItems } = await translationApi.getMultipleJobStatuses(jobIds);
+      const { jobs: statusItems } = await translationApi.getMultipleJobStatuses(activeJobIds);
 
       if (!isMountedRef.current || myGen !== sessionGenRef.current) return;
 
@@ -177,15 +200,17 @@ export const useTranslation = () => {
         const next = { ...prev };
         for (const item of statusItems) {
           const existing = next[item.job_id];
+          if (!existing) continue;
           next[item.job_id] = {
             ...existing,
             job_id: item.job_id,
             status: item.status,
-            error_message: item.error_message ?? existing?.error_message ?? null,
-            // Preserve timestamps/details from a previous full fetch if present
-            submitted_at: existing?.submitted_at ?? '',
-            completed_at: item.status === 'completed' ? (existing?.completed_at ?? new Date().toISOString()) : existing?.completed_at ?? null,
-            result: existing?.result ?? undefined,
+            error_message: item.error_message ?? existing.error_message ?? null,
+            submitted_at: existing.submitted_at ?? '',
+            completed_at: item.status === 'completed'
+              ? (existing.completed_at ?? new Date().toISOString())
+              : existing.completed_at ?? null,
+            result: existing.result ?? undefined,
           };
         }
         return next;
@@ -193,17 +218,21 @@ export const useTranslation = () => {
 
       // For completed jobs without full details, fetch them in parallel.
       const completedWithoutDetails = statusItems.filter(
-        (item) => item.status === 'completed' && !jobs[item.job_id]?.result,
+        (item) => item.status === 'completed' && !jobsRef.current[item.job_id]?.result,
       );
-      await Promise.all(completedWithoutDetails.map((item) => fetchJobDetails(item.job_id)));
-
-      if (!isMountedRef.current || myGen !== sessionGenRef.current) return;
+      if (completedWithoutDetails.length > 0) {
+        void Promise.all(
+          completedWithoutDetails.map((item) => fetchJobDetails(item.job_id)),
+        );
+      }
 
       setJobs((current) => {
         const newStatus = deriveOverallStatus(current);
         setStatus(newStatus);
-
-        if (newStatus !== 'polling' && newStatus !== 'submitting') {
+        const hasRemainingActive = Object.values(current).some(
+          (j) => j.status === 'queued' || j.status === 'processing',
+        );
+        if (!hasRemainingActive) {
           clearPolling();
         }
         return current;
@@ -212,49 +241,42 @@ export const useTranslation = () => {
       if (!isMountedRef.current || myGen !== sessionGenRef.current) return;
 
       pollErrorCountRef.current += 1;
-      console.warn(`Batch polling error (attempt ${pollErrorCountRef.current}):`, err);
+      console.warn(`Translation polling error (attempt ${pollErrorCountRef.current}):`, err);
 
-      if (pollErrorCountRef.current >= 3) {
+      if (pollErrorCountRef.current >= 5) {
         clearPolling();
         setStatus('failed');
         setError(err instanceof Error ? err.message : 'Error checking job status.');
       }
     }
-  }, [clearPolling, deriveOverallStatus, fetchJobDetails, jobs]);
+  }, [clearPolling, deriveOverallStatus, fetchJobDetails]);
 
   /**
-   * Begin polling a batch of job IDs.
+   * Ensure polling is active for all current non-terminal jobs.
    */
-  const startPolling = useCallback((jobIds: string[]) => {
-    clearPolling();
+  const ensurePolling = useCallback(() => {
     pollErrorCountRef.current = 0;
-
-    const myGen = sessionGenRef.current + 1;
-    sessionGenRef.current = myGen;
-
     setStatus('polling');
 
-    pollingIntervalRef.current = window.setInterval(() => {
-      pollBatchStatus(jobIds, myGen);
-    }, 3000);
+    const myGen = sessionGenRef.current;
 
-    pollBatchStatus(jobIds, myGen);
-  }, [clearPolling, pollBatchStatus]);
+    if (pollingIntervalRef.current === null) {
+      pollingIntervalRef.current = window.setInterval(() => {
+        void pollActiveJobs(myGen);
+      }, 3000);
+    }
+
+    void pollActiveJobs(myGen);
+  }, [pollActiveJobs]);
 
   /**
-   * Submit a new translation batch. Accepts a FormData factory so retries
-   * can build fresh FormData objects with unconsumed file streams.
+   * Submit a new translation batch. Merges new jobs with any existing tracked jobs
+   * so multiple batches run and poll concurrently without cancelling or overwriting
+   * previous batches.
    */
   const startTranslation = useCallback(async (buildFormData: () => FormData) => {
-    setStatus('submitting');
     setError(null);
-    setBatchId(null);
-    setJobs({});
-    setJobOrder([]);
-    setDownloadInfo({});
-    downloadFetchedAtRef.current = {};
-    sessionGenRef.current += 1;
-    clearPolling();
+    setStatus((prev) => (prev === 'idle' ? 'submitting' : prev));
 
     try {
       const startData: MultiTranslateResponse = await withRetry(
@@ -267,46 +289,54 @@ export const useTranslation = () => {
 
       setBatchId(startData.batch_id);
 
-      const initialJobs: Record<string, JobStatusResponse> = {};
-      const order: string[] = [];
+      const newJobs: Record<string, JobStatusResponse> = {};
+      const newOrder: string[] = [];
+      const submittedAt = new Date().toISOString();
+
       for (const job of startData.jobs) {
-        initialJobs[job.job_id] = {
+        newJobs[job.job_id] = {
           job_id: job.job_id,
           status: 'queued',
-          submitted_at: new Date().toISOString(),
+          submitted_at: submittedAt,
           completed_at: null,
           error_message: null,
         };
-        order.push(job.job_id);
+        newOrder.push(job.job_id);
       }
-      setJobs(initialJobs);
-      setJobOrder(order);
 
-      startPolling(order);
+      setJobs((prev) => ({ ...prev, ...newJobs }));
+      setJobOrder((prev) => {
+        const set = new Set(prev);
+        const filtered = newOrder.filter((id) => !set.has(id));
+        return [...prev, ...filtered];
+      });
+
+      // Update ref immediately so pollActiveJobs sees new jobs on the synchronous tick
+      jobsRef.current = { ...jobsRef.current, ...newJobs };
+
+      ensurePolling();
     } catch (err: unknown) {
       if (!isMountedRef.current) return;
-      setStatus('failed');
+      const hasActive = Object.values(jobsRef.current).some(
+        (j) => j.status === 'queued' || j.status === 'processing',
+      );
+      if (!hasActive) {
+        setStatus('failed');
+      }
       setError(err instanceof Error ? err.message : 'Failed to start translation job.');
+      throw err;
     }
-  }, [clearPolling, startPolling]);
+  }, [ensurePolling]);
 
   /**
    * Rehydrate a previously-submitted batch (e.g. after a page refresh) from
    * a live status snapshot already fetched by the caller, then resume
-   * polling any non-terminal jobs. Used by TranslationJobsProvider's
-   * resume-on-mount flow -- the caller is responsible for having already
-   * re-validated the batch against the backend (ownership + freshness);
-   * this function only rehydrates local state and (re)starts polling.
+   * polling any non-terminal jobs.
    */
   const resumeBatch = useCallback((
     resumedBatchId: string,
     order: string[],
     statusItems: MultiJobStatusItem[],
-    /**
-     * When the batch was originally submitted, from the persisted record.
-     * Without it these jobs carry no timestamp and sort to the bottom of any
-     * newest-first list — putting a still-running job below finished history.
-     */
     submittedAt?: string,
   ) => {
     if (!isMountedRef.current) return;
@@ -325,45 +355,58 @@ export const useTranslation = () => {
     }
 
     setBatchId(resumedBatchId);
-    setJobs(rehydratedJobs);
-    setJobOrder(order);
+    setJobs((prev) => ({ ...prev, ...rehydratedJobs }));
+    setJobOrder((prev) => {
+      const set = new Set(prev);
+      const filtered = order.filter((id) => !set.has(id));
+      return [...prev, ...filtered];
+    });
     setError(null);
 
-    const nonTerminal = statusItems
-      .filter((item) => !['completed', 'failed', 'cancelled'].includes(item.status))
-      .map((item) => item.job_id);
+    jobsRef.current = { ...jobsRef.current, ...rehydratedJobs };
+
+    const nonTerminal = statusItems.filter(
+      (item) => !['completed', 'failed', 'cancelled'].includes(item.status),
+    );
 
     if (nonTerminal.length > 0) {
-      startPolling(nonTerminal);
+      ensurePolling();
     } else {
-      setStatus(deriveOverallStatus(rehydratedJobs));
+      setStatus(deriveOverallStatus({ ...jobsRef.current, ...rehydratedJobs }));
     }
-  }, [startPolling, deriveOverallStatus]);
+  }, [ensurePolling, deriveOverallStatus]);
 
   /**
-   * Retry: if a batch exists, resume polling any non-terminal jobs.
+   * Full reset — clears all state and cancels polling.
+   */
+  const reset = useCallback(() => {
+    sessionGenRef.current += 1;
+    setStatus('idle');
+    setBatchId(null);
+    setJobs({});
+    setJobOrder([]);
+    setDownloadInfo({});
+    setError(null);
+    downloadFetchedAtRef.current = {};
+    clearPolling();
+  }, [clearPolling]);
+
+  /**
+   * Retry: resume polling any non-terminal jobs.
    * Otherwise reset to idle for a fresh submit.
    */
   const retryOrReset = useCallback(() => {
-    const remaining = Object.values(jobs)
+    const remaining = Object.values(jobsRef.current)
       .filter((j) => j.status !== 'completed' && j.status !== 'failed' && j.status !== 'cancelled')
       .map((j) => j.job_id);
 
     if (remaining.length > 0) {
       setError(null);
-      startPolling(remaining);
+      ensurePolling();
     } else {
-      sessionGenRef.current += 1;
-      setStatus('idle');
-      setBatchId(null);
-      setJobs({});
-      setJobOrder([]);
-      setDownloadInfo({});
-      setError(null);
-      downloadFetchedAtRef.current = {};
-      clearPolling();
+      reset();
     }
-  }, [jobs, startPolling, clearPolling]);
+  }, [ensurePolling, reset]);
 
   /**
    * Cancel a single job (Job Tracker's Cancel action). Calls the backend's
@@ -386,19 +429,6 @@ export const useTranslation = () => {
       };
     });
   }, []);
-
-  /** Full reset — clears all state and cancels any in-flight work. */
-  const reset = useCallback(() => {
-    sessionGenRef.current += 1;
-    setStatus('idle');
-    setBatchId(null);
-    setJobs({});
-    setJobOrder([]);
-    setDownloadInfo({});
-    setError(null);
-    downloadFetchedAtRef.current = {};
-    clearPolling();
-  }, [clearPolling]);
 
   // Clean up on unmount
   useEffect(() => {

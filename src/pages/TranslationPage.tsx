@@ -110,6 +110,7 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onOpenTracker, onBack
 
   const [reviewJobId, setReviewJobId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ ok: boolean; message: string } | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [targetDropdownOpen, setTargetDropdownOpen] = useState(false);
   const targetDropdownRef = useRef<HTMLDivElement>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -149,17 +150,14 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onOpenTracker, onBack
     disabled: hasText,
   });
 
-  // ΓöÇΓöÇ Clear ΓöÇΓöÇ
-  // Bug 7: Also reset translation state so stale output is not shown for a new file
+  // ── Clear ──
   const clearFile = () => {
     setFile(null);
-    reset();
   };
 
   const clearText = () => {
     setSourceText('');
     setShowWordLimitNotice(false);
-    reset();
   };
 
   // Fires the notice only on the transition into over-limit, so it doesn't
@@ -185,7 +183,7 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onOpenTracker, onBack
     setTargetLangs((prev) => prev.filter((c) => c !== code));
   };
 
-  // ΓöÇΓöÇ Translate ΓöÇΓöÇ
+  // ── Translate ──
   const handleTranslate = async () => {
     if (!file && !hasText) return;
 
@@ -204,34 +202,40 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onOpenTracker, onBack
       return;
     }
 
+    const currentFile = file;
+    const currentSourceText = sourceText;
+    const currentTargetLangs = [...targetLangs];
+    const currentSourceLang = sourceLang;
+    const currentDomain = domain;
+
     // Pass a factory so each retry builds fresh FormData with an unconsumed file stream.
     const buildFormData = () => {
       const fd = new FormData();
-      targetLangs.forEach((lang) => fd.append('target_languages', lang));
-      if (sourceLang) fd.append('source_language', sourceLang);
-      fd.append('domain', domain);
-      // enable_dlp, enable_chunking, and priority are intentionally omitted --
-      // the backend applies enable_dlp=True, enable_chunking=True, and decides
-      // priority server-side based on document format (pasted .txt files are
-      // automatically routed to the high-priority queue). Users cannot promote
-      // their own work manually.
-      //
-      // The API only accepts a file upload, so pasted text is wrapped in a
-      // .txt File. That also makes the result come back as a text file, since
-      // the service returns output in the same format it was given.
+      currentTargetLangs.forEach((lang) => fd.append('target_languages', lang));
+      if (currentSourceLang) fd.append('source_language', currentSourceLang);
+      fd.append('domain', currentDomain);
       fd.append(
         'file',
-        file ?? new File([sourceText], TEXT_INPUT_FILENAME, { type: 'text/plain' }),
+        currentFile ?? new File([currentSourceText], TEXT_INPUT_FILENAME, { type: 'text/plain' }),
       );
 
       return fd;
     };
 
-    // Close the run dialog immediately — progress and results are shown on
-    // the page itself (Output panel + Recent runs) once the batch is in flight.
+    // Close the run dialog immediately and reset form fields so the next run starts fresh
     setRunOpen(false);
+    setFile(null);
+    setSourceText('');
+    setShowWordLimitNotice(false);
 
-    await startTranslation(buildFormData);
+    setIsSubmitting(true);
+    try {
+      await startTranslation(buildFormData);
+    } catch {
+      // Handled in context
+    } finally {
+      setIsSubmitting(false);
+    }
 
     setTimeout(() => {
       if (resultRef.current) {
@@ -240,7 +244,7 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onOpenTracker, onBack
     }, 500);
   };
 
-  // ΓöÇΓöÇ Review toast ΓöÇΓöÇ
+  // ── Review toast ──
   const handleReviewSubmitted = (ok: boolean, message: string) => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     setToast({ ok, message });
@@ -255,10 +259,10 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onOpenTracker, onBack
     !textTooLong &&
     targetLangs.length > 0 &&
     targetLangs.length <= 5 &&
-    !targetLangs.includes(sourceLang);
-  const isLoading = status === 'submitting' || status === 'polling';
+    !targetLangs.includes(sourceLang) &&
+    !isSubmitting;
 
-  // ΓöÇΓöÇΓöÇ Render ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ── Render ─────────────────────────────────────────────────────────────
 
   return (
     <div className="page-content">
@@ -284,7 +288,7 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onOpenTracker, onBack
         serviceName="Translation"
         serviceIcon={TRANSLATION_ICON}
         submitLabel={`Start job${targetLangs.length > 1 ? ` (${targetLangs.length} languages)` : ''}`}
-        submitting={isLoading}
+        submitting={isSubmitting}
         canSubmit={canTranslate}
         onSubmit={handleTranslate}
       >
