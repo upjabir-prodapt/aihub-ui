@@ -270,11 +270,7 @@ const JobTrackerPage: React.FC<JobTrackerPageProps> = ({ serviceFilter: initialS
         <div className="tracker-header">
           <div>
             <p className="tracker-eyebrow">Job Tracker</p>
-            <h1 className="tracker-title">Everything that has run</h1>
-            <p className="tracker-subtitle">
-              One log across your services, newest first. Runs and their output files
-              are kept for 7 days, then removed.
-            </p>
+            <h1 className="tracker-title">Service log</h1>
           </div>
           <button type="button" className="tracker-refresh-btn" onClick={handleRefresh} disabled={loading}>
             <RefreshCw size={14} className={loading ? 'spin' : ''} /> Refresh

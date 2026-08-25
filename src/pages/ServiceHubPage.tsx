@@ -77,7 +77,6 @@ const ServiceHubPage: React.FC<ServiceHubPageProps> = ({ entitlements, onNavigat
   const authUser = user ?? salesUser ?? null;
   const email = authUser?.email ?? null;
   const org = (user?.organization || salesUser?.organization) ?? null;
-  const bu = (user?.business_unit || salesUser?.business_unit) ?? null;
 
   const translationActive = tJobOrder
     .map((id) => tJobs[id])
@@ -111,7 +110,15 @@ const ServiceHubPage: React.FC<ServiceHubPageProps> = ({ entitlements, onNavigat
     return 0;
   };
 
+  // Services the user has no entitlement for are hidden outright, not shown locked.
+  const isLocked = (s: (typeof SERVICES)[number]): boolean =>
+    !s.comingSoon &&
+    s.entitlementKey !== undefined &&
+    entitlements !== undefined &&
+    !entitlements[s.entitlementKey];
+
   const filtered = SERVICES.filter((s) => {
+    if (isLocked(s)) return false;
     const q = query.trim().toLowerCase();
     if (!q) return true;
     return s.name.toLowerCase().includes(q) || s.description.toLowerCase().includes(q);
@@ -123,7 +130,7 @@ const ServiceHubPage: React.FC<ServiceHubPageProps> = ({ entitlements, onNavigat
     <div className="page-content">
       <div className="hub-page">
         <p className="hub-eyebrow">
-          Colt AI Hub{org ? ` · ${org}` : ''}{bu ? ` · ${bu}` : ''}
+          Colt AI Hub{org ? ` · ${org}` : ''}
         </p>
         <h1 className="hub-title">Welcome back, {displayNameFromEmail(email)}.</h1>
         <p className="hub-subtitle">
@@ -171,12 +178,7 @@ const ServiceHubPage: React.FC<ServiceHubPageProps> = ({ entitlements, onNavigat
               {filtered
                 .filter((s) => s.category === category)
                 .map((service) => {
-                  const locked =
-                    !service.comingSoon &&
-                    service.entitlementKey !== undefined &&
-                    entitlements !== undefined &&
-                    !entitlements[service.entitlementKey];
-                  const disabled = service.comingSoon || locked;
+                  const disabled = service.comingSoon;
                   const inFlight = inFlightByService(service.id);
 
                   return (
@@ -203,8 +205,6 @@ const ServiceHubPage: React.FC<ServiceHubPageProps> = ({ entitlements, onNavigat
                         <span className="hub-card-status">
                           {service.comingSoon ? (
                             <span className="hub-status-soon">Coming soon</span>
-                          ) : locked ? (
-                            <span className="hub-status-locked">No access</span>
                           ) : inFlight > 0 ? (
                             <>
                               <span className="hub-status-dot" /> {inFlight} in flight
@@ -217,7 +217,6 @@ const ServiceHubPage: React.FC<ServiceHubPageProps> = ({ entitlements, onNavigat
                           type="button"
                           className="hub-run-btn"
                           disabled={disabled}
-                          title={locked ? 'No access — contact your administrator' : undefined}
                           onClick={() => !disabled && onNavigate(service.id)}
                         >
                           Open

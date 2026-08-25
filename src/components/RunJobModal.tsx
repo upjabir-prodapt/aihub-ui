@@ -54,7 +54,6 @@ const RunJobModal: React.FC<RunJobModalProps> = ({
         <div className="run-modal-header">
           <p className="run-modal-eyebrow">New run</p>
           <h2 className="run-modal-title">Start a job</h2>
-          <p className="run-modal-subtitle">Fill in what this service needs and it starts immediately.</p>
         </div>
 
         <div className="run-modal-body">

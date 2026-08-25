@@ -62,7 +62,7 @@ const TRANSLATION_FEATURES = [
   },
   {
     title: 'Domain-tuned output',
-    description: 'Pick the domain (legal, finance, HR…) and the model adapts terminology to match it.',
+    description: 'Pick the domain (legal, finance, HR…) and the model adapts to terminology and tone to match it.',
   },
 ];
 
@@ -271,7 +271,7 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onOpenTracker, onBack
         name="Translation"
         description="Enterprise document translation with automated DLP and anonymization, integrated with Colt's Security Policy. Word and PDF structure is preserved end to end."
         icon={TRANSLATION_ICON}
-        runLabel="Run translation"
+        runLabel="New translation"
         onRun={() => setRunOpen(true)}
         onOpenTracker={onOpenTracker}
         onBack={onBack}
@@ -417,7 +417,7 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onOpenTracker, onBack
 
             {/* Target languages — multi-select dropdown (mirrors source language style) */}
             <div className="form-field">
-              <label className="field-label" htmlFor="tr-target-lang">Target Language <span className="required">*</span></label>
+              <label className="field-label" htmlFor="tr-target-lang">Target Language/s <span className="required">*</span></label>
               <div className="multiselect-dropdown" ref={targetDropdownRef}>
                 <button
                   type="button"

@@ -136,8 +136,8 @@ const Sidebar: React.FC<SidebarProps> = ({
       <nav className="sidebar-nav">
         {!collapsed && <div className="nav-section-label">Services</div>}
 
-        {NAV_ITEMS.map((item) => {
-          const { disabled, locked, title } = resolveItemState(item, entitlements);
+        {NAV_ITEMS.filter((item) => !resolveItemState(item, entitlements).locked).map((item) => {
+          const { disabled, title } = resolveItemState(item, entitlements);
           return (
             <button
               key={item.id}
@@ -152,7 +152,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                 <>
                   <span className="nav-label">{item.label}</span>
                   {item.badge && <span className="nav-item-tag">{item.badge}</span>}
-                  {locked && <span className="nav-item-tag">Locked</span>}
                 </>
               )}
             </button>
