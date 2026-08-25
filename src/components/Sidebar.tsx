@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 
 export interface ServiceEntitlements {
@@ -10,8 +10,6 @@ interface SidebarItem {
   id: string;
   label: string;
   icon: React.ReactNode;
-  disabled?: boolean;
-  locked?: boolean;
 }
 
 interface SidebarProps {
@@ -23,7 +21,7 @@ interface SidebarProps {
   onToggleCollapsed?: () => void;
 }
 
-const NAV_ITEMS: Omit<SidebarItem, 'disabled' | 'locked'>[] = [
+const NAV_ITEMS: SidebarItem[] = [
   {
     id: 'hub',
     label: 'Colt AI Hub',
@@ -63,19 +61,6 @@ const NAV_ITEMS: Omit<SidebarItem, 'disabled' | 'locked'>[] = [
   },
 ];
 
-function resolveItemState(
-  item: (typeof NAV_ITEMS)[number],
-  entitlements?: ServiceEntitlements,
-): { disabled: boolean; locked: boolean; title: string } {
-  if (item.id === 'translation' && entitlements && !entitlements.translation) {
-    return { disabled: true, locked: true, title: 'No access — contact your administrator' };
-  }
-  if (item.id === 'sales' && entitlements && !entitlements.sales) {
-    return { disabled: true, locked: true, title: 'No access — contact your administrator' };
-  }
-  return { disabled: false, locked: false, title: item.label };
-}
-
 const Sidebar: React.FC<SidebarProps> = ({
   activeTab,
   onTabChange,
@@ -83,6 +68,14 @@ const Sidebar: React.FC<SidebarProps> = ({
   collapsed = false,
   onToggleCollapsed,
 }) => {
+  const visibleNavItems = useMemo(() => {
+    return NAV_ITEMS.filter((item) => {
+      if (item.id === 'translation' && entitlements && !entitlements.translation) return false;
+      if (item.id === 'sales' && entitlements && !entitlements.sales) return false;
+      return true;
+    });
+  }, [entitlements]);
+
   return (
     <aside className={`sidebar ${collapsed ? 'sidebar--collapsed' : ''}`}>
       <div className="sidebar-logo">
@@ -112,22 +105,17 @@ const Sidebar: React.FC<SidebarProps> = ({
       <nav className="sidebar-nav">
         {!collapsed && <div className="nav-section-label">Services</div>}
 
-        {NAV_ITEMS.filter((item) => !resolveItemState(item, entitlements).locked).map((item) => {
-          const { disabled, title } = resolveItemState(item, entitlements);
-          return (
-            <button
-              key={item.id}
-              className={`nav-item ${activeTab === item.id ? 'active' : ''} ${disabled ? 'disabled' : ''}`}
-              onClick={() => !disabled && onTabChange(item.id)}
-              aria-disabled={disabled}
-              // When collapsed the label is hidden, so the tooltip carries it.
-              title={collapsed ? `${item.label}${title !== item.label ? ` — ${title}` : ''}` : title}
-            >
-              <span className="nav-icon">{item.icon}</span>
-              {!collapsed && <span className="nav-label">{item.label}</span>}
-            </button>
-          );
-        })}
+        {visibleNavItems.map((item) => (
+          <button
+            key={item.id}
+            className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
+            onClick={() => onTabChange(item.id)}
+            title={collapsed ? item.label : undefined}
+          >
+            <span className="nav-icon">{item.icon}</span>
+            {!collapsed && <span className="nav-label">{item.label}</span>}
+          </button>
+        ))}
       </nav>
     </aside>
   );

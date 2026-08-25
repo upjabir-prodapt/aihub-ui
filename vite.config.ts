@@ -79,6 +79,8 @@ export default defineConfig(({ mode }) => {
       ...(useMockApi ? [viteMockApiPlugin()] : []),
     ],
     server: {
+      host: true,
+      port: 5173,
       proxy: {
         // GCE VM / Cloud Run: service account identity token (audience = .run.app URL)
         '/api/metadata/id-token': {

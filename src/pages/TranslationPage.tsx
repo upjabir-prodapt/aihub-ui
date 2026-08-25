@@ -62,7 +62,7 @@ const TRANSLATION_FEATURES = [
   },
   {
     title: 'Domain-tuned output',
-    description: 'Pick the domain (legal, finance, HR…) and the model adapts to terminology and tone to match it.',
+    description: 'Pick the domain (legal, finance, HR…) and the model adapts terminology and tone to match it.',
   },
 ];
 

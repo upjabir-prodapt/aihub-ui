@@ -7,8 +7,8 @@
     "node": ">=20"
   },
   "scripts": {
-    "dev": "vite",
-    "dev:mock": "vite --mode mock",
+    "dev": "vite --host",
+    "dev:mock": "vite --mode mock --host",
     "build": "tsc -b && vite build",
     "build:sandbox": "tsc -b && vite build --mode sandbox",
     "build:dev": "tsc -b && vite build --mode development",

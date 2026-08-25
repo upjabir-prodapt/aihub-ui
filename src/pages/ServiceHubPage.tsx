@@ -110,21 +110,28 @@ const ServiceHubPage: React.FC<ServiceHubPageProps> = ({ entitlements, onNavigat
     return 0;
   };
 
-  // Services the user has no entitlement for are hidden outright, not shown locked.
-  const isLocked = (s: (typeof SERVICES)[number]): boolean =>
-    !s.comingSoon &&
-    s.entitlementKey !== undefined &&
-    entitlements !== undefined &&
-    !entitlements[s.entitlementKey];
+  const filtered = useMemo(() => {
+    const isLocked = (s: (typeof SERVICES)[number]): boolean =>
+      !s.comingSoon &&
+      s.entitlementKey !== undefined &&
+      entitlements !== undefined &&
+      !entitlements[s.entitlementKey];
 
-  const filtered = SERVICES.filter((s) => {
-    if (isLocked(s)) return false;
     const q = query.trim().toLowerCase();
-    if (!q) return true;
-    return s.name.toLowerCase().includes(q) || s.description.toLowerCase().includes(q);
-  });
+    return SERVICES.filter((s) => {
+      if (isLocked(s)) return false;
+      if (!q) return true;
+      return (
+        s.name.toLowerCase().includes(q) ||
+        s.description.toLowerCase().includes(q) ||
+        s.tags.some((t) => t.toLowerCase().includes(q))
+      );
+    });
+  }, [entitlements, query]);
 
-  const categories = Array.from(new Set(filtered.map((s) => s.category)));
+  const categories = useMemo(() => {
+    return Array.from(new Set(filtered.map((s) => s.category)));
+  }, [filtered]);
 
   return (
     <div className="page-content">
@@ -170,6 +177,12 @@ const ServiceHubPage: React.FC<ServiceHubPageProps> = ({ entitlements, onNavigat
             aria-label="Search services"
           />
         </div>
+
+        {filtered.length === 0 && (
+          <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: '24px 0' }}>
+            No services match &ldquo;{query}&rdquo;.
+          </p>
+        )}
 
         {categories.map((category) => (
           <section key={category} className="hub-category">
