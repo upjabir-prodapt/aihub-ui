@@ -192,14 +192,6 @@ const RecentRuns: React.FC<RecentRunsProps> = ({
                             {formatModel(job.detail.modelUsed, job.detail.modelVersion)}
                           </div>
                         </div>
-                        {typeof job.detail.qualityScore === 'number' && (
-                          <div>
-                            <div className="recent-run-detail-label">Quality</div>
-                            <div className="recent-run-detail-value">
-                              {`${(job.detail.qualityScore * 100).toFixed(1)}%`}
-                            </div>
-                          </div>
-                        )}
                       </div>
                     ) : null}
                   </div>

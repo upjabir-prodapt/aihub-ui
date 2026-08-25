@@ -6,7 +6,6 @@ export interface TranslateRequest {
   domain: string;             // "commercial" | "legal" | "finance" | "hr" | "operations"
   enable_dlp?: boolean;
   enable_chunking?: boolean;
-  enable_judge?: boolean;     // Optional – enable/disable LLM quality evaluation
   priority?: string;          // "standard" | "high" (server-controlled; auto-promoted for .txt)
 }
 
