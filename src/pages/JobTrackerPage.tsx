@@ -270,10 +270,9 @@ const JobTrackerPage: React.FC<JobTrackerPageProps> = ({ serviceFilter: initialS
         <div className="tracker-header">
           <div>
             <p className="tracker-eyebrow">Job Tracker</p>
-            <h1 className="tracker-title">Everything that has run</h1>
+            <h1 className="tracker-title">Service Log</h1>
             <p className="tracker-subtitle">
-              One log across your services, newest first. Runs and their output files
-              are kept for 7 days, then removed.
+              One log across your services, newest first. Runs and their output files are kept for 7 days, then removed
             </p>
           </div>
           <button type="button" className="tracker-refresh-btn" onClick={handleRefresh} disabled={loading}>
@@ -369,162 +368,162 @@ const JobTrackerPage: React.FC<JobTrackerPageProps> = ({ serviceFilter: initialS
               isToday && !showAllToday ? jobsInBucket.slice(0, TODAY_BUCKET_LIMIT) : jobsInBucket;
             const hiddenCount = jobsInBucket.length - visibleJobs.length;
             return (
-            <div key={bucket} className="tracker-group">
-              <div className="tracker-group-label">{bucket}</div>
-              <div className="tracker-list">
-                {visibleJobs.map((job) => {
-                  const expanded = expandedKey === job.key;
-                  const busy = busyKey === job.key;
-                  return (
-                    <div key={job.key} className={`tracker-row status-${job.status}`}>
-                      <button
-                        type="button"
-                        className="tracker-row-main"
-                        onClick={() => {
-                          const next = expanded ? null : job.key;
-                          setExpandedKey(next);
-                          if (next && job.status === 'completed') loadDetail(job);
-                        }}
-                      >
-                        <span className="tracker-row-icon">{job.service === 'translation' ? 'T' : 'S'}</span>
-                        <span className="tracker-row-body">
-                          <span className="tracker-row-title-line">
-                            <span className="tracker-row-title">{job.title}</span>
-                            <span className={`tracker-badge tracker-badge--${job.status}`}>
-                              {STATUS_LABEL[job.status]}
+              <div key={bucket} className="tracker-group">
+                <div className="tracker-group-label">{bucket}</div>
+                <div className="tracker-list">
+                  {visibleJobs.map((job) => {
+                    const expanded = expandedKey === job.key;
+                    const busy = busyKey === job.key;
+                    return (
+                      <div key={job.key} className={`tracker-row status-${job.status}`}>
+                        <button
+                          type="button"
+                          className="tracker-row-main"
+                          onClick={() => {
+                            const next = expanded ? null : job.key;
+                            setExpandedKey(next);
+                            if (next && job.status === 'completed') loadDetail(job);
+                          }}
+                        >
+                          <span className="tracker-row-icon">{job.service === 'translation' ? 'T' : 'S'}</span>
+                          <span className="tracker-row-body">
+                            <span className="tracker-row-title-line">
+                              <span className="tracker-row-title">{job.title}</span>
+                              <span className={`tracker-badge tracker-badge--${job.status}`}>
+                                {STATUS_LABEL[job.status]}
+                              </span>
+                            </span>
+                            <span className="tracker-row-sub">
+                              {job.subtitle} · {timeAgo(job.createdAt)}
                             </span>
                           </span>
-                          <span className="tracker-row-sub">
-                            {job.subtitle} · {timeAgo(job.createdAt)}
+                          <span className="tracker-row-right">
+                            {job.status === 'running' && job.progress !== null ? `${job.progress}%` : null}
                           </span>
-                        </span>
-                        <span className="tracker-row-right">
-                          {job.status === 'running' && job.progress !== null ? `${job.progress}%` : null}
-                        </span>
-                      </button>
+                        </button>
 
-                      {job.status === 'running' && (
-                        <div className="tracker-progress-track">
-                          <div
-                            className={`tracker-progress-fill ${job.progress === null ? 'indeterminate' : ''}`}
-                            style={job.progress !== null ? { width: `${job.progress}%` } : undefined}
-                          />
-                        </div>
-                      )}
+                        {job.status === 'running' && (
+                          <div className="tracker-progress-track">
+                            <div
+                              className={`tracker-progress-fill ${job.progress === null ? 'indeterminate' : ''}`}
+                              style={job.progress !== null ? { width: `${job.progress}%` } : undefined}
+                            />
+                          </div>
+                        )}
 
-                      {expanded && (
-                        <div className="tracker-detail">
-                          {job.errorMessage && <div className="tracker-detail-error">{job.errorMessage}</div>}
-                          <div className="tracker-detail-grid">
-                            <div>
-                              <div className="tracker-detail-label">Run ID</div>
-                              <div className="tracker-detail-value">{job.id}</div>
-                            </div>
-                            <div>
-                              <div className="tracker-detail-label">Service</div>
-                              <div className="tracker-detail-value">{job.serviceLabel}</div>
-                            </div>
-                            {job.startedBy && (
+                        {expanded && (
+                          <div className="tracker-detail">
+                            {job.errorMessage && <div className="tracker-detail-error">{job.errorMessage}</div>}
+                            <div className="tracker-detail-grid">
                               <div>
-                                <div className="tracker-detail-label">Started by</div>
-                                <div className="tracker-detail-value">{job.startedBy}</div>
+                                <div className="tracker-detail-label">Run ID</div>
+                                <div className="tracker-detail-value">{job.id}</div>
                               </div>
-                            )}
-                            {job.status === 'completed' && job.detailStatus === 'loading' && (
-                              <div className="tracker-detail-loading">Loading details…</div>
-                            )}
-                            {job.status === 'completed' && job.detailStatus === 'error' && (
-                              <div className="tracker-detail-error">Couldn't load run details.</div>
-                            )}
-                            {job.status === 'completed' && job.detail && (
-                              <>
+                              <div>
+                                <div className="tracker-detail-label">Service</div>
+                                <div className="tracker-detail-value">{job.serviceLabel}</div>
+                              </div>
+                              {job.startedBy && (
                                 <div>
-                                  <div className="tracker-detail-label">Cost</div>
-                                  <div className="tracker-detail-value">{formatCost(job.detail.costUsd)}</div>
+                                  <div className="tracker-detail-label">Started by</div>
+                                  <div className="tracker-detail-value">{job.startedBy}</div>
                                 </div>
-                                <div>
-                                  <div className="tracker-detail-label">Tokens</div>
-                                  <div className="tracker-detail-value">{job.detail.tokenCount ?? '—'}</div>
-                                </div>
-                                <div>
-                                  <div className="tracker-detail-label">Time</div>
-                                  <div className="tracker-detail-value">
-                                    {job.detail.processingTimeSeconds !== null
-                                      ? formatDuration(job.detail.processingTimeSeconds)
-                                      : 'N/A'}
+                              )}
+                              {job.status === 'completed' && job.detailStatus === 'loading' && (
+                                <div className="tracker-detail-loading">Loading details…</div>
+                              )}
+                              {job.status === 'completed' && job.detailStatus === 'error' && (
+                                <div className="tracker-detail-error">Couldn't load run details.</div>
+                              )}
+                              {job.status === 'completed' && job.detail && (
+                                <>
+                                  <div>
+                                    <div className="tracker-detail-label">Cost</div>
+                                    <div className="tracker-detail-value">{formatCost(job.detail.costUsd)}</div>
                                   </div>
-                                </div>
-                                <div>
-                                  <div className="tracker-detail-label">Model</div>
-                                  <div className="tracker-detail-value">
-                                    {formatModel(job.detail.modelUsed, job.detail.modelVersion)}
+                                  <div>
+                                    <div className="tracker-detail-label">Tokens</div>
+                                    <div className="tracker-detail-value">{job.detail.tokenCount ?? '—'}</div>
                                   </div>
-                                </div>
-                              </>
-                            )}
+                                  <div>
+                                    <div className="tracker-detail-label">Time</div>
+                                    <div className="tracker-detail-value">
+                                      {job.detail.processingTimeSeconds !== null
+                                        ? formatDuration(job.detail.processingTimeSeconds)
+                                        : 'N/A'}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <div className="tracker-detail-label">Model</div>
+                                    <div className="tracker-detail-value">
+                                      {formatModel(job.detail.modelUsed, job.detail.modelVersion)}
+                                    </div>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                            <div className="tracker-detail-actions">
+                              {job.canCancel && (
+                                <button
+                                  type="button"
+                                  className="tracker-action-btn tracker-action-btn--danger"
+                                  disabled={busy}
+                                  onClick={() => void handleCancel(job)}
+                                >
+                                  <XCircle size={13} /> Cancel
+                                </button>
+                              )}
+                              {job.canDownload && (
+                                <button
+                                  type="button"
+                                  className="tracker-action-btn"
+                                  disabled={busy}
+                                  onClick={() => void handleDownload(job)}
+                                >
+                                  <Download size={13} /> Download output
+                                </button>
+                              )}
+                              {job.canReview && (
+                                <button
+                                  type="button"
+                                  className="tracker-action-btn"
+                                  disabled={busy}
+                                  onClick={() => setReviewJobId(job.id)}
+                                >
+                                  <MessageSquare size={13} /> Feedback
+                                </button>
+                              )}
+                              {job.status === 'failed' && (
+                                <span className="tracker-detail-hint">
+                                  Fix the issue above, then start a similar job with the same settings.
+                                </span>
+                              )}
+                            </div>
                           </div>
-                          <div className="tracker-detail-actions">
-                            {job.canCancel && (
-                              <button
-                                type="button"
-                                className="tracker-action-btn tracker-action-btn--danger"
-                                disabled={busy}
-                                onClick={() => void handleCancel(job)}
-                              >
-                                <XCircle size={13} /> Cancel
-                              </button>
-                            )}
-                            {job.canDownload && (
-                              <button
-                                type="button"
-                                className="tracker-action-btn"
-                                disabled={busy}
-                                onClick={() => void handleDownload(job)}
-                              >
-                                <Download size={13} /> Download output
-                              </button>
-                            )}
-                            {job.canReview && (
-                              <button
-                                type="button"
-                                className="tracker-action-btn"
-                                disabled={busy}
-                                onClick={() => setReviewJobId(job.id)}
-                              >
-                                <MessageSquare size={13} /> Feedback
-                              </button>
-                            )}
-                            {job.status === 'failed' && (
-                              <span className="tracker-detail-hint">
-                                Fix the issue above, then start a similar job with the same settings.
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                {isToday && hiddenCount > 0 && (
+                  <button
+                    type="button"
+                    className="tracker-show-all-btn"
+                    onClick={() => setShowAllToday(true)}
+                  >
+                    Show all {jobsInBucket.length} today
+                  </button>
+                )}
+                {isToday && showAllToday && jobsInBucket.length > TODAY_BUCKET_LIMIT && (
+                  <button
+                    type="button"
+                    className="tracker-show-all-btn"
+                    onClick={() => setShowAllToday(false)}
+                  >
+                    Show fewer
+                  </button>
+                )}
               </div>
-              {isToday && hiddenCount > 0 && (
-                <button
-                  type="button"
-                  className="tracker-show-all-btn"
-                  onClick={() => setShowAllToday(true)}
-                >
-                  Show all {jobsInBucket.length} today
-                </button>
-              )}
-              {isToday && showAllToday && jobsInBucket.length > TODAY_BUCKET_LIMIT && (
-                <button
-                  type="button"
-                  className="tracker-show-all-btn"
-                  onClick={() => setShowAllToday(false)}
-                >
-                  Show fewer
-                </button>
-              )}
-            </div>
             );
           })
         )}
