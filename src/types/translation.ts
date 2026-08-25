@@ -6,6 +6,7 @@ export interface TranslateRequest {
   domain: string;             // "commercial" | "legal" | "finance" | "hr" | "operations"
   enable_dlp?: boolean;
   enable_chunking?: boolean;
+  enable_judge?: boolean;     // Optional – enable/disable LLM quality evaluation
   priority?: string;          // "standard" | "high" (server-controlled; auto-promoted for .txt)
 }
 
@@ -56,7 +57,7 @@ export interface TranslationResult {
     domain: string;
     model_used: string;
     model_version: string;
-    quality_score: number;
+    quality_score?: number | null;
     ab_test_variant: string;
     chunks_processed: number;
     retry_attempts: number;
