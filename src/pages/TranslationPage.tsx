@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { useDropzone } from 'react-dropzone';
+import { useDropzone, type FileRejection } from 'react-dropzone';
 import { useTranslationJobs } from '../context/useTranslationJobs';
 import { useServiceJobs } from '../hooks/useServiceJobs';
 import ReviewModal from '../components/ReviewModal';
@@ -140,7 +140,7 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onOpenTracker, onBack
   }, []);
 
   const onDropRejected = useCallback(
-    (fileRejections: Array<{ errors: Array<{ code: string; message: string }> }>) => {
+    (fileRejections: FileRejection[]) => {
       if (!fileRejections.length) return;
       const rejection = fileRejections[0];
       const isTooLarge = rejection.errors.some((e) => e.code === 'file-too-large');
