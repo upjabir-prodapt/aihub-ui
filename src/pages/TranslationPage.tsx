@@ -83,6 +83,8 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onOpenTracker, onBack
   const [sourceText, setSourceText] = useState('');
   /** One-shot notice shown the moment pasted text crosses the word limit. */
   const [showWordLimitNotice, setShowWordLimitNotice] = useState(false);
+  /** Notice shown when an uploaded file exceeds the 10 MB limit. */
+  const [showFileSizeNotice, setShowFileSizeNotice] = useState<number | null>(null);
 
   // Multi-target language selection
   const [sourceLang, setSourceLang] = useState('en');
@@ -146,7 +148,7 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onOpenTracker, onBack
       const isTooLarge = rejection.errors.some((e) => e.code === 'file-too-large');
       const isInvalidType = rejection.errors.some((e) => e.code === 'file-invalid-type');
       if (isTooLarge) {
-        showToast(false, 'File exceeds the 10 MB limit. Please upload a smaller file.');
+        setShowFileSizeNotice(rejection.file.size);
       } else if (isInvalidType) {
         showToast(false, 'Unsupported file format. Please upload a .txt, .docx, or .pdf file.');
       } else {
@@ -177,6 +179,7 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onOpenTracker, onBack
   // ── Clear ──
   const clearFile = () => {
     setFile(null);
+    setShowFileSizeNotice(null);
   };
 
   const clearText = () => {
@@ -251,6 +254,7 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onOpenTracker, onBack
     setFile(null);
     setSourceText('');
     setShowWordLimitNotice(false);
+    setShowFileSizeNotice(null);
 
     setIsSubmitting(true);
     try {
@@ -523,6 +527,42 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onOpenTracker, onBack
               type="button"
               className="notice-btn"
               onClick={() => setShowWordLimitNotice(false)}
+              autoFocus
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* File size limit notice (10 MB max) */}
+      {showFileSizeNotice !== null && (
+        <div
+          className="notice-backdrop"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="file-size-title"
+          onClick={() => setShowFileSizeNotice(null)}
+        >
+          <div className="notice-panel" onClick={(e) => e.stopPropagation()}>
+            <div className="notice-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+            </div>
+            <h3 className="notice-title" id="file-size-title">
+              File exceeds 10 MB limit
+            </h3>
+            <p className="notice-body">
+              {showFileSizeNotice ? `The file you selected is ${formatBytes(showFileSizeNotice)}. ` : ''}
+              Please select or compress your document to be 10 MB or smaller (.txt, .docx, or .pdf).
+            </p>
+            <button
+              type="button"
+              className="notice-btn"
+              onClick={() => setShowFileSizeNotice(null)}
               autoFocus
             >
               Got it
