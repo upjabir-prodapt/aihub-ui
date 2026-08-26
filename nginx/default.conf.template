@@ -1,7 +1,5 @@
-# Debug aid (Architecture B rollout): custom log format that captures whether
-# the inbound request actually carried a real IAP-injected assertion header,
-# and a truncated preview of it (never the full JWT -- avoids leaking full
-# credentials into nginx logs while still letting us confirm presence/shape).
+# PII-safe log format: captures presence of IAP header, routing status, and latency
+# without logging sensitive user emails (goog_email) or auth token payloads.
 # These directives must live in the http{} context (this file is included via
 # conf.d/*.conf from the base nginx image's nginx.conf, which is inside http{}),
 # NOT inside server{} -- map/log_format are invalid inside a server block.
@@ -9,14 +7,8 @@ map $http_x_goog_iap_jwt_assertion $http_x_goog_iap_jwt_assertion_present {
     default "yes";
     ""      "no";
 }
-map $http_x_goog_iap_jwt_assertion $http_x_goog_iap_jwt_assertion_prefix {
-    "~^(?<p>.{0,16})" $p;
-    default "";
-}
-log_format iap_debug '$remote_addr - $status "$request" '
+log_format main_safe '$remote_addr - $status "$request" '
                      'iap_hdr_present=$http_x_goog_iap_jwt_assertion_present '
-                     'iap_hdr_prefix="$http_x_goog_iap_jwt_assertion_prefix" '
-                     'goog_email="$http_x_goog_authenticated_user_email" '
                      'upstream=$upstream_addr upstream_status=$upstream_status '
                      'rt=$request_time urt=$upstream_response_time';
 
@@ -26,6 +18,9 @@ server {
     charset utf-8;
     charset_types text/css text/plain text/javascript application/javascript application/json application/manifest+json image/svg+xml;
 
+    # Allow up to 15MB uploads (supports 10MB translation files + multipart boundary overhead)
+    client_max_body_size 15M;
+
     # aicoeprod-subnet is IPv4-only (privateIpv6GoogleAccess: DISABLE_GOOGLE_ACCESS).
     # Without this, nginx resolves Cloud Run's dual-stack .run.app hostnames and wastes
     # a full connect-timeout retrying each unreachable IPv6 address before falling back
@@ -33,8 +28,8 @@ server {
     # (multiple "Network unreachable" errors per request before success).
     resolver 169.254.169.254 ipv6=off;
 
-    # View this debug log via: gcloud logging read 'resource.type="cloud_run_revision" ...'
-    access_log /dev/stdout iap_debug;
+    # View log via: gcloud logging read 'resource.type="cloud_run_revision" ...'
+    access_log /dev/stdout main_safe;
 
     # Security headers for SPA responses (not forced onto upstream API proxies).
     # Intentionally omit X-XSS-Protection (deprecated / can cause issues).

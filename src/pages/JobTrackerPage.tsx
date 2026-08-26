@@ -269,10 +269,10 @@ const JobTrackerPage: React.FC<JobTrackerPageProps> = ({ serviceFilter: initialS
       <div className="tracker-page">
         <div className="tracker-header">
           <div>
-            <p className="tracker-eyebrow">Job Tracker</p>
-            <h1 className="tracker-title">Service Log</h1>
+            <p className="tracker-eyebrow">COLT AIHUB · Service Activity</p>
+            <h1 className="tracker-title">Job Tracker</h1>
             <p className="tracker-subtitle">
-              One log across your services, newest first. Runs and their output files are kept for 7 days, then removed.
+              Unified job tracker across services in AI Hub. Only the latest 7 days of activity and outputs are displayed here.
             </p>
           </div>
           <button type="button" className="tracker-refresh-btn" onClick={handleRefresh} disabled={loading}>

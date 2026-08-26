@@ -128,15 +128,39 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onOpenTracker, onBack
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // ΓöÇΓöÇ Dropzone ΓöÇΓöÇ
+  const showToast = useCallback((ok: boolean, message: string) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast({ ok, message });
+    toastTimer.current = setTimeout(() => setToast(null), 4500);
+  }, []);
+
+  // ── Dropzone ──
   const onDrop = useCallback((accepted: File[]) => {
     if (accepted.length > 0) setFile(accepted[0]);
   }, []);
+
+  const onDropRejected = useCallback(
+    (fileRejections: Array<{ errors: Array<{ code: string; message: string }> }>) => {
+      if (!fileRejections.length) return;
+      const rejection = fileRejections[0];
+      const isTooLarge = rejection.errors.some((e) => e.code === 'file-too-large');
+      const isInvalidType = rejection.errors.some((e) => e.code === 'file-invalid-type');
+      if (isTooLarge) {
+        showToast(false, 'File exceeds the 10 MB limit. Please upload a smaller file.');
+      } else if (isInvalidType) {
+        showToast(false, 'Unsupported file format. Please upload a .txt, .docx, or .pdf file.');
+      } else {
+        showToast(false, rejection.errors[0]?.message || 'File upload was rejected.');
+      }
+    },
+    [showToast],
+  );
 
   const hasText = sourceText.trim().length > 0;
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
+    onDropRejected,
     accept: {
       'text/plain': ['.txt'],
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
@@ -246,9 +270,7 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onOpenTracker, onBack
 
   // ── Review toast ──
   const handleReviewSubmitted = (ok: boolean, message: string) => {
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    setToast({ ok, message });
-    toastTimer.current = setTimeout(() => setToast(null), 4500);
+    showToast(ok, message);
   };
 
   const wordCount = countWords(sourceText);
