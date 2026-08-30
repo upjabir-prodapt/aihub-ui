@@ -51,6 +51,31 @@ export const useTranslation = () => {
   const [jobOrder, setJobOrder] = useState<string[]>([]);
   const [downloadInfo, setDownloadInfo] = useState<Record<string, DownloadUrlResponse>>({});
   const [error, setError] = useState<string | null>(null);
+  /**
+   * Set when the backend reused an existing job instead of creating a new
+   * one for this submission (implementation_plan.md D.5 / EC-15: a
+   * double-click, or resubmitting the identical document+target+domain
+   * within the idempotency window). Surfaced as a dismissible popup rather
+   * than left invisible, so the user knows why nothing new was created.
+   */
+  const [duplicateNotice, setDuplicateNotice] = useState<string | null>(null);
+  const dismissDuplicateNotice = useCallback(() => setDuplicateNotice(null), []);
+  /**
+   * Set when a previously in-progress batch (persisted in localStorage
+   * across a refresh/reopen) could not be resumed — the job no longer
+   * exists, or ownership no longer resolves to this user
+   * (implementation_plan.md D.1, Sev-1: GET /jobs/status enforces
+   * ownership server-side and fails closed). Surfaced as a popup rather
+   * than silently dropping the stale entry.
+   */
+  const [resumeFailedNotice, setResumeFailedNotice] = useState<string | null>(null);
+  const dismissResumeFailedNotice = useCallback(() => setResumeFailedNotice(null), []);
+  const reportResumeFailed = useCallback(() => {
+    setResumeFailedNotice(
+      "One of your previous translation jobs could no longer be found. " +
+        'It may have finished, been removed, or is no longer accessible.',
+    );
+  }, []);
 
   const jobsRef = useRef<Record<string, JobStatusResponse>>({});
   useEffect(() => {
@@ -292,6 +317,7 @@ export const useTranslation = () => {
       const newJobs: Record<string, JobStatusResponse> = {};
       const newOrder: string[] = [];
       const submittedAt = new Date().toISOString();
+      const duplicateCount = startData.jobs.filter((job) => job.is_duplicate).length;
 
       for (const job of startData.jobs) {
         newJobs[job.job_id] = {
@@ -313,6 +339,18 @@ export const useTranslation = () => {
 
       // Update ref immediately so pollActiveJobs sees new jobs on the synchronous tick
       jobsRef.current = { ...jobsRef.current, ...newJobs };
+
+      // implementation_plan.md D.5 (EC-15): the backend silently reused an
+      // existing job (double-click, or the identical document+target+domain
+      // resubmitted within the idempotency window) instead of creating a new
+      // one. Surface that as a popup rather than leaving it invisible.
+      if (duplicateCount > 0) {
+        setDuplicateNotice(
+          duplicateCount === startData.jobs.length
+            ? "This looks like a job you've already submitted. We're showing you its existing status instead of starting a new one."
+            : `${duplicateCount} of your ${startData.jobs.length} requested translations matched a job you've already submitted — showing its existing status instead of starting a new one.`,
+        );
+      }
 
       ensurePolling();
     } catch (err: unknown) {
@@ -387,6 +425,8 @@ export const useTranslation = () => {
     setJobOrder([]);
     setDownloadInfo({});
     setError(null);
+    setDuplicateNotice(null);
+    setResumeFailedNotice(null);
     downloadFetchedAtRef.current = {};
     clearPolling();
   }, [clearPolling]);
@@ -442,6 +482,11 @@ export const useTranslation = () => {
     jobOrder,
     downloadInfo,
     error,
+    duplicateNotice,
+    dismissDuplicateNotice,
+    resumeFailedNotice,
+    dismissResumeFailedNotice,
+    reportResumeFailed,
     startTranslation,
     resumeBatch,
     retryOrReset,

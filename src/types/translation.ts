@@ -17,6 +17,9 @@ export interface MultiTranslateJobResponse {
   target_language: string;
   status: string;
   status_url: string;
+  /** True when job_id is an existing job reused for a duplicate submission
+   *  (implementation_plan.md D.5 / EC-15 idempotency window). */
+  is_duplicate?: boolean;
 }
 
 export interface MultiTranslateResponse {

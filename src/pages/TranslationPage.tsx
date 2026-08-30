@@ -102,9 +102,12 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onOpenTracker, onBack
     status,
     jobOrder,
     error,
+    duplicateNotice,
+    dismissDuplicateNotice,
+    resumeFailedNotice,
+    dismissResumeFailedNotice,
     startTranslation,
     retryOrReset,
-    reset,
   } = useTranslationJobs();
 
   const serviceJobs = useServiceJobs('translation');
@@ -495,6 +498,80 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onOpenTracker, onBack
 
       </RunJobModal>
 
+      {/* D.1 (Sev-1, implementation_plan.md): a previously in-progress batch
+          persisted from a page refresh could not be resumed — the job no
+          longer exists or ownership no longer resolves to this user. The
+          backend fails closed (404) rather than leaking another user's job,
+          so surface that here instead of silently dropping it. */}
+      {resumeFailedNotice && (
+        <div
+          className="notice-backdrop"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="resume-failed-title"
+          onClick={dismissResumeFailedNotice}
+        >
+          <div className="notice-panel" onClick={(e) => e.stopPropagation()}>
+            <div className="notice-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+            </div>
+            <h3 className="notice-title" id="resume-failed-title">
+              Couldn't resume a previous job
+            </h3>
+            <p className="notice-body">{resumeFailedNotice}</p>
+            <button
+              type="button"
+              className="notice-btn"
+              onClick={dismissResumeFailedNotice}
+              autoFocus
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* D.5 (implementation_plan.md, EC-15): the backend reused an existing
+          job instead of creating a new one for a duplicate submission
+          (double-click, or the identical document+target+domain resubmitted
+          within the idempotency window). Surface that rather than leaving
+          it invisible. */}
+      {duplicateNotice && (
+        <div
+          className="notice-backdrop"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="duplicate-submission-title"
+          onClick={dismissDuplicateNotice}
+        >
+          <div className="notice-panel" onClick={(e) => e.stopPropagation()}>
+            <div className="notice-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="16" x2="12" y2="12" />
+                <line x1="12" y1="8" x2="12.01" y2="8" />
+              </svg>
+            </div>
+            <h3 className="notice-title" id="duplicate-submission-title">
+              Already submitted
+            </h3>
+            <p className="notice-body">{duplicateNotice}</p>
+            <button
+              type="button"
+              className="notice-btn"
+              onClick={dismissDuplicateNotice}
+              autoFocus
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Word-limit notice. Rendered as a sibling of the run dialog rather
           than inside it: the dialog panel animates with a transform, which
           would become the containing block for a position:fixed child and
@@ -571,9 +648,15 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onOpenTracker, onBack
         </div>
       )}
 
-      {/* Batch-level failure — kept because it carries retry/reset actions
-          that the per-run list has no equivalent for. */}
-      {status === 'failed' && (
+      {/* Batch-level failure panel — shown only when submission itself was
+          rejected before any job existed (validation errors: password-
+          protected file, scanned/image-only document, oversized file,
+          etc.). Once job(s) exist, a failure is a pipeline-side outcome for
+          one or more of them, and is shown per-row in Recent runs below
+          (status badge + inline error message) — this panel and its
+          Try Again/Resume/Start Over actions are intentionally not shown in
+          that case; a failed job is not retried. */}
+      {status === 'failed' && jobOrder.length === 0 && (
         <div className="workspace workspace--output">
           <div className="panel">
             <div className="output-error">
@@ -588,13 +671,8 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onOpenTracker, onBack
               <p className="error-message">{error}</p>
               <div className="error-actions">
                 <button className="retry-btn" onClick={retryOrReset} id="retry-btn">
-                  {jobOrder.length > 0 ? 'Resume Checking Status' : 'Try Again'}
+                  Try Again
                 </button>
-                {jobOrder.length > 0 && (
-                  <button className="retry-btn secondary" onClick={reset} id="reset-btn">
-                    Start Over
-                  </button>
-                )}
               </div>
             </div>
           </div>

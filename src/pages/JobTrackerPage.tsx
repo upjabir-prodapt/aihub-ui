@@ -493,11 +493,6 @@ const JobTrackerPage: React.FC<JobTrackerPageProps> = ({ serviceFilter: initialS
                                   <MessageSquare size={13} /> Feedback
                                 </button>
                               )}
-                              {job.status === 'failed' && (
-                                <span className="tracker-detail-hint">
-                                  Fix the issue above, then start a similar job with the same settings.
-                                </span>
-                              )}
                             </div>
                           </div>
                         )}

@@ -106,6 +106,7 @@ export const TranslationJobsProvider: React.FC<{ children: React.ReactNode }> = 
         const { jobs: statusItems } = await translationApi.getMultipleJobStatuses(stored.jobOrder);
         if (statusItems.length === 0) {
           clearStoredBatch();
+          value.reportResumeFailed();
           return;
         }
 
@@ -126,8 +127,10 @@ export const TranslationJobsProvider: React.FC<{ children: React.ReactNode }> = 
       } catch {
         // Job IDs no longer valid, ownership mismatch, or network error --
         // fail closed by dropping the stale local entry rather than
-        // retrying indefinitely.
+        // retrying indefinitely. Tell the user rather than dropping it
+        // silently (implementation_plan.md D.1, Sev-1).
         clearStoredBatch();
+        value.reportResumeFailed();
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
