@@ -6,16 +6,24 @@ import {
   forceRefreshSalesGoogleIdToken,
   SALES_GOOGLE_TOKEN_REFRESH_INTERVAL_MS,
 } from '../api/salesCloudRunAuth';
-import { hubLogin } from '../api/hubAuth';
+import {
+  hubLogin,
+  logoutTranslationSession,
+  refreshTranslationSession,
+} from '../api/hubAuth';
 import {
   type AuthUser,
   clearSession,
   loadSession,
+  saveAccessTokenExpiry,
   saveSession,
 } from './authStorage';
 import {
   clearSalesSession,
   loadSalesSession,
+  logoutSalesSession,
+  refreshSalesSession,
+  saveSalesAccessTokenExpiry,
   saveSalesSession,
   type SalesAuthUser,
 } from '../api/salesAgentApi';
@@ -26,6 +34,20 @@ export type { ServiceEntitlements } from '../components/Sidebar';
 
 /** Background refresh interval for Cloud Run invoker token while logged in. */
 const GOOGLE_TOKEN_REFRESH_INTERVAL_MS = 45 * 60 * 1000;
+
+/**
+ * How often to slide the app session forward.
+ *
+ * Fixed interval, deliberately: both services mint 30-minute tokens and there
+ * is no refresh token, so renewal only works while the current token is still
+ * valid. 25 minutes leaves a 5-minute margin for a failed attempt to be
+ * retried before the token dies.
+ *
+ * Do NOT derive this from a stored expiry timestamp. That is what makes the
+ * whole scheme silently fail: schedule off the wrong stored value and the
+ * first renewal lands long after the access token is already dead.
+ */
+const SESSION_RENEW_INTERVAL_MS = 25 * 60 * 1000;
 
 function readInitialSession() {
   return loadSession();
@@ -83,6 +105,67 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const intervalId = window.setInterval(refresh, SALES_GOOGLE_TOKEN_REFRESH_INTERVAL_MS);
     return () => window.clearInterval(intervalId);
   }, [salesUser]);
+
+  // Sliding app session. Both services issue and validate the SAME
+  // `colt_session` cookie, but each renews independently, so a user signed
+  // into both writes the cookie twice per tick. The two tokens are
+  // equivalent, so last-write-wins is harmless.
+  //
+  // A renewal can only be refused for a terminal reason (expired, past the
+  // 8-hour absolute cap, or entitlement revoked in Firestore), so 401/403
+  // ends that service's session immediately rather than waiting for the user
+  // to trip over a failing API call.
+  const hasTranslationSession = !!user;
+  const hasSalesSession = !!salesUser;
+
+  useEffect(() => {
+    if (!hasTranslationSession && !hasSalesSession) return;
+
+    let cancelled = false;
+
+    const renew = async () => {
+      const jobs: Promise<void>[] = [];
+
+      if (hasTranslationSession) {
+        jobs.push((async () => {
+          const result = await refreshTranslationSession();
+          if (cancelled) return;
+          if (result.status === 'renewed') {
+            saveAccessTokenExpiry(result.expiresIn);
+          } else if (result.status === 'expired') {
+            clearSession();
+            setUser(null);
+            setGoogleIdToken(null);
+            setError('Your session has expired. Please sign in again.');
+          }
+          // 'unavailable' — transient; leave the session alone and retry on
+          // the next tick, which still lands inside the token's lifetime.
+        })());
+      }
+
+      if (hasSalesSession) {
+        jobs.push((async () => {
+          const result = await refreshSalesSession();
+          if (cancelled) return;
+          if (result.status === 'renewed') {
+            saveSalesAccessTokenExpiry(result.expiresIn);
+          } else if (result.status === 'expired') {
+            clearSalesSession();
+            setSalesUser(null);
+            setError('Your session has expired. Please sign in again.');
+          }
+        })());
+      }
+
+      await Promise.all(jobs);
+    };
+
+    const intervalId = window.setInterval(renew, SESSION_RENEW_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [hasTranslationSession, hasSalesSession]);
 
   const login = useCallback(async (
     business_unit: string,
@@ -166,7 +249,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
+  // The session JWT lives in an httpOnly cookie that JS cannot delete, so
+  // clearing localStorage alone would leave a live credential in the browser.
+  // The server call is fire-and-forget and never throws: local state is
+  // cleared immediately either way, so a failed request cannot strand the
+  // user in a half-logged-out UI.
   const logout = useCallback(() => {
+    void logoutTranslationSession();
     setGoogleIdToken(null);
     setUser(null);
     setError(null);
@@ -174,6 +263,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const logoutSales = useCallback(() => {
+    void logoutSalesSession();
     setSalesUser(null);
     setError(null);
     clearSalesSession();

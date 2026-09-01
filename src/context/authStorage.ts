@@ -4,6 +4,20 @@ export interface AuthUser {
   organization: string;
 }
 
+/**
+ * Outcome of a POST /auth/refresh attempt.
+ *
+ * The distinction matters: a 401/403 means the session is genuinely over and
+ * the user must sign in again, whereas a network blip or 5xx is transient and
+ * the next 25-minute tick should simply try again. Collapsing the two would
+ * either log people out over a dropped packet or leave them staring at a dead
+ * session that never re-prompts.
+ */
+export type SessionRenewal =
+  | { status: 'renewed'; expiresIn: number }
+  | { status: 'expired' }
+  | { status: 'unavailable' };
+
 // NOTE: the app-session JWT itself is NO LONGER stored here (or anywhere in
 // localStorage). It now lives exclusively in the httpOnly `colt_session`
 // cookie set by POST /auth/token, which JS cannot read — this is the
@@ -43,6 +57,18 @@ export function saveSession(googleIdToken: string, user: AuthUser, expiresIn: nu
   localStorage.setItem(USER_KEY, JSON.stringify(user));
   localStorage.setItem(EXPIRY_KEY, String(expiry));
   saveAttributionPrefs(user.business_unit, user.organization);
+}
+
+/**
+ * Push the locally-cached expiry forward after a successful renewal.
+ *
+ * Only the expiry moves: the renewed JWT arrives via Set-Cookie and the
+ * user record is unchanged. Without this, `loadSession()` would keep
+ * evaluating the original login's expiry and drop a session that the server
+ * has in fact just extended.
+ */
+export function saveAccessTokenExpiry(expiresInSeconds: number) {
+  localStorage.setItem(EXPIRY_KEY, String(Date.now() + expiresInSeconds * 1000));
 }
 
 export function loadSession(): { googleIdToken: string; user: AuthUser } | null {

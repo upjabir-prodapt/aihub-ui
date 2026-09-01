@@ -9,6 +9,8 @@ export interface SalesAuthUser {
 export interface SalesTokenResponse {
   access_token: string;
   token_type: string;
+  /** Session lifetime in seconds. Optional only because the field post-dates some clients. */
+  expires_in?: number;
   email: string;
 }
 
