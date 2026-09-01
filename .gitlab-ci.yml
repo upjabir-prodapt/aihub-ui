@@ -14,6 +14,7 @@ workflow:
 stages:
   - sync
   - lint
+  - test
   - build
   - deploy
   - promote
@@ -234,7 +235,7 @@ sync-from-azure:
     - if: $CI_COMMIT_BRANCH == "sandbox"
 
 sast:
-  stage: lint
+  stage: test
 
 ".sast-analyzer":
   tags:
@@ -244,7 +245,7 @@ sast:
     - codequality
 
 ".secret-analyzer":
-  stage: lint
+  stage: test
   tags:
     - Sast
     - secret-detection
@@ -252,7 +253,18 @@ sast:
     - codequality
 
 secret_detection:
-  stage: lint
+  stage: test
+
+".ds-analyzer":
+  stage: test
+  tags:
+    - Sast
+    - secret-detection
+    - container
+    - codequality
+
+dependency_scanning:
+  stage: test
 
 frontend-checks:
   stage: lint
