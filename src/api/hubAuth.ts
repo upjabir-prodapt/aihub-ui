@@ -5,7 +5,10 @@ import {
   type SalesAuthUser,
 } from './salesAgentApi';
 import { TRANSLATION_API_BASE } from './translationConfig';
-import { saveSession, type AuthUser } from '../context/authStorage';
+import {
+  saveSession,
+  type AuthUser,
+} from '../context/authStorage';
 import type { ServiceEntitlements } from '../components/Sidebar';
 
 export interface HubLoginResult {
@@ -74,14 +77,19 @@ export async function hubLogin(
           throw new Error(err.detail || err.message || `HTTP ${response.status}`);
         }
 
-        const data = (await response.json()) as { email: string; expires_in?: number };
+        const data = (await response.json()) as {
+          email: string;
+          expires_in?: number;
+          refresh_expires_in?: number;
+        };
         const user: AuthUser = {
           email: data.email,
           business_unit: bu,
           organization: org,
         };
         const expiresIn = data.expires_in ?? 3600;
-        saveSession(googleIdToken, user, expiresIn);
+        const refreshExpiresIn = data.refresh_expires_in;
+        saveSession(googleIdToken, user, expiresIn, refreshExpiresIn);
         result.translation = {
           user,
           googleIdToken,
@@ -124,4 +132,45 @@ export async function hubLogin(
 
   await Promise.all(tasks);
   return result;
+}
+
+export async function refreshAccessToken(): Promise<{
+  expiresIn: number;
+  refreshExpiresIn?: number;
+} | null> {
+  try {
+    // Refresh token is sent via httpOnly cookie (credentials: 'include').
+    // Optionally pass it in the body if called from contexts that need explicit control.
+    const response = await fetch(`${TRANSLATION_API_BASE}/auth/refresh`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        accept: 'application/json',
+      },
+      body: JSON.stringify({}),
+    });
+
+    if (!response.ok) {
+      const err = (await response.json().catch(() => ({ detail: 'Token refresh failed.' }))) as {
+        detail?: string;
+        message?: string;
+      };
+      throw new Error(err.detail || err.message || `HTTP ${response.status}`);
+    }
+
+    const data = (await response.json()) as {
+      expires_in?: number;
+      refresh_expires_in?: number;
+    };
+
+    const expiresIn = data.expires_in ?? 3600;
+    const refreshExpiresIn = data.refresh_expires_in;
+
+    return { expiresIn, refreshExpiresIn };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Token refresh failed.';
+    console.error('Access token refresh failed:', message);
+    return null;
+  }
 }

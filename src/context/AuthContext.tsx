@@ -6,12 +6,15 @@ import {
   forceRefreshSalesGoogleIdToken,
   SALES_GOOGLE_TOKEN_REFRESH_INTERVAL_MS,
 } from '../api/salesCloudRunAuth';
-import { hubLogin } from '../api/hubAuth';
+import { hubLogin, refreshAccessToken } from '../api/hubAuth';
 import {
   type AuthUser,
   clearSession,
   loadSession,
   saveSession,
+  getRefreshExpiryTime,
+  saveRefreshExpiry,
+  saveAccessTokenExpiry,
 } from './authStorage';
 import {
   clearSalesSession,
@@ -69,6 +72,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => window.clearInterval(intervalId);
   }, [user]);
 
+  // Auto-refresh access token ~5 min before expiry to avoid 401s mid-session.
+  // Refresh failure is graceful: the next API call will 401 and trigger re-login.
+  useEffect(() => {
+    if (!user) return;
+
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+    const scheduleRefresh = () => {
+      const refreshExpiryTime = getRefreshExpiryTime();
+      if (!refreshExpiryTime) return;
+
+      // Refresh 5 minutes before expiry
+      const refreshTime = refreshExpiryTime - 5 * 60 * 1000;
+      const now = Date.now();
+      const delayMs = Math.max(0, refreshTime - now);
+
+      timeoutId = window.setTimeout(async () => {
+        try {
+          const result = await refreshAccessToken();
+          if (result) {
+            // Update expiry times in localStorage for next refresh
+            saveAccessTokenExpiry(result.expiresIn);
+            if (result.refreshExpiresIn) {
+              saveRefreshExpiry(result.refreshExpiresIn);
+            }
+            // Reschedule next refresh
+            scheduleRefresh();
+          }
+        } catch (err) {
+          console.warn('Background access token refresh failed:', err);
+        }
+      }, delayMs);
+    };
+
+    scheduleRefresh();
+    return () => {
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+    };
+  }, [user]);
+
   useEffect(() => {
     if (!salesUser) return;
 
@@ -121,7 +164,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (entitlements.translation) {
         const mockUser: AuthUser = { email: mockEmail, business_unit: bu, organization: org };
-        saveSession(mockToken, mockUser, 3600);
+        // Mock login with 1-hour token and 7-day refresh expiry
+        saveSession(mockToken, mockUser, 3600, 7 * 24 * 60 * 60);
         setGoogleIdToken(mockToken);
         setUser(mockUser);
         setIapEmail(mockEmail);
