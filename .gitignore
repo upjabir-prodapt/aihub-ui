@@ -2,11 +2,11 @@
 node_modules/
 
 # Production
-/dist/
-/build/
+dist/
+build/
 
 # Vite cache
-/.vite/
+.vite/
 .clinerules
 memory-bank
 
@@ -28,8 +28,9 @@ Thumbs.db
 # IDE/editor folders
 .vscode/
 .idea/
-
+.kilo/
 .claude/
+GITLAB_CI_VARIABLES.md
 
 # OS generated files
 *.log
@@ -37,8 +38,17 @@ Thumbs.db
 # Certificates and local server config
 certs/
 
-# Generated at build time from nginx/default.conf.template
-nginx/default.conf
+# Python / BFF
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+*.egg-info/
+.coverage
+htmlcov/
 
 # Temporary files
 *.tmp

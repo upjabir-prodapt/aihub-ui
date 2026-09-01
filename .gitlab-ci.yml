@@ -1,6 +1,9 @@
 include:
   - template: Security/SAST.gitlab-ci.yml
   - template: Security/Secret-Detection.gitlab-ci.yml
+  # Gap G15 (dependency and secret scanning in CI) and G16 (front-end
+  # dependency scanning). Covers both the npm and the Python lockfiles.
+  - template: Security/Dependency-Scanning.gitlab-ci.yml
 
 workflow:
   rules:
@@ -22,9 +25,13 @@ variables:
   #      WORKLOAD_IDENTITY_PROVIDER, SERVICE_ACCOUNT, GCP_PROJECT_ID
   # Per-environment: GCP_REGION, ARTIFACT_REPO, IMAGE_NAME, CLOUD_RUN_SERVICE,
   #                  CLOUD_RUN_NETWORK, CLOUD_RUN_SUBNET, CLOUD_RUN_SA
-  # Vite build-time (per env): VITE_TRANSLATION_API_ORIGIN, VITE_SALES_API_ORIGIN,
-  #   VITE_TRANSLATION_CLOUD_RUN_URL, VITE_SALES_CLOUD_RUN_URL, VITE_CONTRACTS_API_BASE,
-  #   VITE_GCP_PROJECT_ID, VITE_GCP_PROJECT_NUMBER, VITE_GCP_REGION, VITE_TLS_CA_FILE
+  # BFF runtime (per env, set on the Cloud Run service by deploy-cloud-run):
+  #   ENTRA_TENANT_ID, ENTRA_CLIENT_ID, ENTRA_APP_ID_URI, ENTRA_REDIRECT_URI,
+  #   ENTRA_SCOPES, ENTRA_CLIENT_SECRET_NAME, IAP_AUDIENCE, IAP_ENABLED,
+  #   FIRESTORE_DATABASE, KMS_KEY_NAME, APIGEE_BASE_URL, APIGEE_API_KEY_SECRET,
+  #   GCS_UPLOAD_BUCKET, GCS_SIGNER_SERVICE_ACCOUNT
+  # There are no VITE_* build-time variables any more: the SPA is served by the
+  # BFF from the same origin and calls only relative paths.
   # See GITLAB_CI_VARIABLES.md
   GCLOUD_USER_INSTALL_DIR: "${CI_PROJECT_DIR}/.tools/google-cloud-sdk"
   GCLOUD_ARCHIVE_URL: "https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz"
@@ -36,6 +43,9 @@ variables:
   # Vite 8 requires Node ^20.19.0 — install to project dir (avoids broken nvm on shell runners).
   NODE_VERSION: "20.19.4"
   NODE_INSTALL_DIR: "${CI_PROJECT_DIR}/.tools/node-v20.19.4"
+  FRONTEND_DIR: "frontend"
+  BFF_DIR: "bff"
+  PIP_CACHE_DIR: "${CI_PROJECT_DIR}/.cache/pip"
 
 ".shell_runner":
   tags:
@@ -80,6 +90,36 @@ variables:
         exit 1
       fi
       echo "OK - node $(node -v), npm $(npm -v)"
+
+".ensure_python":
+  before_script:
+    - !reference [".proxy", before_script]
+    - |
+      set -e
+      # The BFF targets Python 3.11. Shell runners vary, so pick the newest
+      # interpreter >= 3.11 that is present rather than assuming `python3`.
+      PYBIN=""
+      for candidate in python3.13 python3.12 python3.11 python3; do
+        if command -v "$candidate" >/dev/null 2>&1; then
+          major="$("$candidate" -c 'import sys; print(sys.version_info[0])')"
+          minor="$("$candidate" -c 'import sys; print(sys.version_info[1])')"
+          if [ "$major" -eq 3 ] && [ "$minor" -ge 11 ]; then
+            PYBIN="$candidate"
+            break
+          fi
+        fi
+      done
+      if [ -z "$PYBIN" ]; then
+        echo "ERROR - Python >=3.11 required for the BFF; none found on this runner."
+        exit 1
+      fi
+      export PIP_CACHE_DIR="${PIP_CACHE_DIR:-${CI_PROJECT_DIR}/.cache/pip}"
+      mkdir -p "$PIP_CACHE_DIR"
+      "$PYBIN" -m venv "${CI_PROJECT_DIR}/.venv-bff"
+      . "${CI_PROJECT_DIR}/.venv-bff/bin/activate"
+      python -m pip install --upgrade pip
+      pip install -e "${BFF_DIR}[dev]"
+      echo "OK - $(python --version)"
 
 ".ensure_gcloud":
   before_script:
@@ -214,7 +254,7 @@ sast:
 secret_detection:
   stage: lint
 
-eslint:
+frontend-checks:
   stage: lint
   extends:
     - ".ensure_node"
@@ -222,7 +262,7 @@ eslint:
   cache:
     key: npm-$CI_COMMIT_REF_SLUG
     paths:
-      - node_modules/
+      - frontend/node_modules/
       - .cache/npm/
       - .tools/node-v20.19.4/
   script:
@@ -231,11 +271,39 @@ eslint:
       export NPM_CONFIG_CACHE="${NPM_CONFIG_CACHE:-${CI_PROJECT_DIR}/.cache/npm}"
       unset NPM_CONFIG_PREFIX
       mkdir -p "$NPM_CONFIG_CACHE"
+      cd "$FRONTEND_DIR"
       npm ci
       npm run lint
+      npm run typecheck
+      npm run test
   rules:
-    - when: never
-  # Temporarily disabled: only build+deploy needed for this rollout.
+    - if: $CI_COMMIT_BRANCH == "sandbox"
+    - if: $CI_COMMIT_BRANCH == "dev"
+    - if: $CI_COMMIT_BRANCH == "prod"
+
+bff-checks:
+  stage: lint
+  extends:
+    - ".ensure_python"
+    - ".shell_runner"
+  cache:
+    key: pip-$CI_COMMIT_REF_SLUG
+    paths:
+      - .cache/pip/
+  script:
+    - |
+      . "${CI_PROJECT_DIR}/.venv-bff/bin/activate"
+      cd "$BFF_DIR"
+      ruff check app tests
+      ruff format --check app tests
+      mypy app
+      # Session lifecycle correctness lives here (decision D12), so these are
+      # the tests that gate a deploy.
+      pytest -q --cov=app --cov-report=term-missing
+  rules:
+    - if: $CI_COMMIT_BRANCH == "sandbox"
+    - if: $CI_COMMIT_BRANCH == "dev"
+    - if: $CI_COMMIT_BRANCH == "prod"
 
 env-scope-check:
   extends:
@@ -248,12 +316,15 @@ env-scope-check:
   allow_failure: true
   script:
     - |
+      # Deploy plumbing plus every BFF setting that has no safe default.
+      # Secrets are absent by design: only their Secret Manager *names* travel
+      # through CI (gap G15).
       required_vars="WORKLOAD_IDENTITY_PROJECT_NUMBER WORKLOAD_IDENTITY_POOL WORKLOAD_IDENTITY_PROVIDER \
         SERVICE_ACCOUNT GCP_PROJECT_ID GCP_REGION ARTIFACT_REPO IMAGE_NAME \
         CLOUD_RUN_NETWORK CLOUD_RUN_SUBNET CLOUD_RUN_SA CLOUD_RUN_SERVICE \
-        VITE_TRANSLATION_API_ORIGIN VITE_SALES_API_ORIGIN \
-        VITE_TRANSLATION_CLOUD_RUN_URL VITE_SALES_CLOUD_RUN_URL \
-        VITE_CONTRACTS_API_BASE VITE_GCP_PROJECT_ID VITE_GCP_PROJECT_NUMBER VITE_GCP_REGION VITE_TLS_CA_FILE"
+        ENTRA_TENANT_ID ENTRA_CLIENT_ID ENTRA_APP_ID_URI ENTRA_REDIRECT_URI ENTRA_SCOPES \
+        ENTRA_CLIENT_SECRET_NAME IAP_AUDIENCE KMS_KEY_NAME \
+        APIGEE_BASE_URL APIGEE_API_KEY_SECRET GCS_UPLOAD_BUCKET"
       missing=0
       for var in $required_vars; do
         if [ -n "$(printenv "$var")" ]; then
@@ -277,18 +348,14 @@ build-and-push:
   extends:
     - ".gcp_wif"
     - ".shell_runner"
+  needs:
+    - frontend-checks
+    - bff-checks
   when: manual
   script:
     - |
       export DOCKER_CONFIG="${DOCKER_CONFIG:-${CI_PROJECT_DIR}/.cache/docker}"
       mkdir -p "$DOCKER_CONFIG"
-
-      case "$CI_COMMIT_BRANCH" in
-        sandbox) BUILD_MODE="sandbox" ;;
-        dev)     BUILD_MODE="development" ;;
-        prod)    BUILD_MODE="production" ;;
-        *)       echo "Unsupported branch: $CI_COMMIT_BRANCH"; exit 1 ;;
-      esac
 
       IMAGE_URI="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REPO}/${IMAGE_NAME}:${IMAGE_TAG}"
       gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin \
@@ -302,29 +369,12 @@ build-and-push:
         fi
       fi
 
-      TLS_CA_PATH="${VITE_TLS_CA_FILE:-certs/colt-internal-ca.pem}"
-      mkdir -p "$(dirname "$TLS_CA_PATH")"
-      if [ -n "${COLT_INTERNAL_CA_PEM:-}" ] && [ -f "$COLT_INTERNAL_CA_PEM" ]; then
-        cp "$COLT_INTERNAL_CA_PEM" "$TLS_CA_PATH"
-        echo "OK - Colt internal CA copied from COLT_INTERNAL_CA_PEM to ${TLS_CA_PATH}"
-      elif [ ! -f "$TLS_CA_PATH" ]; then
-        echo "ERROR - Missing ${TLS_CA_PATH}. Set GitLab File variable COLT_INTERNAL_CA_PEM or commit the cert for local builds."
-        exit 1
-      fi
-
+      # No VITE_* build args and no internal-CA staging: the SPA is same-origin
+      # and relative-path only, and the BFF (not nginx) now makes the outbound
+      # TLS connection to Apigee. Nothing environment-specific is baked into
+      # the image, so one image is promotable across sandbox -> dev -> prod.
       # shellcheck disable=SC2086
-      docker build $PROXY_ARGS \
-        --build-arg BUILD_MODE="${BUILD_MODE}" \
-        --build-arg VITE_TRANSLATION_API_ORIGIN="${VITE_TRANSLATION_API_ORIGIN}" \
-        --build-arg VITE_SALES_API_ORIGIN="${VITE_SALES_API_ORIGIN}" \
-        --build-arg VITE_TRANSLATION_CLOUD_RUN_URL="${VITE_TRANSLATION_CLOUD_RUN_URL}" \
-        --build-arg VITE_SALES_CLOUD_RUN_URL="${VITE_SALES_CLOUD_RUN_URL}" \
-        --build-arg VITE_CONTRACTS_API_BASE="${VITE_CONTRACTS_API_BASE}" \
-        --build-arg VITE_GCP_PROJECT_ID="${VITE_GCP_PROJECT_ID}" \
-        --build-arg VITE_GCP_PROJECT_NUMBER="${VITE_GCP_PROJECT_NUMBER}" \
-        --build-arg VITE_GCP_REGION="${VITE_GCP_REGION}" \
-        --build-arg VITE_TLS_CA_FILE="${VITE_TLS_CA_FILE:-certs/colt-internal-ca.pem}" \
-        -t "$IMAGE_URI" .
+      docker build $PROXY_ARGS -t "$IMAGE_URI" .
 
       docker push "$IMAGE_URI"
   rules:
@@ -346,11 +396,54 @@ deploy-cloud-run:
     - |
       : "${CLOUD_RUN_NETWORK:?Set CLOUD_RUN_NETWORK for environment ${CI_COMMIT_BRANCH}}"
       : "${CLOUD_RUN_SUBNET:?Set CLOUD_RUN_SUBNET for environment ${CI_COMMIT_BRANCH}}"
+      : "${ENTRA_TENANT_ID:?Set ENTRA_TENANT_ID for environment ${CI_COMMIT_BRANCH}}"
+      : "${ENTRA_CLIENT_ID:?Set ENTRA_CLIENT_ID for environment ${CI_COMMIT_BRANCH}}"
+      # docs 18 §9 records a hardcoded/absent Application ID URI as a known
+      # failure mode: it fails with an invalid-scope error identical to a
+      # missing scope. The BFF also refuses to start without it.
+      : "${ENTRA_APP_ID_URI:?Set ENTRA_APP_ID_URI (api://<client-id>) for environment ${CI_COMMIT_BRANCH}}"
+      : "${IAP_AUDIENCE:?Set IAP_AUDIENCE for environment ${CI_COMMIT_BRANCH}}"
+      : "${APIGEE_BASE_URL:?Set APIGEE_BASE_URL for environment ${CI_COMMIT_BRANCH}}"
+
+      case "$CI_COMMIT_BRANCH" in
+        sandbox) ENVIRONMENT="sandbox" ;;
+        dev)     ENVIRONMENT="dev" ;;
+        prod)    ENVIRONMENT="prod" ;;
+        *)       echo "Unsupported branch: $CI_COMMIT_BRANCH"; exit 1 ;;
+      esac
+
+      # Secret *names* only. Values are fetched from Secret Manager at startup
+      # and are never injected as environment variables (gap G15).
+      # Custom delimiter ^||^ allows ENTRA_SCOPES to contain spaces cleanly.
+      ENV_VARS="^||^ENVIRONMENT=${ENVIRONMENT}"
+      ENV_VARS="${ENV_VARS}||AUTH_MODE=entra"
+      ENV_VARS="${ENV_VARS}||UPSTREAM_MODE=${UPSTREAM_MODE:-apigee}"
+      ENV_VARS="${ENV_VARS}||DOWNSTREAM_AUTH_MODE=${DOWNSTREAM_AUTH_MODE:-headers}"
+      ENV_VARS="${ENV_VARS}||TRANSLATION_UPLOAD_MODE=${TRANSLATION_UPLOAD_MODE:-gcs_signed}"
+      ENV_VARS="${ENV_VARS}||ENTRA_TENANT_ID=${ENTRA_TENANT_ID}"
+      ENV_VARS="${ENV_VARS}||ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID}"
+      ENV_VARS="${ENV_VARS}||ENTRA_APP_ID_URI=${ENTRA_APP_ID_URI}"
+      ENV_VARS="${ENV_VARS}||ENTRA_REDIRECT_URI=${ENTRA_REDIRECT_URI}"
+      ENV_VARS="${ENV_VARS}||ENTRA_SCOPES=${ENTRA_SCOPES}"
+      ENV_VARS="${ENV_VARS}||ENTRA_CLIENT_SECRET_NAME=${ENTRA_CLIENT_SECRET_NAME:-entra-bff-client-secret}"
+      ENV_VARS="${ENV_VARS}||IAP_ENABLED=${IAP_ENABLED:-true}"
+      ENV_VARS="${ENV_VARS}||IAP_AUDIENCE=${IAP_AUDIENCE}"
+      ENV_VARS="${ENV_VARS}||GCP_PROJECT_ID=${GCP_PROJECT_ID}"
+      ENV_VARS="${ENV_VARS}||FIRESTORE_DATABASE=${FIRESTORE_DATABASE:-(default)}"
+      ENV_VARS="${ENV_VARS}||KMS_KEY_NAME=${KMS_KEY_NAME}"
+      ENV_VARS="${ENV_VARS}||APIGEE_BASE_URL=${APIGEE_BASE_URL}"
+      ENV_VARS="${ENV_VARS}||APIGEE_API_KEY_SECRET=${APIGEE_API_KEY_SECRET:-apigee-bff-client-key}"
+      ENV_VARS="${ENV_VARS}||GCS_UPLOAD_BUCKET=${GCS_UPLOAD_BUCKET}"
+      ENV_VARS="${ENV_VARS}||GCS_SIGNER_SERVICE_ACCOUNT=${GCS_SIGNER_SERVICE_ACCOUNT:-$CLOUD_RUN_SA}"
+      ENV_VARS="${ENV_VARS}||SESSION_ABSOLUTE_TTL_SECONDS=${SESSION_ABSOLUTE_TTL_SECONDS:-28800}"
+      ENV_VARS="${ENV_VARS}||SESSION_IDLE_TTL_SECONDS=${SESSION_IDLE_TTL_SECONDS:-3600}"
+      ENV_VARS="${ENV_VARS}||SESSION_ROTATION_GRACE_SECONDS=${SESSION_ROTATION_GRACE_SECONDS:-30}"
+      ENV_VARS="${ENV_VARS}||LOG_LEVEL=${LOG_LEVEL:-INFO}"
 
       IMAGE_URI="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REPO}/${IMAGE_NAME}:${IMAGE_TAG}"
       gcloud beta run deploy "$CLOUD_RUN_SERVICE" \
         --quiet \
-        --update-labels="app=ai-hub-ui,env=${CI_COMMIT_BRANCH},managed-by=gitlab-ci,git-sha=${CI_COMMIT_SHORT_SHA},pipeline=${CI_PIPELINE_IID}" \
+        --update-labels="app=ai-hub-bff,env=${CI_COMMIT_BRANCH},managed-by=gitlab-ci,git-sha=${CI_COMMIT_SHORT_SHA},pipeline=${CI_PIPELINE_IID}" \
         --image "$IMAGE_URI" \
         --platform=managed \
         --region="$GCP_REGION" \
@@ -358,12 +451,22 @@ deploy-cloud-run:
         --network="$CLOUD_RUN_NETWORK" \
         --subnet="$CLOUD_RUN_SUBNET" \
         --service-account="$CLOUD_RUN_SA" \
+        --ingress=internal-and-cloud-load-balancing \
+        --no-allow-unauthenticated \
         --min-instances=1 \
+        --max-instances="${CLOUD_RUN_MAX_INSTANCES:-30}" \
         --no-cpu-throttling \
         --port=8080 \
         --timeout=600 \
         --memory=1Gi \
-        --cpu=1
+        --cpu=1 \
+        --set-env-vars="$ENV_VARS"
+
+      # Fail the deploy if the new revision cannot serve, rather than leaving a
+      # broken revision receiving traffic.
+      gcloud run services describe "$CLOUD_RUN_SERVICE" \
+        --region="$GCP_REGION" --project="$GCP_PROJECT_ID" \
+        --format='value(status.conditions[?type=="Ready"].status)'
   rules:
     - if: $CI_COMMIT_BRANCH == "sandbox"
     - if: $CI_COMMIT_BRANCH == "dev"

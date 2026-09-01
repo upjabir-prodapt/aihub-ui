@@ -1,0 +1,55 @@
+# Local development stack for the AI Hub BFF.
+#
+#   docker compose -f docker-compose.dev.yml up
+#
+# Then run the SPA separately with `npm run dev` in ./frontend (Vite on :5173
+# proxies /auth and /api to the BFF on :8080).
+#
+# Defaults are AUTH_MODE=dev (no IAP, no Entra) and UPSTREAM_MODE=mock (Python
+# mock upstream), so no GCP credentials are required.
+
+services:
+  firestore:
+    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
+    command: >
+      gcloud emulators firestore start
+      --host-port=0.0.0.0:8081
+      --database-mode=firestore-native
+    ports:
+      - "8081:8081"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8081/ >/dev/null || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  bff:
+    build:
+      context: .
+      dockerfile: bff/Dockerfile.dev
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload
+    working_dir: /srv
+    volumes:
+      - ./bff:/srv
+    ports:
+      - "8080:8080"
+    environment:
+      ENVIRONMENT: dev
+      AUTH_MODE: dev
+      UPSTREAM_MODE: mock
+      DOWNSTREAM_AUTH_MODE: headers
+      TRANSLATION_UPLOAD_MODE: multipart
+      IAP_ENABLED: "false"
+      GCP_PROJECT_ID: aihub-local
+      FIRESTORE_DATABASE: "(default)"
+      FIRESTORE_EMULATOR_HOST: firestore:8081
+      SESSION_ABSOLUTE_TTL_SECONDS: "28800"
+      SESSION_IDLE_TTL_SECONDS: "3600"
+      SESSION_ROTATION_GRACE_SECONDS: "30"
+      DEV_SESSION_ROLES: "Translation.User,Sales.User"
+      LOG_LEVEL: DEBUG
+      # SPA is served by Vite in dev; the BFF does not need frontend/dist.
+      SERVE_SPA: "false"
+    depends_on:
+      firestore:
+        condition: service_healthy

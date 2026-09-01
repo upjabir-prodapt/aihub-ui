@@ -1,0 +1,18 @@
+# Development-only image for docker-compose.dev.yml.
+# The production image is the multi-stage Dockerfile at the repo root.
+FROM python:3.11-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1
+
+WORKDIR /srv
+
+COPY bff/pyproject.toml /srv/pyproject.toml
+RUN mkdir -p /srv/app && touch /srv/app/__init__.py \
+    && pip install --no-cache-dir -e ".[dev]"
+
+COPY bff/ /srv/
+
+EXPOSE 8080
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--reload"]
