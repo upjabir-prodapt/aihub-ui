@@ -80,8 +80,8 @@
   gap: 8px;
   padding: 10px 14px;
   border-radius: 10px;
-  background: rgba(239, 68, 68, 0.08);
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  background: rgba(242, 12, 54, 0.08);
+  border: 1px solid rgba(242, 12, 54, 0.2);
   color: #f87171;
   font-size: 12.5px;
   margin-bottom: 18px;
@@ -133,9 +133,9 @@
 }
 
 .dot-running { background: var(--colt-teal); }
-.dot-queued { background: #eab308; }
+.dot-queued { background: #FFC43D; }
 .dot-completed { background: var(--text-muted); }
-.dot-failed { background: #ef4444; }
+.dot-failed { background: #F20C36; }
 
 /* --- Filters --- */
 .tracker-filters {
@@ -343,10 +343,10 @@
 }
 
 .tracker-badge--running { background: var(--colt-teal-light); color: var(--colt-teal); }
-.tracker-badge--queued { background: rgba(234, 179, 8, 0.12); color: #eab308; }
+.tracker-badge--queued { background: rgba(255, 196, 61, 0.12); color: #FFC43D; }
 .tracker-badge--completed { background: var(--bg-hover); color: var(--text-muted); }
 .tracker-badge--failed,
-.tracker-badge--cancelled { background: rgba(239, 68, 68, 0.12); color: #ef4444; }
+.tracker-badge--cancelled { background: rgba(242, 12, 54, 0.12); color: #F20C36; }
 
 .tracker-progress-track {
   height: 3px;
@@ -380,8 +380,8 @@
 .tracker-detail-error {
   padding: 10px 12px;
   border-radius: 8px;
-  background: rgba(239, 68, 68, 0.08);
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  background: rgba(242, 12, 54, 0.08);
+  border: 1px solid rgba(242, 12, 54, 0.2);
   color: #f87171;
   font-size: 12.5px;
   line-height: 1.5;
@@ -450,8 +450,8 @@
 }
 
 .tracker-action-btn--danger:hover:not(:disabled) {
-  border-color: #ef4444;
-  color: #ef4444;
+  border-color: #F20C36;
+  color: #F20C36;
 }
 
 .tracker-detail-hint {

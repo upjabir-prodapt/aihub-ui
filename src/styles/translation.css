@@ -337,7 +337,7 @@
   background: var(--bg-elevated);
   border: 1px solid var(--border-default);
   color: var(--text-primary);
-  font-family: var(--font-sans);
+  font-family: var(--font-primary);
   font-size: 13px;
   line-height: 1.6;
   resize: vertical;
@@ -391,7 +391,7 @@
   background: var(--bg-elevated);
   border: 1px solid var(--border-default);
   color: var(--text-primary);
-  font-family: var(--font-sans);
+  font-family: var(--font-primary);
   font-size: 13px;
   appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235a5a78' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
@@ -701,7 +701,7 @@
 .batch-id {
   font-size: 11px;
   color: var(--text-muted);
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-mono);
   background: var(--bg-elevated);
   padding: 3px 8px;
   border-radius: 6px;
@@ -730,7 +730,7 @@
 }
 
 .batch-result-card--failed {
-  border-color: rgba(239, 68, 68, 0.3);
+  border-color: rgba(242, 12, 54, 0.3);
 }
 
 .batch-result-header {
@@ -765,8 +765,8 @@
 }
 
 .status-badge--completed {
-  background: rgba(74, 222, 128, 0.12);
-  color: #4ade80;
+  background: rgba(0, 215, 189, 0.12);
+  color: #00D7BD;
 }
 
 .status-badge--processing,
@@ -777,15 +777,15 @@
 
 .status-badge--failed,
 .status-badge--cancelled {
-  background: rgba(239, 68, 68, 0.12);
-  color: #ef4444;
+  background: rgba(242, 12, 54, 0.12);
+  color: #F20C36;
 }
 
 .batch-result-error {
   padding: 16px 20px;
   font-size: 13px;
-  color: #ef4444;
-  background: rgba(239, 68, 68, 0.06);
+  color: #F20C36;
+  background: rgba(242, 12, 54, 0.06);
 }
 
 .batch-result-actions {
@@ -834,12 +834,12 @@
   width: 52px;
   height: 52px;
   border-radius: 50%;
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  background: rgba(242, 12, 54, 0.1);
+  border: 1px solid rgba(242, 12, 54, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #ef4444;
+  color: #F20C36;
   margin-bottom: 4px;
 }
 
@@ -856,9 +856,9 @@
   line-height: 1.5;
   padding: 8px 12px;
   border-radius: 8px;
-  background: rgba(239, 68, 68, 0.06);
-  border: 1px solid rgba(239, 68, 68, 0.15);
-  font-family: 'JetBrains Mono', monospace;
+  background: rgba(242, 12, 54, 0.06);
+  border: 1px solid rgba(242, 12, 54, 0.15);
+  font-family: var(--font-mono);
 }
 
 .error-actions {
@@ -938,7 +938,7 @@
 }
 
 .required {
-  color: #ef4444;
+  color: #F20C36;
   margin-left: 2px;
 }
 
@@ -1248,9 +1248,9 @@
 }
 
 .rating-hint { color: var(--text-muted); font-weight: 400; }
-.rating-poor { color: #ef4444; }
-.rating-fair { color: #f97316; }
-.rating-good { color: #eab308; }
+.rating-poor { color: #F20C36; }
+.rating-fair { color: #FF7A00; }
+.rating-good { color: #FFC43D; }
 .rating-great { color: #84cc16; }
 .rating-excellent { color: var(--colt-teal); }
 
@@ -1262,7 +1262,7 @@
   background: var(--bg-elevated);
   border: 1px solid var(--border-default);
   color: var(--text-primary);
-  font-family: var(--font-sans);
+  font-family: var(--font-primary);
   font-size: 13px;
   line-height: 1.6;
   resize: vertical;
@@ -1292,7 +1292,7 @@
 }
 
 .review-char-counter.at-limit {
-  color: #ef4444;
+  color: #F20C36;
 }
 
 /* Example feedback guidance */
@@ -1415,8 +1415,8 @@
 }
 
 .review-toast--error {
-  background: rgba(239, 68, 68, 0.08);
-  border-color: rgba(239, 68, 68, 0.3);
+  background: rgba(242, 12, 54, 0.08);
+  border-color: rgba(242, 12, 54, 0.3);
 }
 
 .review-toast-icon {
@@ -1435,8 +1435,8 @@
 }
 
 .review-toast--error .review-toast-icon {
-  background: rgba(239, 68, 68, 0.12);
-  color: #ef4444;
+  background: rgba(242, 12, 54, 0.12);
+  color: #F20C36;
 }
 
 .review-toast-message {

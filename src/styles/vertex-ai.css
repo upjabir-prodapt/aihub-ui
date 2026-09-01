@@ -37,9 +37,9 @@
   margin-right: 8px;
 }
 
-.status-active { background: #10b981; box-shadow: 0 0 10px #10b981; }
-.status-warn { background: #f59e0b; }
-.status-locked { background: #ef4444; }
+.status-active { background: #00D7BD; box-shadow: 0 0 10px #00D7BD; }
+.status-warn { background: #FFC43D; }
+.status-locked { background: #F20C36; }
 
 .env-type {
   font-size: 11px;

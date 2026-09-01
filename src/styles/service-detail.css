@@ -385,12 +385,12 @@
 }
 
 .field-textarea--error {
-  border-color: #ef4444;
+  border-color: #F20C36;
 }
 
 .field-textarea--error:focus {
-  border-color: #ef4444;
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.14);
+  border-color: #F20C36;
+  box-shadow: 0 0 0 3px rgba(242, 12, 54, 0.14);
 }
 
 .field-label-muted {
@@ -462,8 +462,8 @@
   height: 44px;
   margin: 0 auto 14px;
   border-radius: 12px;
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.22);
+  background: rgba(242, 12, 54, 0.1);
+  border: 1px solid rgba(242, 12, 54, 0.22);
   color: #f87171;
 }
 

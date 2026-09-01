@@ -77,8 +77,8 @@
   gap: 8px;
   padding: 9px 12px;
   border-radius: 9px;
-  background: rgba(239, 68, 68, 0.08);
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  background: rgba(242, 12, 54, 0.08);
+  border: 1px solid rgba(242, 12, 54, 0.2);
   color: #f87171;
   font-size: 12px;
   margin-bottom: 12px;
@@ -145,10 +145,10 @@
 }
 
 .recent-run-badge--running { background: var(--colt-teal-light); color: var(--colt-teal); }
-.recent-run-badge--queued { background: rgba(234, 179, 8, 0.12); color: #eab308; }
+.recent-run-badge--queued { background: rgba(255, 196, 61, 0.12); color: #FFC43D; }
 .recent-run-badge--completed { background: var(--bg-active); color: var(--text-muted); }
 .recent-run-badge--failed,
-.recent-run-badge--cancelled { background: rgba(239, 68, 68, 0.12); color: #ef4444; }
+.recent-run-badge--cancelled { background: rgba(242, 12, 54, 0.12); color: #F20C36; }
 
 .recent-run-sub {
   font-size: 11.5px;
@@ -183,8 +183,8 @@
   margin-top: 8px;
   padding: 8px 10px;
   border-radius: 8px;
-  background: rgba(239, 68, 68, 0.08);
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  background: rgba(242, 12, 54, 0.08);
+  border: 1px solid rgba(242, 12, 54, 0.2);
   color: #f87171;
   font-size: 11.5px;
   line-height: 1.5;
@@ -221,8 +221,8 @@
 }
 
 .recent-run-action-btn--danger:hover:not(:disabled) {
-  border-color: #ef4444;
-  color: #ef4444;
+  border-color: #F20C36;
+  color: #F20C36;
 }
 
 /* --- Expanded detail (cost/tokens/time/model), mirrors .tracker-detail --- */

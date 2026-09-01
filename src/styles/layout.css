@@ -90,46 +90,36 @@
   gap: 12px;
 }
 
-.logo-mark {
+/* Colt SVG wordmark — full logo when sidebar is expanded */
+.logo-brand-block {
   display: flex;
-  align-items: center;
-  gap: 0;
-  position: relative;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.logo-wordmark {
+  width: 80px;
+  height: auto;
+  color: var(--text-primary);
+}
+
+.logo-product-badge {
+  font-family: var(--font-primary);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--colt-teal);
+  line-height: 1;
+}
+
+/* Colt Edge chevron — compact mark when sidebar is collapsed */
+.logo-edge-icon {
   width: 34px;
   height: 34px;
   flex-shrink: 0;
-}
-
-/* Colt Chevron (The Colt Edge) */
-.logo-chevron {
-  width: 34px;
-  height: 34px;
-  background: var(--colt-teal);
-  clip-path: polygon(0 0, 70% 0, 100% 50%, 70% 100%, 0 100%, 30% 50%);
-}
-
-.logo-text-block {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.logo-company {
-  font-family: var(--font-serif);
-  font-size: 16px;
-  font-weight: 500;
-  color: var(--text-primary);
-  letter-spacing: -0.3px;
-  line-height: 1;
-}
-
-.logo-product {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--colt-teal);
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  line-height: 1;
 }
 
 /* --- Nav --- */
@@ -447,8 +437,8 @@
 }
 
 .user-menu-logout:hover {
-  background: rgba(239, 68, 68, 0.08);
-  color: #ef4444;
+  background: rgba(242, 12, 54, 0.08);
+  color: #F20C36;
 }
 
 /* ===== PAGE CONTENT AREA ===== */
@@ -595,8 +585,8 @@
 }
 
 .auth-logout-btn:hover {
-  background: rgba(239, 68, 68, 0.12);
-  color: #ef4444;
+  background: rgba(242, 12, 54, 0.12);
+  color: #F20C36;
 }
 
 /* ===== LOGIN MODAL ===== */
@@ -776,7 +766,7 @@
 }
 
 .login-input.input-error {
-  border-color: #ef4444;
+  border-color: #F20C36;
 }
 
 .login-input::placeholder {
@@ -785,7 +775,7 @@
 
 .field-error-msg {
   font-size: 11px;
-  color: #ef4444;
+  color: #F20C36;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -798,8 +788,8 @@
   gap: 8px;
   padding: 10px 12px;
   border-radius: 10px;
-  background: rgba(239, 68, 68, 0.08);
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  background: rgba(242, 12, 54, 0.08);
+  border: 1px solid rgba(242, 12, 54, 0.2);
   color: #f87171;
   font-size: 12px;
   line-height: 1.4;
