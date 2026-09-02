@@ -16,6 +16,7 @@ import ServiceHubPage from './pages/ServiceHubPage';
 import JobTrackerPage from './pages/JobTrackerPage';
 import TranslationPage from './pages/TranslationPage';
 import SalesAgentPage from './pages/SalesAgentPage';
+import NaaSPage from './naas/NaaSPage';
 import './styles/layout.css';
 
 
@@ -232,6 +233,12 @@ function AppShell() {
           style={{ display: activeTab === 'tracker' ? 'flex' : 'none' }}
         >
           <JobTrackerPage serviceFilter={trackerServiceFilter} />
+        </div>
+        <div
+          className="main-pane"
+          style={{ display: activeTab === 'naas' ? 'flex' : 'none' }}
+        >
+          <NaaSPage />
         </div>
         <div
           className="main-pane"

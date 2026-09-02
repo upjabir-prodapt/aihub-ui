@@ -1,0 +1,79 @@
+.gauge-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  padding: 1.25rem 1.25rem 1rem;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.gauge-card-title {
+  align-self: flex-start;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 0.25rem;
+}
+
+.gauge-svg {
+  width: 100%;
+  max-width: 240px;
+  overflow: visible;
+}
+
+.gauge-track {
+  stroke: var(--border-default);
+}
+
+/* Reference bands (e.g. green/yellow/red) — muted so the solid value fill
+   drawn on top of them still reads as the loudest thing on the gauge. */
+.gauge-zone {
+  opacity: 0.22;
+}
+
+.gauge-threshold-tick {
+  stroke: var(--text-muted);
+  stroke-width: 2;
+}
+
+.gauge-scale-label {
+  font-size: 8px;
+  fill: var(--text-muted);
+}
+
+.gauge-needle {
+  stroke: var(--text-primary);
+  stroke-width: 3;
+  stroke-linecap: round;
+  transition: all 0.4s ease;
+}
+
+.gauge-hub {
+  fill: var(--text-primary);
+}
+
+.gauge-value {
+  font-size: 1.75rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-top: -0.5rem;
+}
+
+.gauge-status {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-top: 0.35rem;
+}
+
+.gauge-status-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
