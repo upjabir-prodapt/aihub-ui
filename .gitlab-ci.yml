@@ -218,7 +218,27 @@ variables:
       aud: https://iam.googleapis.com
   before_script:
     - !reference [".ensure_gcloud", before_script]
-    - echo "$WORKLOAD_IDENTITY_TOKEN" > workload_identity.jwt
+    - |
+      set -e
+      : "${WORKLOAD_IDENTITY_PROJECT_NUMBER:?Set WORKLOAD_IDENTITY_PROJECT_NUMBER (scope: ${CI_COMMIT_BRANCH})}"
+      : "${WORKLOAD_IDENTITY_POOL:?Set WORKLOAD_IDENTITY_POOL (scope: ${CI_COMMIT_BRANCH})}"
+      : "${WORKLOAD_IDENTITY_PROVIDER:?Set WORKLOAD_IDENTITY_PROVIDER (scope: ${CI_COMMIT_BRANCH})}"
+      : "${SERVICE_ACCOUNT:?Set SERVICE_ACCOUNT (scope: ${CI_COMMIT_BRANCH})}"
+      : "${GCP_PROJECT_ID:?Set GCP_PROJECT_ID (scope: ${CI_COMMIT_BRANCH})}"
+
+      echo "$WORKLOAD_IDENTITY_TOKEN" > workload_identity.jwt
+      python3 -c "
+      import json, base64
+      try:
+          t = open('workload_identity.jwt').read().strip()
+          p = t.split('.')[1]
+          p += '=' * ((4 - len(p) % 4) % 4)
+          claims = json.loads(base64.urlsafe_b64decode(p))
+          safe = {k: v for k, v in claims.items() if k not in ('sub', 'user_email')}
+          print('OIDC Token Claims:', json.dumps(safe, indent=2))
+      except Exception as e:
+          print('OIDC claim decode error:', e)
+      " 2>/dev/null || true
     - |
       printf '%s\n' "{
         \"type\": \"external_account\",
@@ -413,6 +433,8 @@ build-and-push:
   needs:
     - frontend-checks
     - bff-checks
+  environment:
+    name: "$CI_COMMIT_BRANCH"
   when: manual
   script:
     - |
