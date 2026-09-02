@@ -36,7 +36,12 @@ class GraphClient:
         self._settings = settings
         self._http = http
 
-    def _fallback(self) -> GraphProfile:
+    def fallback_profile(self) -> GraphProfile:
+        """The documented placeholders (docs 19 §3.3), used on every failure path.
+
+        Public because the caller also needs it when the Graph token exchange
+        itself fails and no Graph call is attempted at all.
+        """
         return GraphProfile(
             department=self._settings.graph_unknown_department,
             company_name=self._settings.graph_unknown_company,
@@ -46,7 +51,7 @@ class GraphClient:
     async def get_department_and_company(self, access_token: str) -> GraphProfile:
         """``GET /v1.0/me?$select=department,companyName``; fail open."""
         if not access_token:
-            return self._fallback()
+            return self.fallback_profile()
 
         url = f"{self._settings.graph_base_url.rstrip('/')}{GRAPH_ME_PATH}"
         try:
@@ -57,18 +62,18 @@ class GraphClient:
             )
         except Exception as exc:  # noqa: BLE001 - fail open by design
             logger.warning("graph_profile_unreachable", extra={"error": str(exc)})
-            return self._fallback()
+            return self.fallback_profile()
 
         if response.status_code >= 400:
             # A 401 here usually means User.Read was never consented (docs 19 §3.1).
             logger.warning("graph_profile_rejected", extra={"status": response.status_code})
-            return self._fallback()
+            return self.fallback_profile()
 
         try:
             profile = response.json()
         except ValueError:
             logger.warning("graph_profile_unparseable")
-            return self._fallback()
+            return self.fallback_profile()
 
         return GraphProfile(
             department=str(profile.get("department") or self._settings.graph_unknown_department),

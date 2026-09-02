@@ -27,13 +27,14 @@ variables:
   # Per-environment: GCP_REGION, ARTIFACT_REPO, IMAGE_NAME, CLOUD_RUN_SERVICE,
   #                  CLOUD_RUN_NETWORK, CLOUD_RUN_SUBNET, CLOUD_RUN_SA
   # BFF runtime (per env, set on the Cloud Run service by deploy-cloud-run):
-  #   ENTRA_TENANT_ID, ENTRA_CLIENT_ID, ENTRA_APP_ID_URI, ENTRA_REDIRECT_URI,
+  #   ENTRA_TENANT_ID, ENTRA_CLIENT_ID, ENTRA_APP_ID_URI,
+  #   ENTRA_ACCESS_TOKEN_AUDIENCES, ENTRA_REDIRECT_URI,
   #   ENTRA_SCOPES, ENTRA_CLIENT_SECRET_NAME, IAP_AUDIENCE, IAP_ENABLED,
   #   FIRESTORE_DATABASE, KMS_KEY_NAME, APIGEE_BASE_URL, APIGEE_API_KEY_SECRET,
   #   GCS_UPLOAD_BUCKET, GCS_SIGNER_SERVICE_ACCOUNT
   # There are no VITE_* build-time variables any more: the SPA is served by the
   # BFF from the same origin and calls only relative paths.
-  # See GITLAB_CI_VARIABLES.md
+  # See GITLAB_CI_VARIABLES.md and ENTRA_SETUP.md
   GCLOUD_USER_INSTALL_DIR: "${CI_PROJECT_DIR}/.tools/google-cloud-sdk"
   GCLOUD_ARCHIVE_URL: "https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz"
   CLOUDSDK_CONFIG: "${CI_PROJECT_DIR}/.cache/gcloud-config"
@@ -41,12 +42,20 @@ variables:
   DOCKER_CONFIG: "${CI_PROJECT_DIR}/.cache/docker"
   CI_WORK_TMP: "${CI_PROJECT_DIR}/.ci-work"
   NPM_CONFIG_CACHE: "${CI_PROJECT_DIR}/.cache/npm"
-  # Vite 8 requires Node ^20.19.0 — install to project dir (avoids broken nvm on shell runners).
-  NODE_VERSION: "20.19.4"
-  NODE_INSTALL_DIR: "${CI_PROJECT_DIR}/.tools/node-v20.19.4"
+  # Node 24 LTS — install to project dir (avoids broken nvm on shell runners).
+  # Not 20: jsdom 30 / undici 8 / @testing-library/jest-dom 7 require >= 22.22
+  # (undici's webidl.util.markAsUncloneable is missing on 20, which crashes every
+  # vitest jsdom worker before a single test runs).
+  NODE_VERSION: "24.20.0"
+  NODE_INSTALL_DIR: "${CI_PROJECT_DIR}/.tools/node-v24.20.0"
   FRONTEND_DIR: "frontend"
   BFF_DIR: "bff"
   PIP_CACHE_DIR: "${CI_PROJECT_DIR}/.cache/pip"
+  # The BFF targets Python 3.11 (same minor as the python:3.11-slim runtime).
+  # Shell runners have no 3.11+, so fall back to a standalone CPython build.
+  PYTHON_VERSION: "3.11.16"
+  PYTHON_BUILD_TAG: "20260901"
+  PYTHON_INSTALL_DIR: "${CI_PROJECT_DIR}/.tools/python-3.11.16"
 
 ".shell_runner":
   tags:
@@ -66,7 +75,7 @@ variables:
     - !reference [".proxy", before_script]
     - |
       set -e
-      NODE_VERSION="${NODE_VERSION:-20.19.4}"
+      NODE_VERSION="${NODE_VERSION:-24.20.0}"
       NODE_INSTALL_DIR="${NODE_INSTALL_DIR:-${CI_PROJECT_DIR}/.tools/node-v${NODE_VERSION}}"
       NODE_DIST="node-v${NODE_VERSION}-linux-x64"
 
@@ -86,8 +95,8 @@ variables:
       hash -r
 
       node_major="$(node -p 'parseInt(process.versions.node.split(".")[0], 10)')"
-      if [ "$node_major" -lt 20 ]; then
-        echo "ERROR - Node >=20 required (found $(node -v))"
+      if [ "$node_major" -lt 22 ]; then
+        echo "ERROR - Node >=22 required (found $(node -v))"
         exit 1
       fi
       echo "OK - node $(node -v), npm $(npm -v)"
@@ -102,21 +111,60 @@ variables:
       PYBIN=""
       for candidate in python3.13 python3.12 python3.11 python3; do
         if command -v "$candidate" >/dev/null 2>&1; then
-          major="$("$candidate" -c 'import sys; print(sys.version_info[0])')"
-          minor="$("$candidate" -c 'import sys; print(sys.version_info[1])')"
+          major="$("$candidate" -c 'import sys; print(sys.version_info[0])')" || continue
+          minor="$("$candidate" -c 'import sys; print(sys.version_info[1])')" || continue
           if [ "$major" -eq 3 ] && [ "$minor" -ge 11 ]; then
             PYBIN="$candidate"
             break
           fi
         fi
       done
+
+      # No system interpreter is new enough (amsgit02 ships 3.9/3.10 only), so
+      # install a relocatable CPython into the project dir, the same way Node is
+      # handled above. Nothing is written outside ${CI_PROJECT_DIR}.
       if [ -z "$PYBIN" ]; then
-        echo "ERROR - Python >=3.11 required for the BFF; none found on this runner."
+        PYTHON_VERSION="${PYTHON_VERSION:-3.11.16}"
+        PYTHON_BUILD_TAG="${PYTHON_BUILD_TAG:-20260901}"
+        PYTHON_INSTALL_DIR="${PYTHON_INSTALL_DIR:-${CI_PROJECT_DIR}/.tools/python-${PYTHON_VERSION}}"
+        PYTHON_ARCHIVE="cpython-${PYTHON_VERSION}+${PYTHON_BUILD_TAG}-x86_64-unknown-linux-gnu-install_only.tar.gz"
+        # Override PYTHON_ARCHIVE_URL with an internal mirror if the proxy ever
+        # stops allowing github.com release downloads.
+        PYTHON_ARCHIVE_URL="${PYTHON_ARCHIVE_URL:-https://github.com/astral-sh/python-build-standalone/releases/download/${PYTHON_BUILD_TAG}/${PYTHON_ARCHIVE}}"
+
+        # Probe by running it, not by testing -x: a restored cache can carry a
+        # half-usable tree (symlinks, lost permissions) that still looks present.
+        if ! "${PYTHON_INSTALL_DIR}/bin/python3" -V >/dev/null 2>&1; then
+          echo "No system Python >=3.11; installing CPython ${PYTHON_VERSION} to ${PYTHON_INSTALL_DIR}..."
+          mkdir -p "${CI_PROJECT_DIR}/.tools" "${CI_WORK_TMP:-${CI_PROJECT_DIR}/.ci-work}"
+          tmp="$(mktemp -d "${CI_WORK_TMP:-${CI_PROJECT_DIR}/.ci-work}/python-install.XXXXXX")"
+          if ! curl -fsSL "$PYTHON_ARCHIVE_URL" -o "${tmp}/python.tar.gz"; then
+            echo "ERROR - could not download ${PYTHON_ARCHIVE_URL}."
+            echo "        Install python3.11+ on this runner, or set PYTHON_ARCHIVE_URL to an internal mirror."
+            rm -rf "$tmp"
+            exit 1
+          fi
+          # install_only archives unpack to a single `python/` directory.
+          tar -xzf "${tmp}/python.tar.gz" -C "$tmp"
+          rm -rf "${PYTHON_INSTALL_DIR}"
+          mv "${tmp}/python" "${PYTHON_INSTALL_DIR}"
+          rm -rf "$tmp"
+        fi
+
+        export PATH="${PYTHON_INSTALL_DIR}/bin:$PATH"
+        hash -r
+        PYBIN="${PYTHON_INSTALL_DIR}/bin/python3"
+      fi
+
+      if [ -z "$PYBIN" ]; then
+        echo "ERROR - Python >=3.11 required for the BFF; none found and none installable."
         exit 1
       fi
       export PIP_CACHE_DIR="${PIP_CACHE_DIR:-${CI_PROJECT_DIR}/.cache/pip}"
       mkdir -p "$PIP_CACHE_DIR"
-      "$PYBIN" -m venv "${CI_PROJECT_DIR}/.venv-bff"
+      # --clear: shell runners reuse the build directory, and a venv left behind
+      # by an older interpreter would silently keep pointing at it.
+      "$PYBIN" -m venv --clear "${CI_PROJECT_DIR}/.venv-bff"
       . "${CI_PROJECT_DIR}/.venv-bff/bin/activate"
       python -m pip install --upgrade pip
       pip install -e "${BFF_DIR}[dev]"
@@ -276,7 +324,7 @@ frontend-checks:
     paths:
       - frontend/node_modules/
       - .cache/npm/
-      - .tools/node-v20.19.4/
+      - .tools/node-v24.20.0/
   script:
     - |
       export PATH="${NODE_INSTALL_DIR}/bin:$PATH"
@@ -302,6 +350,7 @@ bff-checks:
     key: pip-$CI_COMMIT_REF_SLUG
     paths:
       - .cache/pip/
+      - .tools/python-3.11.16/
   script:
     - |
       . "${CI_PROJECT_DIR}/.venv-bff/bin/activate"
@@ -334,7 +383,8 @@ env-scope-check:
       required_vars="WORKLOAD_IDENTITY_PROJECT_NUMBER WORKLOAD_IDENTITY_POOL WORKLOAD_IDENTITY_PROVIDER \
         SERVICE_ACCOUNT GCP_PROJECT_ID GCP_REGION ARTIFACT_REPO IMAGE_NAME \
         CLOUD_RUN_NETWORK CLOUD_RUN_SUBNET CLOUD_RUN_SA CLOUD_RUN_SERVICE \
-        ENTRA_TENANT_ID ENTRA_CLIENT_ID ENTRA_APP_ID_URI ENTRA_REDIRECT_URI ENTRA_SCOPES \
+        ENTRA_TENANT_ID ENTRA_CLIENT_ID ENTRA_APP_ID_URI ENTRA_ACCESS_TOKEN_AUDIENCES \
+        ENTRA_REDIRECT_URI ENTRA_SCOPES \
         ENTRA_CLIENT_SECRET_NAME IAP_AUDIENCE KMS_KEY_NAME \
         APIGEE_BASE_URL APIGEE_API_KEY_SECRET GCS_UPLOAD_BUCKET"
       missing=0
@@ -410,10 +460,14 @@ deploy-cloud-run:
       : "${CLOUD_RUN_SUBNET:?Set CLOUD_RUN_SUBNET for environment ${CI_COMMIT_BRANCH}}"
       : "${ENTRA_TENANT_ID:?Set ENTRA_TENANT_ID for environment ${CI_COMMIT_BRANCH}}"
       : "${ENTRA_CLIENT_ID:?Set ENTRA_CLIENT_ID for environment ${CI_COMMIT_BRANCH}}"
-      # docs 18 §9 records a hardcoded/absent Application ID URI as a known
-      # failure mode: it fails with an invalid-scope error identical to a
-      # missing scope. The BFF also refuses to start without it.
-      : "${ENTRA_APP_ID_URI:?Set ENTRA_APP_ID_URI (api://<client-id>) for environment ${CI_COMMIT_BRANCH}}"
+      # An absent or wrong Application ID URI fails with an invalid-scope error
+      # identical to a missing scope. It is the URI of the RESOURCE app
+      # (AICOE-API-DEV), never the BFF's own client ID. See ENTRA_SETUP.md.
+      : "${ENTRA_APP_ID_URI:?Set ENTRA_APP_ID_URI (the AICOE-API-DEV Application ID URI) for environment ${CI_COMMIT_BRANCH}}"
+      # Accepted aud of the API access token. Under requestedAccessTokenVersion:2
+      # this is the resource app's client ID GUID, not the App ID URI. A mismatch
+      # yields sign-in success followed by 403 on every API call.
+      : "${ENTRA_ACCESS_TOKEN_AUDIENCES:?Set ENTRA_ACCESS_TOKEN_AUDIENCES for environment ${CI_COMMIT_BRANCH}}"
       : "${IAP_AUDIENCE:?Set IAP_AUDIENCE for environment ${CI_COMMIT_BRANCH}}"
       : "${APIGEE_BASE_URL:?Set APIGEE_BASE_URL for environment ${CI_COMMIT_BRANCH}}"
 
@@ -435,8 +489,13 @@ deploy-cloud-run:
       ENV_VARS="${ENV_VARS}||ENTRA_TENANT_ID=${ENTRA_TENANT_ID}"
       ENV_VARS="${ENV_VARS}||ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID}"
       ENV_VARS="${ENV_VARS}||ENTRA_APP_ID_URI=${ENTRA_APP_ID_URI}"
+      ENV_VARS="${ENV_VARS}||ENTRA_ACCESS_TOKEN_AUDIENCES=${ENTRA_ACCESS_TOKEN_AUDIENCES}"
       ENV_VARS="${ENV_VARS}||ENTRA_REDIRECT_URI=${ENTRA_REDIRECT_URI}"
       ENV_VARS="${ENV_VARS}||ENTRA_SCOPES=${ENTRA_SCOPES}"
+      # Graph is a separate resource and needs its own token exchange, so its
+      # scopes are never part of ENTRA_SCOPES. The default is correct; this is
+      # here so that overriding the CI variable actually takes effect.
+      ENV_VARS="${ENV_VARS}||GRAPH_SCOPES=${GRAPH_SCOPES:-openid profile offline_access https://graph.microsoft.com/User.Read}"
       ENV_VARS="${ENV_VARS}||ENTRA_CLIENT_SECRET_NAME=${ENTRA_CLIENT_SECRET_NAME:-entra-bff-client-secret}"
       ENV_VARS="${ENV_VARS}||IAP_ENABLED=${IAP_ENABLED:-true}"
       ENV_VARS="${ENV_VARS}||IAP_AUDIENCE=${IAP_AUDIENCE}"

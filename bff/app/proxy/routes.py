@@ -58,6 +58,18 @@ async def _proxy(
 
     required = SERVICE_ROLES[service]
     if required and not set(record.roles).intersection(required):
+        logger.warning(
+            "proxy_role_denied",
+            extra={
+                "service": service,
+                "oid": record.subject_oid,
+                "sessionRoles": list(record.roles),
+                "requiredAnyOf": list(required),
+                "detail": "An empty sessionRoles list means the access token carried no "
+                "roles[] claim -- an Entra App Role assignment problem, not a BFF "
+                "one. Look for access_token_has_no_roles at sign-in.",
+            },
+        )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={"error": "forbidden", "requiredAnyOf": list(required)},

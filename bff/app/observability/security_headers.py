@@ -24,21 +24,11 @@ def build_csp(*, connect_src_extra: str = "", is_dev: bool = False) -> str:
         connect_src = f"'self' {connect_src_extra.strip()}"
 
     # In dev, allow Swagger UI CDN resources (/docs)
-    script_src = (
-        "'self' 'unsafe-inline' https://cdn.jsdelivr.net"
-        if is_dev
-        else "'self'"
-    )
+    script_src = "'self' 'unsafe-inline' https://cdn.jsdelivr.net" if is_dev else "'self'"
     style_src = (
-        "'self' 'unsafe-inline' https://cdn.jsdelivr.net"
-        if is_dev
-        else "'self' 'unsafe-inline'"
+        "'self' 'unsafe-inline' https://cdn.jsdelivr.net" if is_dev else "'self' 'unsafe-inline'"
     )
-    img_src = (
-        "'self' data: blob: https://fastapi.tiangolo.com"
-        if is_dev
-        else "'self' data: blob:"
-    )
+    img_src = "'self' data: blob: https://fastapi.tiangolo.com" if is_dev else "'self' data: blob:"
 
     directives = [
         "default-src 'self'",

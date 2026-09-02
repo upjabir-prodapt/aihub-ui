@@ -28,6 +28,10 @@ UploadMode = Literal["gcs_signed", "multipart"]
 SESSION_COOKIE_NAME = "__Host-AISESSION"
 CSRF_HEADER_NAME = "X-CSRF-Token"
 
+# Scopes that are not tied to a resource and may be combined with any one
+# resource's scopes in a single authorization request.
+RESERVED_OIDC_SCOPES = frozenset({"openid", "profile", "email", "offline_access"})
+
 
 class ConfigError(RuntimeError):
     """Raised when the process is not configured well enough to serve traffic."""
@@ -65,12 +69,21 @@ class Settings(BaseSettings):
     entra_tenant_id: str = ""
     entra_client_id: str = ""
     entra_app_id_uri: str = ""
+    # Accepted ``aud`` values for the API access token, space-separated. Empty
+    # means "just ENTRA_APP_ID_URI". The correct value depends on the resource
+    # app's ``requestedAccessTokenVersion``: v1 tokens carry the App ID URI, v2
+    # tokens carry the resource app's client ID GUID. Listing both lets the two
+    # be switched independently of a redeploy.
+    entra_access_token_audiences: str = ""
     entra_redirect_uri: str = ""
     entra_scopes: str = ""
     entra_client_secret_name: str = "entra-bff-client-secret"
     entra_authority_host: str = "https://login.microsoftonline.com"
     entra_post_logout_redirect_uri: str = ""
     graph_base_url: str = "https://graph.microsoft.com"
+    # Graph needs its own token: one access token has exactly one audience, so
+    # ``User.Read`` can never share a request with the platform API scopes.
+    graph_scopes: str = "openid profile offline_access https://graph.microsoft.com/User.Read"
     # docs 19 §3.3: exact fail-open placeholders.
     graph_unknown_department: str = "Unknown Department"
     graph_unknown_company: str = "Unknown Company"
@@ -155,6 +168,21 @@ class Settings(BaseSettings):
         return self.entra_scopes.split()
 
     @property
+    def access_token_audiences(self) -> list[str]:
+        """Every ``aud`` value the API access token may legitimately carry.
+
+        PyJWT treats a list as "any of these match", which is what lets one
+        deployment span a v1 -> v2 access-token migration on the resource app.
+        """
+        explicit = self.entra_access_token_audiences.split()
+        return explicit or ([self.entra_app_id_uri] if self.entra_app_id_uri else [])
+
+    @property
+    def v1_issuer(self) -> str:
+        """Issuer of a v1 access token. v2 tokens come from the authority host."""
+        return f"https://sts.windows.net/{self.entra_tenant_id}/"
+
+    @property
     def dev_roles(self) -> list[str]:
         return [r.strip() for r in self.dev_session_roles.split(",") if r.strip()]
 
@@ -209,6 +237,42 @@ class Settings(BaseSettings):
                 "ENTRA_APP_ID_URI must look like 'api://<client-id>' or an https URI (docs 18 §9)"
             )
         return v.rstrip("/")
+
+    @model_validator(mode="after")
+    def _single_resource_scopes(self) -> Settings:
+        """``ENTRA_SCOPES`` must name exactly one resource.
+
+        Entra issues one access token per resource. A ``scope=`` that mixes
+        Microsoft Graph with the platform API is rejected outright
+        (``invalid_scope`` / ``AADSTS28000``), and the symptom -- a failed code
+        exchange -- looks identical to a missing scope. Catching it here turns a
+        confusing runtime failure into a boot-time one.
+        """
+        prefix = self.entra_app_id_uri
+        if self.auth_mode != "entra" or not self.entra_scopes or not prefix:
+            # A missing ENTRA_APP_ID_URI is reported by _require_mode_settings;
+            # flagging every scope as an offender here would only bury it.
+            return self
+
+        offenders = [
+            scope
+            for scope in self.scope_list
+            if scope not in RESERVED_OIDC_SCOPES and not scope.startswith(f"{prefix}/")
+        ]
+
+        if offenders:
+            raise ConfigError(
+                "Invalid BFF configuration; refusing to start.\n  - "
+                f"ENTRA_SCOPES may only contain the reserved OIDC scopes "
+                f"({' '.join(sorted(RESERVED_OIDC_SCOPES))}) and scopes belonging to the "
+                f"one resource named by ENTRA_APP_ID_URI ({prefix!r}). "
+                f"Offending scope(s): {' '.join(offenders)}.\n  - "
+                "Microsoft Graph scopes such as 'User.Read' or "
+                "'https://graph.microsoft.com/User.Read' must NOT appear here: Graph is a "
+                "separate resource and gets its own token exchange. Configure it via "
+                "GRAPH_SCOPES instead (docs: ENTRA_SETUP.md)."
+            )
+        return self
 
     @model_validator(mode="after")
     def _require_mode_settings(self) -> Settings:

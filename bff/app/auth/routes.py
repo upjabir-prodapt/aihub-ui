@@ -158,7 +158,18 @@ async def login(
     try:
         identity = await validator.validate(request.headers.get(IAP_ASSERTION_HEADER))
     except IapValidationError as exc:
-        logger.warning("iap_validation_failed", extra={"error": str(exc)})
+        logger.warning(
+            "iap_validation_failed",
+            extra={
+                "error": str(exc),
+                "assertionPresent": IAP_ASSERTION_HEADER in request.headers,
+                "iapAudience": settings.iap_audience,
+                "detail": "With IAP_ENABLED=true every request must arrive through the "
+                "IAP-fronted load balancer. A missing assertion means the service was "
+                "reached directly (e.g. the run.app URL) or the load balancer is not "
+                "built yet; an invalid one usually means IAP_AUDIENCE is wrong.",
+            },
+        )
         return _terminal_error(
             request,
             title="Request did not come through the front door",
@@ -166,6 +177,15 @@ async def login(
             status_code=status.HTTP_403_FORBIDDEN,
         )
 
+    logger.info(
+        "login_start",
+        extra={
+            "iapEnabled": settings.iap_enabled,
+            "iapIdentityResolved": identity is not None,
+            "loginHintEmail": identity.email if identity else None,
+            "returnTo": target,
+        },
+    )
     return await _begin_authorize(
         services,
         login_hint=identity.email if identity else None,
@@ -226,6 +246,15 @@ async def callback(  # noqa: C901 - a linear flow with explicit error branches
     error_description: Annotated[str | None, Query()] = None,
 ) -> Response:
     settings = services.settings
+    logger.info(
+        "callback_received",
+        extra={
+            "hasCode": bool(code),
+            "hasState": bool(state),
+            "entraError": error,
+            "entraErrorDescription": error_description,
+        },
+    )
     if services.oidc is None or services.sessions is None:  # pragma: no cover
         return _terminal_error(
             request,
@@ -316,14 +345,36 @@ async def callback(  # noqa: C901 - a linear flow with explicit error branches
         return _terminal_error(
             request,
             title="Sign-in could not be completed",
-            detail="The authorization code could not be exchanged for tokens. If this "
-            "persists, check ENTRA_APP_ID_URI and the requested scopes against the app "
-            "registration.",
+            detail="The authorization code could not be exchanged for, or validated against, the "
+            "app registration. Check that ENTRA_SCOPES names exactly one resource, that "
+            "ENTRA_ACCESS_TOKEN_AUDIENCES matches the resource app's "
+            "<code>requestedAccessTokenVersion</code> (v2 issues the client ID GUID as "
+            "<code>aud</code>, v1 the App ID URI), and that all requested scopes exist on "
+            "the app registration. See ENTRA_SETUP.md.",
         )
 
-    # Decision D6 / docs 19 Option A. Fail-open, so never let this abort sign-in.
-    profile = await GraphClient(settings=settings, http=services.http).get_department_and_company(
-        tokens.access_token
+    # Graph is a different resource, so it needs its own access token: the one
+    # above is audienced at the platform API and Graph would reject it. Decision
+    # D6 / docs 19 Option A -- fail open, never let this abort sign-in.
+    graph_client = GraphClient(settings=settings, http=services.http)
+    graph_tokens = await services.oidc.acquire_graph_token(tokens.refresh_token)
+    if graph_tokens is None:
+        logger.warning("graph_profile_skipped_no_token")
+        profile = graph_client.fallback_profile()
+    else:
+        # Entra rotates refresh tokens. The one we just spent may no longer be
+        # redeemable, so the session must carry the replacement forward or it
+        # dies at the first token refresh.
+        tokens.refresh_token = graph_tokens.refresh_token or tokens.refresh_token
+        profile = await graph_client.get_department_and_company(graph_tokens.access_token)
+
+    logger.info(
+        "graph_profile_resolved",
+        extra={
+            "resolved": profile.resolved,
+            "department": profile.department,
+            "companyName": profile.company_name,
+        },
     )
 
     try:
@@ -341,6 +392,15 @@ async def callback(  # noqa: C901 - a linear flow with explicit error branches
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         )
 
+    logger.info(
+        "sign_in_complete",
+        extra={
+            "oid": principal.oid,
+            "email": principal.email,
+            "roles": principal.roles,
+            "returnTo": safe_return_to(auth_state.return_to),
+        },
+    )
     response = RedirectResponse(
         safe_return_to(auth_state.return_to),
         status_code=status.HTTP_302_FOUND,
@@ -468,6 +528,35 @@ async def logout(
     # Step 3: identical attributes, Max-Age=0.
     clear_session_cookie(response)
     return response
+
+
+@router.get("/logout", include_in_schema=False)
+async def logout_get_is_not_frontchannel() -> Response:
+    """Diagnostic 405 for a front-channel logout URL registered on the wrong path.
+
+    Entra loads the front-channel logout URL in a hidden iframe with a GET, so
+    registering ``/auth/logout`` fails *invisibly*: the iframe swallows the
+    405 and sessions are simply never terminated on an Entra-initiated sign-out.
+    Nobody sees a broken page; the only symptom is a session that outlives the
+    sign-out by up to ``SESSION_ABSOLUTE_TTL_SECONDS``.
+
+    This path stays POST-only on purpose — docs 13 §1 forbids a GET-reachable
+    logout — so the fix belongs in the app registration, not here. All this
+    handler adds is a log line that names the correct path.
+    """
+    logger.error(
+        "frontchannel_logout_misconfigured",
+        extra={"expectedPath": "/auth/frontchannel-logout"},
+    )
+    return JSONResponse(
+        {
+            "error": "method_not_allowed",
+            "detail": "POST /auth/logout is user-initiated logout. Entra's front-channel "
+            "logout URL must be registered as /auth/frontchannel-logout.",
+        },
+        status_code=status.HTTP_405_METHOD_NOT_ALLOWED,
+        headers={"Allow": "POST", "Cache-Control": "no-store"},
+    )
 
 
 @router.get("/frontchannel-logout")

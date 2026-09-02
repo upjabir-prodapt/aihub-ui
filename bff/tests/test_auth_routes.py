@@ -158,9 +158,25 @@ async def test_logout_from_a_foreign_origin_is_rejected(
     assert response.status_code == 403
 
 
-async def test_logout_is_not_reachable_by_get(client: httpx.AsyncClient) -> None:
+async def test_logout_is_not_reachable_by_get(
+    client: httpx.AsyncClient, signed_in: dict[str, object], store: InMemorySessionStore
+) -> None:
+    """docs 13 §1: a GET-reachable logout is forbidden.
+
+    A front-channel logout URL misregistered on this path is the likely source of
+    such a GET, so the response must name the correct path — otherwise the
+    misconfiguration is invisible: Entra's hidden iframe swallows the 405 and the
+    only symptom is a session outliving the sign-out.
+    """
+    session_id = client.cookies[SESSION_COOKIE_NAME]
+
     response = await client.get("/auth/logout")
+
     assert response.status_code == 405
+    assert response.headers["allow"] == "POST"
+    assert "/auth/frontchannel-logout" in response.json()["detail"]
+    # And it must not double as a logout: nothing is terminated.
+    assert await store.get(hash_session_id(session_id)) is not None
 
 
 # ── front-channel logout ─────────────────────────────────────────────────────

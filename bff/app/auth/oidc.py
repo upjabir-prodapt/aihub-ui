@@ -162,6 +162,20 @@ class OidcClient:
             # The parameter that actually requests silent auth. login_hint alone
             # only pre-selects an account (docs 15 §0.1).
             params["prompt"] = "none"
+
+        logger.info(
+            "authorize_request",
+            extra={
+                "endpoint": endpoint,
+                "clientId": params["client_id"],
+                "redirectUri": params["redirect_uri"],
+                # The single most common cause of a failed sign-in. Logged in
+                # full so it can be diffed against the app registration.
+                "scope": params["scope"],
+                "prompt": params.get("prompt", "(interactive)"),
+                "hasLoginHint": bool(login_hint),
+            },
+        )
         return f"{endpoint}?{urlencode(params)}"
 
     # ── token endpoint ───────────────────────────────────────────────────────
@@ -189,6 +203,19 @@ class OidcClient:
                 payload = response.json()
             code = str(payload.get("error", f"http_{response.status_code}"))
             description = str(payload.get("error_description", ""))
+            # error_description carries the AADSTS code and a human sentence; it
+            # is the difference between "invalid_scope" and knowing *which*
+            # scope. Always surface it.
+            logger.error(
+                "entra_token_endpoint_error",
+                extra={
+                    "grantType": form.get("grant_type"),
+                    "status": response.status_code,
+                    "entraError": code,
+                    "entraErrorDescription": description,
+                    "requestedScope": form.get("scope"),
+                },
+            )
             if code == "invalid_grant":
                 raise InvalidGrantError(
                     "refresh token rejected by Entra", code=code, description=description
@@ -199,7 +226,20 @@ class OidcClient:
                 )
             raise OidcError(f"token request failed: {code}", code=code, description=description)
 
-        return dict(response.json())
+        payload_ok = dict(response.json())
+        logger.info(
+            "entra_token_endpoint_ok",
+            extra={
+                "grantType": form.get("grant_type"),
+                # The scopes Entra actually granted, which may be narrower than
+                # those requested.
+                "grantedScope": payload_ok.get("scope"),
+                "expiresIn": payload_ok.get("expires_in"),
+                "hasRefreshToken": bool(payload_ok.get("refresh_token")),
+                "hasIdToken": bool(payload_ok.get("id_token")),
+            },
+        )
+        return payload_ok
 
     def _token_set(self, payload: dict[str, Any], *, previous_refresh: str = "") -> TokenSet:
         return TokenSet(
@@ -234,21 +274,83 @@ class OidcClient:
         )
         return self._token_set(payload, previous_refresh=refresh_token)
 
+    async def acquire_graph_token(self, refresh_token: str) -> TokenSet | None:
+        """Redeem the refresh token for a *Microsoft Graph* access token.
+
+        An access token has exactly one audience, so the token used for the
+        platform API can never also call Graph. ``ENTRA_SCOPES`` therefore names
+        only the API resource, and ``User.Read`` is acquired here in a second
+        exchange (docs 19 Option A).
+
+        Returns ``None`` on any failure: ``department``/``companyName`` are a
+        reporting dimension, not a security control, and must never block sign-in.
+
+        The caller **must** adopt ``TokenSet.refresh_token`` from the result:
+        Entra rotates refresh tokens and the one passed in may no longer be
+        redeemable.
+        """
+        if not refresh_token:
+            logger.warning("graph_token_skipped_no_refresh_token")
+            return None
+        try:
+            payload = await self._post_token(
+                {
+                    "grant_type": "refresh_token",
+                    "refresh_token": refresh_token,
+                    "scope": self._settings.graph_scopes,
+                }
+            )
+        except OidcError as exc:
+            logger.warning(
+                "graph_token_exchange_failed",
+                extra={
+                    "error": str(exc),
+                    "entraError": exc.code,
+                    "entraErrorDescription": exc.description,
+                    "detail": "department/companyName will fall back to placeholders. "
+                    "Usually Graph User.Read is not consented on the BFF app.",
+                },
+            )
+            return None
+        tokens = self._token_set(payload, previous_refresh=refresh_token)
+        logger.info(
+            "graph_token_acquired",
+            extra={"refreshTokenRotated": tokens.refresh_token != refresh_token},
+        )
+        return tokens
+
     # ── validation ───────────────────────────────────────────────────────────
 
-    def _decode(self, token: str, *, audience: str, jwks_uri: str, issuer: str) -> dict[str, Any]:
+    def _decode(
+        self, token: str, *, audience: str | list[str], jwks_uri: str, issuer: str
+    ) -> dict[str, Any]:
         signing_key = self._jwks(jwks_uri).get_signing_key_from_jwt(token)
-        return dict(
+        claims = dict(
             jwt.decode(
                 token,
                 signing_key.key,
                 algorithms=["RS256"],
+                # PyJWT treats a list as "any of these match".
                 audience=audience,
                 issuer=issuer,
                 options={"require": ["exp", "iat", "aud", "iss"]},
                 leeway=60,
             )
         )
+        # Tie the token back to our tenant. The issuer check alone is not enough
+        # when a tenant-independent metadata document is in play.
+        expected_tid = self._settings.entra_tenant_id
+        if expected_tid and claims.get("tid") != expected_tid:
+            raise OidcError(f"token tid {claims.get('tid')!r} is not tenant {expected_tid!r}")
+        return claims
+
+    @staticmethod
+    def _unverified_claims(token: str) -> dict[str, Any]:
+        """Claims for diagnostics only. Never used for a trust decision."""
+        try:
+            return dict(jwt.decode(token, options={"verify_signature": False}))
+        except Exception:  # noqa: BLE001 - diagnostics must never raise
+            return {}
 
     async def validate_id_token(self, id_token: str, *, expected_nonce: str) -> dict[str, Any]:
         meta = await self.metadata()
@@ -263,33 +365,121 @@ class OidcClient:
                 issuer=issuer,
             )
         except Exception as exc:  # noqa: BLE001
+            seen = self._unverified_claims(id_token)
+            logger.error(
+                "id_token_rejected",
+                extra={
+                    "error": str(exc),
+                    "tokenAud": seen.get("aud"),
+                    "tokenIss": seen.get("iss"),
+                    "tokenTid": seen.get("tid"),
+                    "expectedAudience": self._settings.entra_client_id,
+                    "expectedIssuer": issuer,
+                },
+            )
             raise OidcError(f"id_token validation failed: {exc}") from exc
 
         if claims.get("nonce") != expected_nonce:
+            logger.error("id_token_nonce_mismatch")
             raise OidcError("id_token nonce mismatch")
+
+        logger.info(
+            "id_token_validated",
+            extra={
+                "oid": claims.get("oid"),
+                "tid": claims.get("tid"),
+                "hasGroups": "groups" in claims,
+                "groupCount": len(claims.get("groups") or []),
+                "hasSid": bool(claims.get("sid")),
+                "hasClaimNames": "_claim_names" in claims,
+            },
+        )
+        if "_claim_names" in claims:
+            logger.error(
+                "id_token_group_overflow",
+                extra={
+                    "detail": "Entra replaced groups[] with _claim_names because the user is "
+                    "in too many groups. Workforce-pool group mapping will match "
+                    "nothing and IAP will deny this user. Switch the groups claim to "
+                    "'Groups assigned to the application'.",
+                },
+            )
         return claims
 
     async def validate_access_token(self, access_token: str) -> dict[str, Any]:
         """Validate the access token so ``roles`` can be trusted (decision D7).
 
-        The audience is ``ENTRA_APP_ID_URI`` — the same value Apigee's Verify JWT
-        policy checks (docs 15 §B.11).
+        The accepted audiences come from ``ENTRA_ACCESS_TOKEN_AUDIENCES`` (falling
+        back to ``ENTRA_APP_ID_URI``) — the same values Apigee's Verify JWT policy
+        must check (docs 15 §B.11).
+
+        Both access-token versions are accepted, because which one Entra issues is
+        controlled by ``requestedAccessTokenVersion`` on the *resource* app
+        registration, not by anything here:
+
+        * v1 (``null``/``1``): ``iss`` is ``https://sts.windows.net/<tid>/`` and
+          ``aud`` is the App ID URI.
+        * v2 (``2``): ``iss`` ends in ``/v2.0`` and ``aud`` is the resource app's
+          client ID GUID.
+
+        Getting this wrong used to yield an empty role set and a 403 on every API
+        call while sign-in still succeeded, so a failure here is logged with the
+        offending claims.
         """
         meta = await self.metadata()
         jwks_uri = str(meta.get("jwks_uri", ""))
         issuer = str(meta.get("issuer", ""))
-        audience = self._settings.entra_app_id_uri
-        for candidate_issuer in (issuer, issuer.replace("/v2.0", "/")):
+        audiences = self._settings.access_token_audiences
+
+        last: Exception | None = None
+        for candidate_issuer in (issuer, self._settings.v1_issuer):
+            if not candidate_issuer:
+                continue
             try:
-                return await asyncio.to_thread(
+                claims = await asyncio.to_thread(
                     self._decode,
                     access_token,
-                    audience=audience,
+                    audience=audiences,
                     jwks_uri=jwks_uri,
                     issuer=candidate_issuer,
                 )
             except Exception as exc:  # noqa: BLE001, PERF203
                 last = exc
+            else:
+                logger.info(
+                    "access_token_validated",
+                    extra={
+                        "tokenVer": claims.get("ver"),
+                        "tokenAud": claims.get("aud"),
+                        "tokenIss": claims.get("iss"),
+                        "roles": claims.get("roles") or [],
+                        "scp": claims.get("scp"),
+                    },
+                )
+                if not claims.get("roles"):
+                    logger.warning(
+                        "access_token_has_no_roles",
+                        extra={
+                            "detail": "Token validated but carries no roles[] claim. The user "
+                            "is in no group assigned to an App Role on the resource app, "
+                            "or the App Role's allowed member type is not Users/Groups. "
+                            "Sign-in will succeed and every API call will 403.",
+                        },
+                    )
+                return claims
+
+        seen = self._unverified_claims(access_token)
+        logger.error(
+            "access_token_rejected",
+            extra={
+                "error": str(last),
+                "tokenAud": seen.get("aud"),
+                "tokenIss": seen.get("iss"),
+                "tokenVer": seen.get("ver"),
+                "expectedAudiences": audiences,
+                "expectedIssuers": [issuer, self._settings.v1_issuer],
+            },
+        )
         raise OidcError(f"access_token validation failed: {last}")
 
     async def principal_from(self, tokens: TokenSet, *, expected_nonce: str) -> Principal:
@@ -299,13 +489,27 @@ class OidcClient:
             access_claims = await self.validate_access_token(tokens.access_token)
         except OidcError as exc:
             # An access token minted for a resource we cannot validate is a
-            # configuration error (usually ENTRA_APP_ID_URI, docs 18 §9). Roles
-            # gate the UI, so fail closed with an empty role set rather than
-            # inventing entitlements.
+            # configuration error: ENTRA_ACCESS_TOKEN_AUDIENCES not matching the
+            # resource app's requestedAccessTokenVersion is the usual cause.
+            #
+            # Degrading to an empty role set produces a session that looks signed
+            # in but is 403'd by every API call, which is indistinguishable from a
+            # group-assignment problem and near-impossible to diagnose. Outside
+            # local development, fail the sign-in outright instead.
             logger.error("access_token_unvalidated", extra={"error": str(exc)})
+            if not self._settings.is_dev_auth and self._settings.environment != "dev":
+                raise
             access_claims = {}
 
         roles = [str(r) for r in (access_claims.get("roles") or id_claims.get("roles") or [])]
+        logger.info(
+            "principal_resolved",
+            extra={
+                "oid": id_claims.get("oid"),
+                "roles": roles,
+                "rolesSource": "access_token" if access_claims.get("roles") else "id_token",
+            },
+        )
         return Principal(
             oid=str(id_claims.get("oid") or access_claims.get("oid") or ""),
             email=str(

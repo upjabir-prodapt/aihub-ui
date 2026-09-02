@@ -51,11 +51,85 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             "iapEnabled": settings.iap_enabled,
         },
     )
+    _log_auth_configuration(settings, services)
     try:
         yield
     finally:
         await services.aclose()
         logger.info("bff_stopped")
+
+
+def _log_auth_configuration(settings: Settings, services: Services) -> None:
+    """Dump the resolved Entra/IAP wiring once, at startup.
+
+    Every value here is a public identifier — tenant IDs, client IDs, App ID URIs
+    and scopes all travel in tokens and URLs. No secret *values* are involved:
+    only Secret Manager names, and whether the lookup succeeded.
+
+    This exists because the failure modes in this area are silent and mutually
+    indistinguishable. A wrong audience, an unset ``requestedAccessTokenVersion``
+    and an unassigned App Role all present as "signed in, then 403 on
+    everything". One log line with the effective configuration turns a
+    multi-hour bisect into a diff.
+    """
+    if settings.auth_mode != "entra":
+        logger.warning(
+            "auth_config_dev_mode",
+            extra={
+                "authMode": settings.auth_mode,
+                "devRoles": settings.dev_roles,
+                "detail": "Entra is bypassed; sessions are minted locally.",
+            },
+        )
+        return
+
+    v2_issuer = f"https://login.microsoftonline.com/{settings.entra_tenant_id}/v2.0"
+    logger.info(
+        "auth_config",
+        extra={
+            "tenantId": settings.entra_tenant_id,
+            "bffClientId": settings.entra_client_id,
+            "appIdUri": settings.entra_app_id_uri,
+            "acceptedAccessTokenAudiences": settings.access_token_audiences,
+            "acceptedAccessTokenIssuers": [v2_issuer, settings.v1_issuer],
+            "idTokenAudience": settings.entra_client_id,
+            "redirectUri": settings.entra_redirect_uri,
+            "scopes": settings.scope_list,
+            "graphScopes": settings.graph_scopes.split(),
+            "discoveryUrl": settings.entra_discovery_url,
+            "clientSecretName": settings.entra_client_secret_name,
+            "clientSecretLoaded": settings.entra_client_secret_name
+            in services.secrets.loaded_names(),
+            "iapEnabled": settings.iap_enabled,
+            "iapAudience": settings.iap_audience,
+            "readyErrors": services.ready_errors,
+        },
+    )
+
+    # Cheap, high-value assertions about configuration that is *syntactically*
+    # valid but cannot work. Each of these has cost real debugging time.
+    if settings.iap_enabled and "/backendServices/" in settings.iap_audience:
+        service_ref = settings.iap_audience.rsplit("/", 1)[-1]
+        if not service_ref.isdigit():
+            logger.error(
+                "iap_audience_is_not_numeric",
+                extra={
+                    "iapAudience": settings.iap_audience,
+                    "detail": "IAP_AUDIENCE must end with the NUMERIC backend service id, "
+                    "not its name. Read it with: gcloud compute backend-services "
+                    "describe <name> --format='value(id)'. Every request will 401.",
+                },
+            )
+
+    if settings.entra_app_id_uri in settings.access_token_audiences:
+        logger.warning(
+            "access_token_audience_is_the_app_id_uri",
+            extra={
+                "detail": "Only correct when the resource app still issues v1 access tokens "
+                "(requestedAccessTokenVersion null/1). Under v2 the aud claim is the "
+                "resource app's client ID GUID and this will reject every token.",
+            },
+        )
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:

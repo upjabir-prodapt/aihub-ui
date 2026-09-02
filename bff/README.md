@@ -57,9 +57,11 @@ once.
 | `SERVE_SPA` / `SPA_DIST_DIR` | `true` / `/srv/static` | Set `false` in dev; Vite owns the bundle. |
 | `ENTRA_TENANT_ID` | — | Required when `AUTH_MODE=entra`. |
 | `ENTRA_CLIENT_ID` | — | The `AI-BFF` application (client) ID. |
-| `ENTRA_APP_ID_URI` | — | `api://<client-id>`. **Never hardcode** (docs 18 §9). Validated at startup. |
+| `ENTRA_APP_ID_URI` | — | Application ID URI of the **resource** app (`AICOE-API-DEV`), *not* the BFF. Validated at startup. |
+| `ENTRA_ACCESS_TOKEN_AUDIENCES` | `ENTRA_APP_ID_URI` | Space-delimited accepted `aud` values for the API access token. Under `requestedAccessTokenVersion: 2` this is the resource app's **client ID GUID**; under v1 it is the App ID URI. List both to span a migration. |
 | `ENTRA_REDIRECT_URI` | — | Must end `/auth/callback`; https outside localhost. |
-| `ENTRA_SCOPES` | — | Space-delimited. Must include `offline_access`. |
+| `ENTRA_SCOPES` | — | Space-delimited. Must include `offline_access`. **Exactly one resource**: only reserved OIDC scopes plus scopes under `ENTRA_APP_ID_URI`. Graph scopes here are rejected at startup. |
+| `GRAPH_SCOPES` | `openid profile offline_access https://graph.microsoft.com/User.Read` | Second token exchange for `department`/`companyName`. Graph is a separate resource and cannot share a token with the API. |
 | `ENTRA_CLIENT_SECRET_NAME` | `entra-bff-client-secret` | Secret Manager **name**. |
 | `ENTRA_POST_LOGOUT_REDIRECT_URI` | — | Optional. |
 | `IAP_ENABLED` / `IAP_AUDIENCE` | `true` / — | Audience format depends on where IAP lands. |
