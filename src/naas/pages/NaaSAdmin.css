@@ -1,0 +1,129 @@
+.naas-admin-page {
+  min-height: 100%;
+  background: var(--bg-base);
+  padding: 0 1.5rem 3rem;
+  overflow-y: auto;
+}
+
+.naas-admin-header {
+  display: flex;
+  align-items: baseline;
+  gap: 1.25rem;
+  padding: 1.5rem 0 1rem;
+}
+
+.naas-admin-header h1 {
+  font-size: 1.5rem;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.naas-back-link {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--text-teal);
+  font-family: inherit;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.naas-back-link:hover {
+  text-decoration: underline;
+}
+
+.naas-admin-error {
+  color: var(--text-error);
+  margin: 0 0 1rem;
+}
+
+.naas-admin-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.naas-admin-tab {
+  border: 1px solid var(--border-default);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  padding: 0.6rem 1.1rem;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-fast);
+}
+
+.naas-admin-tab--active {
+  background: var(--colt-teal);
+  border-color: var(--colt-teal);
+  color: #121212;
+}
+
+.naas-admin-table-wrap {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  box-shadow: var(--shadow-md);
+  overflow-x: auto;
+}
+
+.naas-admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.naas-admin-table th,
+.naas-admin-table td {
+  text-align: left;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--border-subtle);
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+
+.naas-admin-table th {
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.naas-admin-table tr:last-child td {
+  border-bottom: none;
+}
+
+.naas-admin-empty {
+  color: var(--text-muted);
+  text-align: center;
+  padding: 2rem 1rem;
+}
+
+.naas-admin-approve-btn {
+  border: none;
+  background: var(--colt-teal);
+  color: #121212;
+  padding: 0.45rem 0.9rem;
+  border-radius: 8px;
+  font-size: 0.825rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: filter var(--transition-fast);
+}
+
+.naas-admin-approve-btn:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.naas-admin-approve-btn:disabled {
+  background: var(--bg-active);
+  color: var(--text-muted);
+  cursor: default;
+}

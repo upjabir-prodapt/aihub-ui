@@ -1,0 +1,103 @@
+.port-search {
+  align-self: stretch;
+  /* Fills .chat-extra's full width (see ChatPanel.css) rather than
+     capping at a fixed pixel value, so dragging AgentScreen's resizable
+     divider to give the chat pane more room actually grows this widget. */
+  width: 100%;
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: 14px;
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+
+.port-search--error {
+  padding: 0.9rem 1.1rem;
+  color: var(--text-error);
+  font-size: 0.875rem;
+}
+
+.port-search-input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+}
+
+.port-search-icon {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.port-search-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 0.9rem;
+  font-family: inherit;
+  color: var(--text-primary);
+}
+
+.port-search-input::placeholder {
+  color: var(--text-muted);
+}
+
+.port-search-results {
+  max-height: 260px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.port-search-empty {
+  padding: 1rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.port-search-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.65rem 1rem;
+  border: none;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-card);
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+  transition: background var(--transition-fast);
+}
+
+.port-search-row:last-child {
+  border-bottom: none;
+}
+
+.port-search-row:hover:not(:disabled) {
+  background: var(--colt-teal-light);
+}
+
+.port-search-row:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.port-search-row--selected {
+  background: var(--colt-teal-mid);
+  opacity: 1;
+}
+
+.port-search-row-location {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.port-search-row-meta {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
