@@ -3,8 +3,18 @@ import type { AgentPublic, ChatRequest, ChatResponse, ServiceOrderTicket } from 
 // The only place the agent-backend's base URL is read from. Everything
 // else in the app imports fetchAgents/postChat rather than calling
 // fetch() directly, so the backend stays a swappable network peer.
-const AGENT_BACKEND_URL =
-  import.meta.env.VITE_NAAS_AGENT_BACKEND_URL ?? 'http://127.0.0.1:8200';
+//
+// Mirrors vite.config.ts's useMockApi check: in mock mode, requests go to
+// the dev server's own origin (relative URL) so vitePluginMock.ts's
+// middleware can intercept them, same as the translation/sales APIs.
+const isMockMode =
+  !import.meta.env.PROD &&
+  (import.meta.env.VITE_USE_MOCKS === 'true' ||
+    import.meta.env.MODE === 'mock' ||
+    import.meta.env.MODE === 'development');
+const AGENT_BACKEND_URL = isMockMode
+  ? ''
+  : (import.meta.env.VITE_NAAS_AGENT_BACKEND_URL ?? 'http://127.0.0.1:8200');
 
 export async function fetchAgents(): Promise<AgentPublic[]> {
   const res = await fetch(`${AGENT_BACKEND_URL}/agents`);
