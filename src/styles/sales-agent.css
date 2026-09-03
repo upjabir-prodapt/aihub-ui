@@ -394,6 +394,72 @@
 }
 
 /* Capabilities */
+.sa-requests-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.sa-request-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.sa-request-row:last-of-type {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.sa-request-row .sa-field {
+  flex: 1;
+}
+
+.sa-remove-row {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid var(--border-default);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 16px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sa-remove-row:hover {
+  background: rgba(242, 12, 54, 0.1);
+  border-color: rgba(242, 12, 54, 0.3);
+  color: #f20c36;
+}
+
+.sa-add-row-btn {
+  width: 100%;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px dashed var(--border-default);
+  background: transparent;
+  color: var(--colt-teal);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  margin-bottom: 16px;
+}
+
+.sa-add-row-btn:hover {
+  background: var(--colt-teal-light);
+  border-color: var(--colt-teal);
+}
+
 .sa-capabilities {
   display: flex;
   flex-wrap: wrap;
@@ -414,17 +480,152 @@
 .sa-cap svg { color: var(--colt-teal); opacity: 0.85; }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   PROCESSING — status tracker
+   JOBS GRID — multiple concurrent jobs
    ═══════════════════════════════════════════════════════════════════════ */
-.sa-tracker {
-  margin: auto;
+.sa-jobs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+  gap: 20px;
   width: 100%;
-  max-width: 560px;
-  border-radius: 22px;
+}
+
+.sa-job-card {
+  border-radius: 18px;
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
   box-shadow: var(--shadow-md);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
   overflow: hidden;
+}
+
+.sa-job-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sa-job-status {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--colt-teal);
+}
+
+.sa-job-status.in-progress {
+  background: var(--colt-teal-light);
+  border: 1px solid var(--border-teal);
+}
+
+.sa-job-status.completed {
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  color: #22c55e;
+}
+
+.sa-job-status.failed {
+  background: rgba(242, 12, 54, 0.1);
+  border: 1px solid rgba(242, 12, 54, 0.3);
+  color: #f20c36;
+}
+
+.sa-job-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.sa-job-company {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 0;
+}
+
+.sa-job-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  margin-top: 2px;
+  word-break: break-all;
+}
+
+.sa-job-progress {
+  padding: 12px;
+  background: var(--bg-elevated);
+  border-radius: 10px;
+}
+
+.sa-progress-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+}
+
+.sa-progress-label {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.sa-progress-value {
+  color: var(--colt-teal);
+  font-weight: 600;
+}
+
+.sa-job-error {
+  padding: 12px;
+  border-radius: 10px;
+  background: rgba(242, 12, 54, 0.06);
+  border: 1px solid rgba(242, 12, 54, 0.15);
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  word-break: break-word;
+}
+
+.sa-job-meta-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sa-job-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 20px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.sa-job-loading svg {
+  color: var(--colt-teal);
+}
+
+.sa-empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-secondary);
+  font-size: 15px;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   PROCESSING — status tracker (DEPRECATED - removed)
+   ═══════════════════════════════════════════════════════════════════════ */
+.sa-tracker {
+  display: none;
 }
 
 .sa-tracker-head {
@@ -716,6 +917,12 @@
   filter: brightness(1.07);
   color: #04201d;
   background: var(--colt-teal);
+}
+
+.sa-btn--small {
+  padding: 6px 10px;
+  font-size: 11px;
+  width: auto;
 }
 
 .sa-report-body {
@@ -1023,6 +1230,21 @@
 
   .sa-tracker { max-width: 100%; }
   .sa-gate-card { padding: 32px 22px; }
+
+  .sa-jobs-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sa-request-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding-bottom: 10px;
+  }
+
+  .sa-remove-row {
+    width: 100%;
+  }
 }
 
 /* ── Small phones (≤480px) ── */

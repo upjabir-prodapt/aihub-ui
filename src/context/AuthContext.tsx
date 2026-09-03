@@ -204,6 +204,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (entitlements.translation) {
         const mockUser: AuthUser = { email: mockEmail, business_unit: bu, organization: org };
+        // 1-hour mock lifetime — deliberately longer than the real 30-minute
+        // token, because the 25-minute renewal tick has no backend to call in
+        // dev and leaves the session alone on a failed attempt.
         saveSession(mockToken, mockUser, 3600);
         setGoogleIdToken(mockToken);
         setUser(mockUser);

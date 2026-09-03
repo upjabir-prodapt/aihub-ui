@@ -32,6 +32,10 @@ export type SessionRenewal =
 const GOOGLE_TOKEN_KEY = 'colt_google_id_token';
 const USER_KEY = 'colt_auth_user';
 const EXPIRY_KEY = 'colt_auth_expiry';
+// Legacy: written by the earlier refresh-token scheme, which the timer-based
+// renewal replaced. Retained only so clearSession() purges it from browsers
+// that ran that build; nothing writes it any more.
+const REFRESH_EXPIRY_KEY = 'colt_refresh_expiry';
 const BU_PREF_KEY = 'colt_auth_bu';
 const ORG_PREF_KEY = 'colt_auth_org';
 
@@ -51,7 +55,11 @@ function saveAttributionPrefs(business_unit: string, organization: string) {
  * Persist non-sensitive session state after a successful /auth/token call.
  * The JWT itself arrives via Set-Cookie (httpOnly) and is never touched here.
  */
-export function saveSession(googleIdToken: string, user: AuthUser, expiresIn: number) {
+export function saveSession(
+  googleIdToken: string,
+  user: AuthUser,
+  expiresIn: number,
+) {
   const expiry = Date.now() + expiresIn * 1000;
   localStorage.setItem(GOOGLE_TOKEN_KEY, googleIdToken);
   localStorage.setItem(USER_KEY, JSON.stringify(user));
@@ -94,4 +102,5 @@ export function clearSession() {
   localStorage.removeItem(GOOGLE_TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
   localStorage.removeItem(EXPIRY_KEY);
+  localStorage.removeItem(REFRESH_EXPIRY_KEY);
 }

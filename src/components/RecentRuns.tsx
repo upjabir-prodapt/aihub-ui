@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { RefreshCw, Download, XCircle, AlertTriangle, MessageSquare } from 'lucide-react';
 import { timeAgo } from '../utils/time';
 import { formatDuration, formatModel, formatCost } from '../utils/jobs';
-import type { UnifiedJob, UnifiedJobStatus } from '../types/jobs';
+import type { UnifiedJob } from '../types/jobs';
 import '../styles/recent-runs.css';
 
 interface RecentRunsProps {
@@ -25,14 +25,6 @@ interface RecentRunsProps {
   /** Optional "view all" link into the shared Job Tracker page. */
   onOpenTracker?: () => void;
 }
-
-const STATUS_LABEL: Record<UnifiedJobStatus, string> = {
-  queued: 'Queued',
-  running: 'Running',
-  completed: 'Completed',
-  failed: 'Failed',
-  cancelled: 'Cancelled',
-};
 
 /**
  * Inline "recent runs" panel embedded on a service page — the same run data
@@ -108,15 +100,12 @@ const RecentRuns: React.FC<RecentRunsProps> = ({
                   aria-expanded={expanded}
                 >
                   <span className="recent-run-title">{job.title}</span>
-                  <span className={`recent-run-badge recent-run-badge--${job.status}`}>
-                    {STATUS_LABEL[job.status]}
-                  </span>
                 </button>
                 <div className="recent-run-sub">
                   {job.subtitle} · {timeAgo(job.createdAt)}
                 </div>
 
-                {job.status === 'running' && (
+                {(job.status === 'running' || job.status === 'queued') && (
                   <div className="recent-run-progress-track">
                     <div
                       className={`recent-run-progress-fill ${job.progress === null ? 'indeterminate' : ''}`}
