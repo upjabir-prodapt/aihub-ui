@@ -286,5 +286,109 @@ button svg,
   }
 }
 
+/* ── Markdown content ────────────────────────────────────────────────────────
+   Shared renderer styling for any `<ReactMarkdown>` output across the app
+   (sales research reports in Recent runs / Job Tracker's expanded detail). ── */
+.markdown-content {
+  font-size: 15px;
+  line-height: 1.75;
+  color: var(--text-primary);
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3 {
+  color: var(--text-primary);
+  margin-top: 32px;
+  margin-bottom: 14px;
+  line-height: 1.3;
+}
+.markdown-content > *:first-child { margin-top: 0; }
+
+.markdown-content h1 {
+  font-size: 26px;
+  border-bottom: 2px solid var(--border-teal);
+  padding-bottom: 8px;
+}
+.markdown-content h2 {
+  font-size: 21px;
+  color: var(--colt-teal);
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 5px;
+}
+.markdown-content h3 { font-size: 17px; }
+
+.markdown-content p { margin-bottom: 15px; }
+
+.markdown-content ul,
+.markdown-content ol { margin: 0 0 15px; padding-left: 24px; }
+
+.markdown-content li { margin-bottom: 7px; }
+
+.markdown-content a { color: var(--colt-teal); text-decoration: underline; }
+
+.markdown-content blockquote {
+  border-left: 4px solid var(--colt-teal);
+  background: var(--bg-elevated);
+  padding: 14px 18px;
+  margin: 22px 0;
+  border-radius: 0 12px 12px 0;
+  color: var(--text-secondary);
+}
+
+.markdown-content code {
+  background: var(--bg-hover);
+  padding: 2px 6px;
+  border-radius: 5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.88em;
+}
+
+.markdown-content pre {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 16px;
+  overflow-x: auto;
+  margin-bottom: 16px;
+}
+
+.markdown-content pre code { background: none; padding: 0; }
+
+.markdown-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 16px;
+  font-size: 13.5px;
+  display: block;
+  overflow-x: auto;
+}
+
+.markdown-content th,
+.markdown-content td {
+  border: 1px solid var(--border-default);
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.markdown-content th { background: var(--bg-elevated); font-weight: 700; }
+
+.markdown-content img { max-width: 100%; height: auto; border-radius: 10px; }
+
+.markdown-content hr {
+  border: none;
+  border-top: 1px solid var(--border-subtle);
+  margin: 28px 0;
+}
+
+@media (max-width: 768px) {
+  .markdown-content { font-size: 14px; }
+  .markdown-content h1 { font-size: 21px; }
+  .markdown-content h2 { font-size: 18px; }
+  .markdown-content h3 { font-size: 16px; }
+}
+
 
 

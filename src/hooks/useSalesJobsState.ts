@@ -10,9 +10,13 @@ import { getResearchStatus, cancelResearch } from '../api/salesAgentApi';
  * panel, before the next server refresh picks it up, and to keep polling it
  * while it's active.
  *
- * Deliberately not persisted: the backend purges runs and their output files
- * after 7 days, so a localStorage copy would resurrect rows the server has
- * already dropped and contradict the rolling-week view.
+ * Not persisted here directly — SalesJobsContext (which wraps this hook)
+ * saves the *identifiers* of still-in-progress jobs to localStorage and
+ * re-attaches to them via `restoreJob` after re-validating each one live
+ * against the backend on mount (mirroring TranslationJobsContext), so a
+ * refresh doesn't lose a run that hasn't shown up in server history yet.
+ * Terminal jobs are never persisted, since by then `GET /research/jobs`
+ * already carries them and the backend purges runs after 7 days anyway.
  */
 
 export type SalesJobStatus =
@@ -75,6 +79,43 @@ export const useSalesJobsState = () => {
     setJobOrder((prev) => [jobId, ...prev.filter((id) => id !== jobId)]);
   }, []);
 
+  /**
+   * Re-attach to a job that was still in progress before the page was
+   * reloaded (called by SalesJobsContext after re-validating the job live
+   * against the backend — see restoreJob's caller). No-ops if the job is
+   * already tracked (e.g. a fresh registerJob beat this to the punch).
+   */
+  const restoreJob = useCallback(
+    (
+      jobId: string,
+      companyName: string,
+      accountId: string,
+      createdAt: string,
+      rawStatus: string,
+      errorMessage: string | null,
+    ) => {
+      const status = (rawStatus.toUpperCase() as SalesJobStatus) || 'PENDING';
+      const terminal = status === 'COMPLETED' || status === 'FAILED' || status === 'CANCELLED';
+      setJobs((prev) => {
+        if (prev[jobId]) return prev;
+        return {
+          ...prev,
+          [jobId]: {
+            job_id: jobId,
+            company_name: companyName,
+            account_id: accountId,
+            status,
+            createdAt,
+            completedAt: terminal ? new Date().toISOString() : null,
+            errorMessage,
+          },
+        };
+      });
+      setJobOrder((prev) => (prev.includes(jobId) ? prev : [jobId, ...prev]));
+    },
+    [],
+  );
+
   const refreshJob = useCallback(async (jobId: string) => {
     try {
       const res = await getResearchStatus(jobId);
@@ -133,5 +174,5 @@ export const useSalesJobsState = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return { jobs, jobOrder, registerJob, refreshJob, refreshAll, cancelJob };
+  return { jobs, jobOrder, registerJob, restoreJob, refreshJob, refreshAll, cancelJob };
 };

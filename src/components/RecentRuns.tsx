@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { RefreshCw, Download, XCircle, AlertTriangle, MessageSquare } from 'lucide-react';
+import { RefreshCw, Download, XCircle, AlertTriangle, MessageSquare, FileText } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import { timeAgo } from '../utils/time';
 import { formatDuration, formatModel, formatCost } from '../utils/jobs';
 import type { UnifiedJob, UnifiedJobStatus } from '../types/jobs';
@@ -58,6 +59,8 @@ const RecentRuns: React.FC<RecentRunsProps> = ({
 }) => {
   const visible = jobs.slice(0, limit);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  /** Sales research jobs carry a full markdown report — shown collapsed by default. */
+  const [reportOpenKey, setReportOpenKey] = useState<string | null>(null);
 
   const toggleExpand = (job: UnifiedJob) => {
     const next = expandedKey === job.key ? null : job.key;
@@ -116,7 +119,7 @@ const RecentRuns: React.FC<RecentRunsProps> = ({
                   {job.subtitle} · {timeAgo(job.createdAt)}
                 </div>
 
-                {job.status === 'running' && (
+                {(job.status === 'running' || job.status === 'queued') && (
                   <div className="recent-run-progress-track">
                     <div
                       className={`recent-run-progress-fill ${job.progress === null ? 'indeterminate' : ''}`}
@@ -194,6 +197,25 @@ const RecentRuns: React.FC<RecentRunsProps> = ({
                         </div>
                       </div>
                     ) : null}
+                    {job.detailStatus === 'loaded' && job.detail?.reportContent && (
+                      <div className="recent-run-report">
+                        <button
+                          type="button"
+                          className="recent-run-report-toggle"
+                          onClick={() =>
+                            setReportOpenKey((prev) => (prev === job.key ? null : job.key))
+                          }
+                        >
+                          <FileText size={12} />
+                          {reportOpenKey === job.key ? 'Hide report' : 'View report'}
+                        </button>
+                        {reportOpenKey === job.key && (
+                          <div className="recent-run-report-body markdown-content">
+                            <ReactMarkdown>{job.detail.reportContent}</ReactMarkdown>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { RefreshCw, Download, XCircle, AlertTriangle, MessageSquare } from 'lucide-react';
+import { RefreshCw, Download, XCircle, AlertTriangle, MessageSquare, FileText } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import { useAuth } from '../context/useAuth';
 import { useTranslationJobs } from '../context/useTranslationJobs';
 import { useSalesJobs } from '../context/useSalesJobs';
@@ -68,6 +69,8 @@ const JobTrackerPage: React.FC<JobTrackerPageProps> = ({ serviceFilter: initialS
     setServiceFilter(initialServiceFilter);
   }
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  /** Sales research jobs carry a full markdown report — shown collapsed by default. */
+  const [reportOpenKey, setReportOpenKey] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   // "Today" is capped to the 3 most recent runs by default to keep the top of
@@ -398,11 +401,13 @@ const JobTrackerPage: React.FC<JobTrackerPageProps> = ({ serviceFilter: initialS
                             </span>
                           </span>
                           <span className="tracker-row-right">
-                            {job.status === 'running' && job.progress !== null ? `${job.progress}%` : null}
+                            {(job.status === 'running' || job.status === 'queued') && job.progress !== null
+                              ? `${job.progress}%`
+                              : null}
                           </span>
                         </button>
 
-                        {job.status === 'running' && (
+                        {(job.status === 'running' || job.status === 'queued') && (
                           <div className="tracker-progress-track">
                             <div
                               className={`tracker-progress-fill ${job.progress === null ? 'indeterminate' : ''}`}
@@ -462,6 +467,25 @@ const JobTrackerPage: React.FC<JobTrackerPageProps> = ({ serviceFilter: initialS
                                 </>
                               )}
                             </div>
+                            {job.status === 'completed' && job.detailStatus === 'loaded' && job.detail?.reportContent && (
+                              <div className="tracker-report">
+                                <button
+                                  type="button"
+                                  className="tracker-report-toggle"
+                                  onClick={() =>
+                                    setReportOpenKey((prev) => (prev === job.key ? null : job.key))
+                                  }
+                                >
+                                  <FileText size={12} />
+                                  {reportOpenKey === job.key ? 'Hide report' : 'View report'}
+                                </button>
+                                {reportOpenKey === job.key && (
+                                  <div className="tracker-report-body markdown-content">
+                                    <ReactMarkdown>{job.detail.reportContent}</ReactMarkdown>
+                                  </div>
+                                )}
+                              </div>
+                            )}
                             <div className="tracker-detail-actions">
                               {job.canCancel && (
                                 <button
