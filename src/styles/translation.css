@@ -858,7 +858,6 @@
   border-radius: 8px;
   background: rgba(242, 12, 54, 0.06);
   border: 1px solid rgba(242, 12, 54, 0.15);
-  font-family: var(--font-mono);
 }
 
 .error-actions {

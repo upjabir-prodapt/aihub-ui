@@ -14,6 +14,10 @@ import {
   persistSalesGoogleIdToken,
 } from './salesCloudRunAuth';
 import { SALES_API_BASE } from './salesConfig';
+import type { SessionRenewal } from '../context/authStorage';
+
+/** Fallback session lifetime if a response omits `expires_in` (both services mint 30 min). */
+const DEFAULT_SESSION_SECONDS = 1800;
 
 // ── Re-export Types ────────────────────────────────────────────────────────
 
@@ -51,10 +55,19 @@ function saveSalesAttributionPrefs(business_unit: string, organization: string) 
   localStorage.setItem(SALES_ORG_PREF_KEY, organization);
 }
 
+/**
+ * Push the locally-cached Sales expiry forward after a successful renewal.
+ * Mirrors `saveAccessTokenExpiry()` on the Translation side: only the expiry
+ * moves, since the renewed JWT arrives via Set-Cookie.
+ */
+export function saveSalesAccessTokenExpiry(expiresInSeconds: number) {
+  localStorage.setItem(SALES_EXPIRY_KEY, String(Date.now() + expiresInSeconds * 1000));
+}
+
 export function saveSalesSession(
   googleIdToken: string,
   user: SalesAuthUser,
-  expiresInSeconds = 1800,
+  expiresInSeconds = DEFAULT_SESSION_SECONDS,
 ) {
   const expiry = Date.now() + expiresInSeconds * 1000;
   persistSalesGoogleIdToken(googleIdToken);
@@ -179,6 +192,63 @@ export async function salesAuthenticate(
 
   const data = (await res.json()) as SalesTokenResponse;
   return { ...data, googleIdToken };
+}
+
+/**
+ * POST /api/sales/v1/auth/refresh — slide the shared session forward.
+ *
+ * Sent with NO request body, exactly as on the Translation side: the endpoint
+ * takes none, and the still-valid `colt_session` cookie is the whole
+ * credential. Deliberately uses a bare `fetch` rather than
+ * `fetchSalesWithAuth`, whose 401/403 retry would re-issue a renewal that has
+ * already been definitively refused.
+ */
+export async function refreshSalesSession(): Promise<SessionRenewal> {
+  let res: Response;
+  try {
+    res = await fetch(`${SALES_API_BASE}/auth/refresh`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: await salesAuthHeaders(),
+    });
+  } catch {
+    // Offline, DNS failure, proxy hiccup — the session may well still be
+    // valid, so report transient rather than ending it.
+    return { status: 'unavailable' };
+  }
+
+  if (res.status === 401 || res.status === 403) {
+    // Past the 8-hour cap, already expired, or entitlement revoked. The
+    // server has cleared the cookie; the session is over.
+    return { status: 'expired' };
+  }
+
+  if (!res.ok) return { status: 'unavailable' };
+
+  try {
+    const data = (await res.json()) as { expires_in?: number };
+    return { status: 'renewed', expiresIn: data.expires_in ?? DEFAULT_SESSION_SECONDS };
+  } catch {
+    // The renewal itself succeeded and Set-Cookie has landed; only the body
+    // was unreadable. Assume the standard lifetime rather than discarding it.
+    return { status: 'renewed', expiresIn: DEFAULT_SESSION_SECONDS };
+  }
+}
+
+/**
+ * POST /api/sales/v1/auth/logout — clear the server-set session cookie.
+ * Never throws: logout must proceed locally even if the request fails.
+ */
+export async function logoutSalesSession(): Promise<void> {
+  try {
+    await fetch(`${SALES_API_BASE}/auth/logout`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: await salesAuthHeaders(),
+    });
+  } catch {
+    // Best effort — the local session is cleared regardless.
+  }
 }
 
 /** POST /api/sales/v1/research/initiate */

@@ -12,7 +12,6 @@
 }
 
 .tracker-eyebrow {
-  font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.12em;
@@ -82,7 +81,7 @@
   border-radius: 10px;
   background: rgba(242, 12, 54, 0.08);
   border: 1px solid rgba(242, 12, 54, 0.2);
-  color: #f87171;
+  color: var(--text-error);
   font-size: 12.5px;
   margin-bottom: 18px;
 }
@@ -111,7 +110,6 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-family: var(--font-mono);
   font-size: 10.5px;
   font-weight: 500;
   letter-spacing: 0.08em;
@@ -230,7 +228,6 @@
 }
 
 .tracker-group-label {
-  font-family: var(--font-mono);
   font-size: 10.5px;
   font-weight: 600;
   letter-spacing: 0.1em;
@@ -332,7 +329,6 @@
 }
 
 .tracker-badge {
-  font-family: var(--font-mono);
   font-size: 9.5px;
   font-weight: 600;
   letter-spacing: 0.06em;
@@ -382,7 +378,7 @@
   border-radius: 8px;
   background: rgba(242, 12, 54, 0.08);
   border: 1px solid rgba(242, 12, 54, 0.2);
-  color: #f87171;
+  color: var(--text-error);
   font-size: 12.5px;
   line-height: 1.5;
   margin-bottom: 12px;
@@ -403,7 +399,6 @@
 }
 
 .tracker-detail-label {
-  font-family: var(--font-mono);
   font-size: 9.5px;
   font-weight: 600;
   letter-spacing: 0.08em;
@@ -413,6 +408,10 @@
 }
 
 .tracker-detail-value {
+  /* Run IDs, token counts, costs, timestamps — the technical values
+     monospace exists for. The labels beside them are ordinary UI chrome
+     and stay in Urbanist. */
+  font-family: var(--font-mono);
   font-size: 12.5px;
   color: var(--text-primary);
   word-break: break-word;

@@ -672,6 +672,12 @@
   align-items: center;
 }
 
+.modal-logo-edge {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}
+
 .modal-logo-company {
   font-size: 14px;
   font-weight: 700;
@@ -790,7 +796,7 @@
   border-radius: 10px;
   background: rgba(242, 12, 54, 0.08);
   border: 1px solid rgba(242, 12, 54, 0.2);
-  color: #f87171;
+  color: var(--text-error);
   font-size: 12px;
   line-height: 1.4;
 }

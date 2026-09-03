@@ -43,7 +43,7 @@
 
 .env-type {
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 1px;
   color: var(--text-muted);
@@ -179,7 +179,7 @@
   padding: 4px 10px;
   border-radius: 6px;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 900;
   text-transform: uppercase;
 }
 
@@ -200,7 +200,7 @@
 
 .metric-val {
   font-size: 20px;
-  font-weight: 800;
+  font-weight: 900;
   color: var(--text-primary);
   margin-top: 4px;
 }

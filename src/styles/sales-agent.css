@@ -99,7 +99,7 @@
 
 .sa-header-title {
   font-size: 19px;
-  font-weight: 800;
+  font-weight: 900;
   letter-spacing: -0.4px;
   color: var(--text-primary);
   line-height: 1.2;
@@ -200,7 +200,7 @@
 }
 
 .sa-session-logout:hover {
-  color: #f87171;
+  color: var(--text-error);
   background: rgba(242, 12, 54, 0.1);
 }
 
@@ -263,7 +263,7 @@
 
 .sa-hero-title {
   font-size: clamp(28px, 5vw, 44px);
-  font-weight: 800;
+  font-weight: 900;
   letter-spacing: -1px;
   line-height: 1.1;
   color: var(--text-primary);
@@ -1099,7 +1099,7 @@
 
 .sa-gate-title {
   font-size: 24px;
-  font-weight: 800;
+  font-weight: 900;
   letter-spacing: -0.5px;
   color: var(--text-primary);
 }

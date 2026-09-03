@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/useAuth';
 import { loadAttributionPrefs } from '../context/authStorage';
 import { loadSalesAttributionPrefs } from '../api/salesAgentApi';
-import type { ServiceEntitlements } from './Sidebar';
+import { ColtEdge, type ServiceEntitlements } from './Sidebar';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -73,8 +73,11 @@ const LoginModalPanel: React.FC<LoginModalProps> = ({
 
         <div className="modal-header">
           <div className="modal-logo-row">
+            {/* Shares the sidebar's Colt Edge mark rather than a local
+                clip-path copy, so the brand asset has one definition to
+                replace when the official one arrives. */}
             <div className="modal-logo-mark">
-              <div className="logo-chevron" />
+              <ColtEdge className="modal-logo-edge" />
             </div>
             <div>
               <div className="modal-logo-company">Colt</div>

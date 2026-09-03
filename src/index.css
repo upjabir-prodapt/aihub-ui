@@ -1,4 +1,7 @@
-@import url('https://fonts.googleapis.com/css2?family=Urbanist:wght@400;500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+/* Fonts are requested once, from index.html's <link> with its preconnects.
+   A duplicate @import here would cost a second render-blocking round trip for
+   byte-identical families, and a slower one: @import is only discovered after
+   this stylesheet itself has been fetched and parsed. */
 
 /* ===== CSS RESET & BASE ===== */
 *, *::before, *::after {
@@ -27,6 +30,12 @@
 
   /* ── Typography — Official Colt Brand: Urbanist + IBM Plex Mono ── */
   --font-primary: 'Urbanist', Arial, system-ui, -apple-system, sans-serif;
+  /* IBM Plex Mono is NOT a Colt brand font — the system sanctions only
+     Urbanist, Meiryo UI (Japanese) and Arial, and defines no monospace at
+     all. It is kept as a deliberate internal-tool exception, restricted to
+     genuinely technical values: run IDs, token counts, costs, timestamps,
+     counters. It must not be used for headings, labels, badges or body copy.
+     Pending Brand Team sign-off (CMOBrandDigital@colt.net). */
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 
   /* Sizes */
@@ -44,8 +53,17 @@
   -webkit-font-smoothing: antialiased;
 }
 
-/* ── Heading hierarchy — Urbanist Bold/Black for all headings ── */
-h1, h2, h3, h4, h5, h6 {
+/* ── Heading hierarchy — Urbanist Black for main headings ──
+   Brand: "Urbanist ... recommended in two weights: Regular and Black —
+   Black for main headings." h1/h2 are the main headings and take Black;
+   h3–h6 are subordinate and stay at Bold so the hierarchy remains readable
+   rather than uniformly heavy. */
+h1, h2 {
+  font-family: var(--font-primary);
+  font-weight: 900;
+}
+
+h3, h4, h5, h6 {
   font-family: var(--font-primary);
   font-weight: 700;
 }
@@ -66,8 +84,15 @@ h1, h2, h3, h4, h5, h6 {
 
   --text-primary: #FFFFFF;
   --text-secondary: #C8CDCC;
-  --text-muted: #7E8584;
+  /* Nudged up from #7E8584, which fell to 4.27:1 on --bg-hover. Now clears
+     4.5:1 on every dark surface in use. */
+  --text-muted: #828988;
   --text-teal: #00D7BD;
+  /* Tint of Colt Tomato, hue preserved, lightened for dark surfaces.
+     Colt Tomato itself only reaches 4.18:1 on --bg-card and 4.60:1 on
+     --bg-base, so it fails AA for normal text exactly where error copy
+     lives. This tint clears 5.4:1 on every dark surface in use. */
+  --text-error: #F8637E;
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.6);
@@ -94,8 +119,20 @@ h1, h2, h3, h4, h5, h6 {
 
   --text-primary: #121212;
   --text-secondary: #484A47;
-  --text-muted: #767875;
-  --text-teal: #00A59B;
+  /* Darkened from #767875, which reached only 4.46:1 on white and 3.74:1 on
+     --bg-elevated. Now clears 4.5:1 on every light surface in use. */
+  --text-muted: #696B68;
+  /* Darkened from Colt Dusk #00A59B. Dusk is the brand's recommended link
+     colour but manages only 3.06:1 on white and 2.57:1 on --bg-elevated,
+     well under AA for normal text. This is a darker step in the same brand
+     family (between Dusk and Colt Dark Green #0C554F), which is precisely
+     what the brand asks for: "use our darker brand colours for links, it's
+     better for accessibility". Clears 4.5:1 on every light surface. */
+  --text-teal: #007770;
+  /* Darkened Colt Tomato. The brand hex reaches only 4.30:1 on white and
+     3.61:1 on --bg-elevated, under AA for normal text; this clears 4.5:1 on
+     every light surface in use. */
+  --text-error: #D40A2F;
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.08);

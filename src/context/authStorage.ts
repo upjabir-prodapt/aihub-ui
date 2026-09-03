@@ -4,6 +4,20 @@ export interface AuthUser {
   organization: string;
 }
 
+/**
+ * Outcome of a POST /auth/refresh attempt.
+ *
+ * The distinction matters: a 401/403 means the session is genuinely over and
+ * the user must sign in again, whereas a network blip or 5xx is transient and
+ * the next 25-minute tick should simply try again. Collapsing the two would
+ * either log people out over a dropped packet or leave them staring at a dead
+ * session that never re-prompts.
+ */
+export type SessionRenewal =
+  | { status: 'renewed'; expiresIn: number }
+  | { status: 'expired' }
+  | { status: 'unavailable' };
+
 // NOTE: the app-session JWT itself is NO LONGER stored here (or anywhere in
 // localStorage). It now lives exclusively in the httpOnly `colt_session`
 // cookie set by POST /auth/token, which JS cannot read — this is the
@@ -12,16 +26,15 @@ export interface AuthUser {
 // verified user's email/business_unit/organization (safe to display) and an
 // expiry timestamp used purely to decide when to re-prompt for login.
 //
-// Refresh tokens are stored similarly to session JWTs: the server sets a
-// httpOnly `colt_refresh_token` cookie, and we optionally store metadata
-// about refresh expiry for proactive token refresh before main token expires.
-//
 // `colt_google_id_token` is a separate concern — it's the Cloud Run IAM
 // invoker identity token for calling the backend's own Cloud Run URL, not
 // this app's session-identity credential, so it is left as-is.
 const GOOGLE_TOKEN_KEY = 'colt_google_id_token';
 const USER_KEY = 'colt_auth_user';
 const EXPIRY_KEY = 'colt_auth_expiry';
+// Legacy: written by the earlier refresh-token scheme, which the timer-based
+// renewal replaced. Retained only so clearSession() purges it from browsers
+// that ran that build; nothing writes it any more.
 const REFRESH_EXPIRY_KEY = 'colt_refresh_expiry';
 const BU_PREF_KEY = 'colt_auth_bu';
 const ORG_PREF_KEY = 'colt_auth_org';
@@ -46,17 +59,24 @@ export function saveSession(
   googleIdToken: string,
   user: AuthUser,
   expiresIn: number,
-  refreshExpiresIn?: number,
 ) {
   const expiry = Date.now() + expiresIn * 1000;
   localStorage.setItem(GOOGLE_TOKEN_KEY, googleIdToken);
   localStorage.setItem(USER_KEY, JSON.stringify(user));
   localStorage.setItem(EXPIRY_KEY, String(expiry));
-  if (refreshExpiresIn) {
-    const refreshExpiry = Date.now() + refreshExpiresIn * 1000;
-    localStorage.setItem(REFRESH_EXPIRY_KEY, String(refreshExpiry));
-  }
   saveAttributionPrefs(user.business_unit, user.organization);
+}
+
+/**
+ * Push the locally-cached expiry forward after a successful renewal.
+ *
+ * Only the expiry moves: the renewed JWT arrives via Set-Cookie and the
+ * user record is unchanged. Without this, `loadSession()` would keep
+ * evaluating the original login's expiry and drop a session that the server
+ * has in fact just extended.
+ */
+export function saveAccessTokenExpiry(expiresInSeconds: number) {
+  localStorage.setItem(EXPIRY_KEY, String(Date.now() + expiresInSeconds * 1000));
 }
 
 export function loadSession(): { googleIdToken: string; user: AuthUser } | null {
@@ -83,19 +103,4 @@ export function clearSession() {
   localStorage.removeItem(USER_KEY);
   localStorage.removeItem(EXPIRY_KEY);
   localStorage.removeItem(REFRESH_EXPIRY_KEY);
-}
-
-export function getRefreshExpiryTime(): number | null {
-  const refreshExpiryRaw = localStorage.getItem(REFRESH_EXPIRY_KEY);
-  return refreshExpiryRaw ? parseInt(refreshExpiryRaw, 10) : null;
-}
-
-export function saveRefreshExpiry(refreshExpiresIn: number) {
-  const refreshExpiry = Date.now() + refreshExpiresIn * 1000;
-  localStorage.setItem(REFRESH_EXPIRY_KEY, String(refreshExpiry));
-}
-
-export function saveAccessTokenExpiry(expiresIn: number) {
-  const expiry = Date.now() + expiresIn * 1000;
-  localStorage.setItem(EXPIRY_KEY, String(expiry));
 }

@@ -21,7 +21,11 @@ interface SidebarProps {
   onToggleCollapsed?: () => void;
 }
 
-/* Official Colt vector wordmark (currentColor fill for theme flexibility) */
+/* Official Colt vector wordmark. Single source of truth for the wordmark:
+   the duplicate src/assets/colt-logo*.svg files were deleted rather than
+   imported, because a Vite asset import resolves to a URL and an <img> cannot
+   inherit `currentColor` — the wordmark has to flip between white on the dark
+   theme and #121212 on the light one, so it must stay inline SVG. */
 const ColtLogo: React.FC<{ className?: string }> = ({ className }) => (
   <svg className={className} viewBox="0 0 305.4 120" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-label="Colt">
     <g>
@@ -33,8 +37,12 @@ const ColtLogo: React.FC<{ className?: string }> = ({ className }) => (
   </svg>
 );
 
-/* Colt Edge chevron — shown as compact mark when sidebar is collapsed */
-const ColtEdge: React.FC<{ className?: string }> = ({ className }) => (
+/* Colt Edge chevron — shown as compact mark when sidebar is collapsed.
+   TODO(brand): this is a hand-drawn approximation, not the official Colt Edge.
+   Brand guidance is "do not edit or alter the icons"; the real asset has been
+   requested from CMOBrandDigital@colt.net. Replace here and in
+   public/favicon.svg, which carries the same approximation, once supplied. */
+export const ColtEdge: React.FC<{ className?: string }> = ({ className }) => (
   <svg className={className} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
     <polygon points="6,2 22,16 6,30 14,16" fill="#00D7BD"/>
   </svg>
