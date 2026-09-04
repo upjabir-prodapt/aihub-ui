@@ -19,7 +19,23 @@ const LANGUAGES = [
   { code: 'ja', label: 'Japanese', flag: '🇯🇵' },
 ];
 
-const SOURCE_LANGUAGES = LANGUAGES;
+/**
+ * Sentinel for "let the backend detect the source language".
+ * The API rejects the literal string "auto" (it is not a key in
+ * language_mapper.json), so it must be omitted from the request body
+ * rather than sent -- see buildFormData below.
+ */
+const AUTO_DETECT = 'auto';
+
+/**
+ * The source dropdown offers auto-detection in addition to the translatable
+ * languages; the target dropdown does not. The default stays an explicit
+ * language so the backend's source-language check applies to a normal
+ * submission -- picking a language is a claim about the document, and the
+ * worker now verifies it. Auto-detect is the escape hatch the mismatch
+ * error points users to.
+ */
+const SOURCE_LANGUAGES = [{ code: AUTO_DETECT, label: 'Auto-detect', flag: '' }, ...LANGUAGES];
 
 /** Filename given to pasted text when it's wrapped into an uploadable .txt file. */
 const TEXT_INPUT_FILENAME = 'pasted-text.txt';
@@ -242,7 +258,12 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onOpenTracker, onBack
     const buildFormData = () => {
       const fd = new FormData();
       currentTargetLangs.forEach((lang) => fd.append('target_languages', lang));
-      if (currentSourceLang) fd.append('source_language', currentSourceLang);
+      // Omitted entirely for auto-detect: the API validates source_language
+      // against language_mapper.json, which has no "auto" key, so sending
+      // the sentinel would 422. An absent field is what selects detection.
+      if (currentSourceLang && currentSourceLang !== AUTO_DETECT) {
+        fd.append('source_language', currentSourceLang);
+      }
       fd.append('domain', currentDomain);
       fd.append(
         'file',
