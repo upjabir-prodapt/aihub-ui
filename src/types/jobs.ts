@@ -13,8 +13,6 @@ export interface UnifiedJobDetail {
   modelUsed: string | null;
   modelVersion: string | null;
   qualityScore: number | null;
-  /** Full markdown report body — sales research jobs only; translation has no equivalent. */
-  reportContent?: string | null;
 }
 
 export interface UnifiedJob {

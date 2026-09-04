@@ -228,15 +228,15 @@ function extractSalesDetail(res: Awaited<ReturnType<typeof getResearchResult>>):
     modelUsed: card?.model_version?.trim() || null,
     modelVersion: null,
     qualityScore: null,
-    reportContent: res.report_content ?? res.report_markdown ?? null,
   };
 }
 
 /**
- * Lazily fetches and merges a job's cost/tokens/time/model (and, for sales,
- * the full report body) into whichever state array (Recent runs' local
- * list, Job Tracker's history) holds it — called on row expand, and cached
- * so repeat expands are free.
+ * Lazily fetches and merges a job's cost/tokens/time/model detail into
+ * whichever state array (Recent runs' local list, Job Tracker's history)
+ * holds it — called on row expand, and cached so repeat expands are free.
+ * For sales, the report body itself is intentionally not surfaced here —
+ * Download is the only way to get it.
  */
 export async function loadJobDetail(
   job: UnifiedJob,

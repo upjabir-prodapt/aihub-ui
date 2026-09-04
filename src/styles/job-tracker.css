@@ -417,40 +417,6 @@
   word-break: break-word;
 }
 
-/* --- Sales research report (full markdown), collapsed by default --- */
-.tracker-report {
-  margin-bottom: 14px;
-}
-
-.tracker-report-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 11px;
-  border-radius: 7px;
-  border: 1px solid var(--border-default);
-  background: var(--bg-card);
-  color: var(--colt-teal);
-  font-size: 12px;
-  font-weight: 600;
-  transition: all var(--transition-fast);
-}
-
-.tracker-report-toggle:hover {
-  border-color: var(--colt-teal);
-  background: var(--colt-teal-light);
-}
-
-.tracker-report-body {
-  margin-top: 10px;
-  padding: 14px 16px;
-  max-height: 420px;
-  overflow-y: auto;
-  border-radius: 10px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-}
-
 .tracker-detail-actions {
   display: flex;
   align-items: center;
