@@ -9,7 +9,13 @@ export interface TranslateRequest {
   priority?: string;          // "standard" | "high" (server-controlled; auto-promoted for .txt)
 }
 
-// Hub browser path: /api/translation/v1/* → Translation backend /api/v1/*
+// Hub browser path: /api/translation/v1/* → Apigee `int` proxy (no path
+// rewrite) → Translation backend, whose own API_PREFIX is also
+// /api/translation/v1 (see the shared-dev implementation plan, decision D6).
+// A previous version of this comment said Apigee rewrote the path to the
+// backend's /api/v1/*; that was never true — the backend's prefix was
+// changed to match Apigee's incoming path instead, so paths are identical
+// end to end. Do not "fix" this back to a rewrite assumption.
 //
 // POST /api/translation/v1/translate → 202
 export interface MultiTranslateJobResponse {
