@@ -99,7 +99,18 @@ class Settings(BaseSettings):
     firestore_database: str = "(default)"
     firestore_emulator_host: str = ""
     kms_key_name: str = ""
-    gcs_upload_bucket: str = ""
+    # Per-service upload buckets (AICOE-Terraform split the old shared
+    # gclt-aicoe-dev-st-artifacts bucket into per-app buckets 2026-09-05 --
+    # see that repo's GAP-REGISTER R-13). GcsSigner takes the bucket as a
+    # call-time parameter (see uploads/gcs.py), not a single global setting,
+    # so each route passes its own service's bucket explicitly.
+    gcs_upload_bucket_translation: str = ""
+    # Not yet consumed by any route -- Sales-Agent has no upload flow through
+    # the BFF today (it takes a text query, not a document; its own backend
+    # mints its own signed URLs for the final report, see that repo's
+    # GCS_SIGNED_URL_EXPIRATION_HOURS). Declared now so the naming
+    # convention is established before that route exists, not after.
+    gcs_upload_bucket_sales_agent: str = ""
     gcs_signer_service_account: str = ""
 
     # ── Apigee ───────────────────────────────────────────────────────────────
@@ -302,7 +313,7 @@ class Settings(BaseSettings):
             need(self.apigee_api_key_secret, "APIGEE_API_KEY_SECRET")
 
         if self.translation_upload_mode == "gcs_signed":
-            need(self.gcs_upload_bucket, "GCS_UPLOAD_BUCKET")
+            need(self.gcs_upload_bucket_translation, "GCS_UPLOAD_BUCKET_TRANSLATION")
 
         if self.environment == "prod":
             if self.auth_mode != "entra":

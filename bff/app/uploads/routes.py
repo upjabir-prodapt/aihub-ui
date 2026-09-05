@@ -73,6 +73,7 @@ async def create_translation_upload(
     signer = GcsSigner(settings)
     try:
         signed = await signer.signed_put_url(
+            bucket_name=settings.gcs_upload_bucket_translation,
             subject_oid=session.record.subject_oid,
             filename=payload.filename,
             content_type=payload.content_type,

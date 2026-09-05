@@ -74,7 +74,8 @@ once.
 | `APIGEE_API_KEY_SECRET` | `apigee-bff-client-key` | Secret Manager **name**. |
 | `APIGEE_API_KEY_HEADER` | `x-apikey` | Unverified; see README open item 1. |
 | `APIGEE_USER_OID_HEADER` | `x-colt-user-oid` | Docs disagree; see README open item 3. |
-| `GCS_UPLOAD_BUCKET` | — | Required when `TRANSLATION_UPLOAD_MODE=gcs_signed`. |
+| `GCS_UPLOAD_BUCKET_TRANSLATION` | — | Required when `TRANSLATION_UPLOAD_MODE=gcs_signed`. `GcsSigner` takes the bucket as a call-time parameter, so this is passed explicitly by the translation upload route, not read as one global default. |
+| `GCS_UPLOAD_BUCKET_SALES_AGENT` | — | Declared for the naming convention, not consumed by any route yet — Sales-Agent has no upload flow through the BFF today. |
 | `GCS_SIGNER_SERVICE_ACCOUNT` | — | Needed for `signBlob` signing on Cloud Run. |
 | `SESSION_ABSOLUTE_TTL_SECONDS` | `28800` | 8 h, aligned with IAP. |
 | `SESSION_IDLE_TTL_SECONDS` | `3600` | |
@@ -95,7 +96,7 @@ any are missing.
 - `roles/datastore.user` — Firestore sessions
 - `roles/cloudkms.cryptoKeyEncrypterDecrypter` on the session key — DEK wrap/unwrap
 - `roles/secretmanager.secretAccessor` on `entra-bff-client-secret` and `apigee-bff-client-key`
-- `roles/storage.objectAdmin` on `GCS_UPLOAD_BUCKET` — signed uploads
+- `roles/storage.objectAdmin` on `GCS_UPLOAD_BUCKET_TRANSLATION` (and `GCS_UPLOAD_BUCKET_SALES_AGENT` if that route is ever added) — signed uploads
 - `roles/iam.serviceAccountTokenCreator` **on itself** — required for `signBlob` URL signing
 
 ## Tests

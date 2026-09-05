@@ -69,9 +69,9 @@ class GcsSigner:
             self._client = storage.Client(project=self._settings.gcp_project_id)
         return self._client
 
-    def _sign(self, object_name: str, content_type: str) -> str:
+    def _sign(self, bucket_name: str, object_name: str, content_type: str) -> str:
         client = self._ensure_client()
-        bucket = client.bucket(self._settings.gcs_upload_bucket)  # type: ignore[attr-defined]
+        bucket = client.bucket(bucket_name)  # type: ignore[attr-defined]
         blob = bucket.blob(object_name)
 
         kwargs: dict[str, object] = {
@@ -99,11 +99,18 @@ class GcsSigner:
         return str(credentials.token)
 
     async def signed_put_url(
-        self, *, subject_oid: str, filename: str, content_type: str
+        self, *, bucket_name: str, subject_oid: str, filename: str, content_type: str
     ) -> SignedUpload:
+        """Mint a signed PUT URL in the given service's own dedicated bucket.
+
+        `bucket_name` is passed by the caller (one per service route), not
+        read from a single global setting -- each backend service has its
+        own dedicated GCS bucket (AICOE-Terraform GAP-REGISTER R-13), so
+        there is no one bucket this class could default to.
+        """
         object_name = object_name_for(subject_oid=subject_oid, filename=filename)
         try:
-            url = await asyncio.to_thread(self._sign, object_name, content_type)
+            url = await asyncio.to_thread(self._sign, bucket_name, object_name, content_type)
         except Exception as exc:  # noqa: BLE001
             logger.error("signed_url_generation_failed", extra={"error": str(exc)})
             raise SigningUnavailableError(
@@ -113,7 +120,7 @@ class GcsSigner:
 
         return SignedUpload(
             upload_url=url,
-            gs_uri=f"gs://{self._settings.gcs_upload_bucket}/{object_name}",
+            gs_uri=f"gs://{bucket_name}/{object_name}",
             object_name=object_name,
             expires_in=int(SIGNED_URL_TTL.total_seconds()),
             # The browser PUT must send exactly this or the signature will not match.

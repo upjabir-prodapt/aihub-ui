@@ -302,7 +302,7 @@ is also exactly what goes into `ENTRA_SCOPES`.
 | `KMS_KEY_NAME` | full resource name of the `session` key |
 | `FIRESTORE_DATABASE` | `(default)` |
 | `APIGEE_BASE_URL` / `APIGEE_API_KEY_SECRET` | `https://aihub-api.aicoedev-int.colt.net` / `apigee-bff-client-key` |
-| `GCS_UPLOAD_BUCKET` / `GCS_SIGNER_SERVICE_ACCOUNT` | upload bucket / `aihub-bff-sa@…` |
+| `GCS_UPLOAD_BUCKET_TRANSLATION` / `GCS_SIGNER_SERVICE_ACCOUNT` | Translation's dedicated upload bucket / `aihub-bff-sa@…` |
 
 Full table with dev values: [`GITLAB_CI_VARIABLES.md`](GITLAB_CI_VARIABLES.md).
 
@@ -314,7 +314,7 @@ Not yet present in Terraform. The BFF cannot start without the first one:
 - `roles/cloudkms.cryptoKeyEncrypterDecrypter` on the `session` key
 - `roles/datastore.user`
 - `roles/iam.serviceAccountTokenCreator` **on itself** (V4 signed URLs via `signBlob`)
-- `roles/storage.objectAdmin` on `GCS_UPLOAD_BUCKET`
+- `roles/storage.objectAdmin` on `GCS_UPLOAD_BUCKET_TRANSLATION` (and `GCS_UPLOAD_BUCKET_SALES_AGENT` if/when a Sales-Agent upload route is added)
 
 ---
 

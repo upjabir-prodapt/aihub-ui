@@ -31,7 +31,9 @@ variables:
   #   ENTRA_ACCESS_TOKEN_AUDIENCES, ENTRA_REDIRECT_URI,
   #   ENTRA_SCOPES, ENTRA_CLIENT_SECRET_NAME, IAP_AUDIENCE, IAP_ENABLED,
   #   FIRESTORE_DATABASE, KMS_KEY_NAME, APIGEE_BASE_URL, APIGEE_API_KEY_SECRET,
-  #   GCS_UPLOAD_BUCKET, GCS_SIGNER_SERVICE_ACCOUNT
+  #   GCS_UPLOAD_BUCKET_TRANSLATION, GCS_SIGNER_SERVICE_ACCOUNT
+  # Optional: GCS_UPLOAD_BUCKET_SALES_AGENT (declared, not consumed by any
+  #   route yet -- see GITLAB_CI_VARIABLES.md)
   # There are no VITE_* build-time variables any more: the SPA is served by the
   # BFF from the same origin and calls only relative paths.
   # See GITLAB_CI_VARIABLES.md and ENTRA_SETUP.md
@@ -406,7 +408,7 @@ env-scope-check:
         ENTRA_TENANT_ID ENTRA_CLIENT_ID ENTRA_APP_ID_URI ENTRA_ACCESS_TOKEN_AUDIENCES \
         ENTRA_REDIRECT_URI ENTRA_SCOPES \
         ENTRA_CLIENT_SECRET_NAME IAP_AUDIENCE KMS_KEY_NAME \
-        APIGEE_BASE_URL APIGEE_API_KEY_SECRET GCS_UPLOAD_BUCKET"
+        APIGEE_BASE_URL APIGEE_API_KEY_SECRET GCS_UPLOAD_BUCKET_TRANSLATION"
       missing=0
       for var in $required_vars; do
         if [ -n "$(printenv "$var")" ]; then
@@ -526,7 +528,12 @@ deploy-cloud-run:
       ENV_VARS="${ENV_VARS}||KMS_KEY_NAME=${KMS_KEY_NAME}"
       ENV_VARS="${ENV_VARS}||APIGEE_BASE_URL=${APIGEE_BASE_URL}"
       ENV_VARS="${ENV_VARS}||APIGEE_API_KEY_SECRET=${APIGEE_API_KEY_SECRET:-apigee-bff-client-key}"
-      ENV_VARS="${ENV_VARS}||GCS_UPLOAD_BUCKET=${GCS_UPLOAD_BUCKET}"
+      ENV_VARS="${ENV_VARS}||GCS_UPLOAD_BUCKET_TRANSLATION=${GCS_UPLOAD_BUCKET_TRANSLATION}"
+      # Not consumed by any route yet (Sales-Agent has no upload flow through
+      # the BFF today) -- passed through if set so the value is ready without
+      # a CI change once that route exists. Empty is fine; the Settings
+      # validator does not require it.
+      ENV_VARS="${ENV_VARS}||GCS_UPLOAD_BUCKET_SALES_AGENT=${GCS_UPLOAD_BUCKET_SALES_AGENT:-}"
       ENV_VARS="${ENV_VARS}||GCS_SIGNER_SERVICE_ACCOUNT=${GCS_SIGNER_SERVICE_ACCOUNT:-$CLOUD_RUN_SA}"
       ENV_VARS="${ENV_VARS}||SESSION_ABSOLUTE_TTL_SECONDS=${SESSION_ABSOLUTE_TTL_SECONDS:-28800}"
       ENV_VARS="${ENV_VARS}||SESSION_IDLE_TTL_SECONDS=${SESSION_IDLE_TTL_SECONDS:-3600}"
