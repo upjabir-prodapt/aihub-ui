@@ -1,8 +1,9 @@
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { postChat } from '../api/client';
-import './ChatPanel.css';
+import { postChat } from '../api/naasAgentApi';
+import { useAuth } from '../context/useAuth';
+import '../styles/ChatPanel.css';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -42,6 +43,10 @@ function makeSessionId(): string {
 // whichever agentId is passed in, so this same component works for every
 // agent screen; nothing here is SRE-Monitor-specific.
 export default function ChatPanel({ agentId, onToolResults, renderBeforeMessage }: ChatPanelProps) {
+  // Threaded through as ChatRequest.user_id when present, matching the
+  // sales/translation pattern of reusing the hub's colt_session identity;
+  // chat still works logged out (user_id simply omitted).
+  const { user } = useAuth();
   const [sessionId] = useState(makeSessionId);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -69,7 +74,7 @@ export default function ChatPanel({ agentId, onToolResults, renderBeforeMessage 
     hasGreetedRef.current = true;
 
     setSending(true);
-    postChat({ agent_id: agentId, message: 'Hi', session_id: sessionId })
+    postChat({ agent_id: agentId, message: 'Hi', session_id: sessionId, user_id: user?.email })
       .then((res) => {
         setMessages([{ role: 'assistant', text: res.reply, toolResults: res.tool_results }]);
         if (onToolResults && Object.keys(res.tool_results ?? {}).length > 0) {
@@ -92,7 +97,7 @@ export default function ChatPanel({ agentId, onToolResults, renderBeforeMessage 
     setMessages((prev) => [...prev, { role: 'user', text }]);
     setSending(true);
     try {
-      const res = await postChat({ agent_id: agentId, message: text, session_id: sessionId });
+      const res = await postChat({ agent_id: agentId, message: text, session_id: sessionId, user_id: user?.email });
       setMessages((prev) => [
         ...prev,
         { role: 'assistant', text: res.reply, toolResults: res.tool_results },

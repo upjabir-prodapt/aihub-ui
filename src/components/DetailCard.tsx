@@ -1,4 +1,4 @@
-import './DetailCard.css';
+import '../styles/DetailCard.css';
 
 interface DetailRow {
   label: string;

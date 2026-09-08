@@ -59,11 +59,7 @@ export async function handleMockApiRequest(
   }
 
   // ── NaaS Agent Backend ────────────────────────────────────────────────────
-  if (
-    pathname === '/agents' ||
-    pathname === '/chat' ||
-    pathname.startsWith('/admin/tickets')
-  ) {
+  if (pathname.startsWith('/api/naas/v1')) {
     const handled = await handleNaasMock(pathname, method, req, res);
     if (handled) return;
   }

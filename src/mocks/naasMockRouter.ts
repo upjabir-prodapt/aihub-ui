@@ -1,12 +1,18 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { readBody, sendJson } from './translationMockRouter.ts';
 import { mockNaasManager } from './mockNaasManager.ts';
-import type { AgentPublic, ChatRequest, ChatResponse } from '../naas/api/types.ts';
+import type { AgentPublic, ChatRequest, ChatResponse } from '../types/naas.ts';
 
-// Basic stub for the agent-backend (naas-mcp) API — see src/naas/api/client.ts.
+// Basic stub for the agent-backend (naas-mcp) API — see src/api/naasAgentApi.ts.
 // Returns plain canned replies with empty tool_results, so agent-specific
 // panels (ServiceOrderPanel, SreMonitorPanel) stay in their empty state.
 // Not a simulation of the real ADK orchestrator/MCP tool flow.
+//
+// Paths are prefixed /api/naas/v1/... (matching the same-origin path the
+// browser calls, see naasConfig.ts), even though naas-mcp's own real routes
+// are bare /agents, /chat, /admin/tickets/* — the prefix is stripped by
+// vite.config.ts's proxy rewrite / nginx in the non-mock case, so the mock
+// here matches what the browser actually requests.
 const MOCK_AGENTS: AgentPublic[] = [
   {
     id: 'service-order',
@@ -34,12 +40,12 @@ export async function handleNaasMock(
   req: IncomingMessage,
   res: ServerResponse,
 ): Promise<boolean> {
-  if (pathname === '/agents' && method === 'GET') {
+  if (pathname === '/api/naas/v1/agents' && method === 'GET') {
     sendJson(res, 200, MOCK_AGENTS);
     return true;
   }
 
-  if (pathname === '/chat' && method === 'POST') {
+  if (pathname === '/api/naas/v1/chat' && method === 'POST') {
     const raw = await readBody(req);
     try {
       const request = JSON.parse(raw) as ChatRequest;
@@ -56,17 +62,17 @@ export async function handleNaasMock(
     return true;
   }
 
-  if (pathname === '/admin/tickets/pending' && method === 'GET') {
+  if (pathname === '/api/naas/v1/admin/tickets/pending' && method === 'GET') {
     sendJson(res, 200, mockNaasManager.getPending());
     return true;
   }
 
-  if (pathname === '/admin/tickets/history' && method === 'GET') {
+  if (pathname === '/api/naas/v1/admin/tickets/history' && method === 'GET') {
     sendJson(res, 200, mockNaasManager.getHistory());
     return true;
   }
 
-  const approveMatch = pathname.match(/^\/admin\/tickets\/(\d+)\/approve$/);
+  const approveMatch = pathname.match(/^\/api\/naas\/v1\/admin\/tickets\/(\d+)\/approve$/);
   if (approveMatch && method === 'POST') {
     const ticketId = Number(approveMatch[1]);
     const ticket = mockNaasManager.approve(ticketId);

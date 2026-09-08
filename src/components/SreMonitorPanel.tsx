@@ -1,10 +1,10 @@
-import type { LeftPanelProps } from '../../registry/leftPanels';
-import type { SreMonitorState } from './types';
-import DetailCard from '../../components/DetailCard';
-import Gauge from '../../components/Gauge';
-import StatCard from '../../components/StatCard';
-import LineChart from '../../components/LineChart';
-import './SreMonitorPanel.css';
+import type { LeftPanelProps } from './leftPanels';
+import type { SreMonitorState } from '../types/sreMonitor';
+import DetailCard from './DetailCard';
+import Gauge from './Gauge';
+import StatCard from './StatCard';
+import LineChart from './LineChart';
+import '../styles/SreMonitorPanel.css';
 
 // Fixed status palette (never themed) — see mcp-server's thresholds in
 // agent_backend/agents/sre_monitor/prompt.md, which these mirror exactly.

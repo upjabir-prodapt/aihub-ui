@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
-import type { ConnectionPort, ListPortsResult } from './types';
-import './PortSearch.css';
+import type { ConnectionPort, ListPortsResult } from '../types/serviceOrder';
+import '../styles/PortSearch.css';
 
 // Defense in depth: the backend normalizes every field to a plain string
 // (mcp-server/tools/connections.py's _display()), but this API has

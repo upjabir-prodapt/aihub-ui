@@ -1,4 +1,4 @@
-import type { ServiceOrderState } from './types';
+import type { ServiceOrderState } from '../types/serviceOrder';
 
 // Derives "where are we in the conversation" from the tools that have
 // fired so far. `state` is expected to be ServiceOrderPanel's *effective*

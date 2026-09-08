@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import NaaSLanding from './pages/NaaSLanding';
-import NaaSAgentScreen from './pages/NaaSAgentScreen';
-import NaaSAdmin from './pages/NaaSAdmin';
+import NaaSLanding from './NaaSLanding';
+import NaaSAgentScreen from './NaaSAgentScreen';
+import NaaSAdmin from './NaaSAdmin';
 
 type NaaSView = { name: 'grid' } | { name: 'agent'; agentId: string } | { name: 'admin' };
 

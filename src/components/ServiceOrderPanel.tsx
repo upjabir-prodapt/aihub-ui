@@ -15,10 +15,10 @@ import {
   Tag,
   type LucideIcon,
 } from 'lucide-react';
-import type { LeftPanelProps } from '../../registry/leftPanels';
-import type { ServiceOrderState } from './types';
-import { computeServiceOrderFlow, type FlowNode, type NodeStatus, type ServiceOrderFlow } from './flowState';
-import './ServiceOrderPanel.css';
+import type { LeftPanelProps } from './leftPanels';
+import type { ServiceOrderState } from '../types/serviceOrder';
+import { computeServiceOrderFlow, type FlowNode, type NodeStatus, type ServiceOrderFlow } from '../utils/serviceOrderFlowState';
+import '../styles/ServiceOrderPanel.css';
 
 // Which tool_results keys computeServiceOrderFlow actually reads — see
 // useEffectiveServiceOrderState below.

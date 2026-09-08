@@ -53,6 +53,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, __dirname, '')
   const translationApiOrigin = env.VITE_TRANSLATION_API_ORIGIN
   const salesApiOrigin = env.VITE_SALES_API_ORIGIN
+  const naasAgentBackendUrl = env.VITE_NAAS_AGENT_BACKEND_URL
   const tlsCaFile = env.VITE_TLS_CA_FILE
   const coltInternalCa = tlsCaFile ? path.resolve(__dirname, tlsCaFile) : undefined
   const tlsCa = coltInternalCa && fs.existsSync(coltInternalCa)
@@ -66,10 +67,11 @@ export default defineConfig(({ mode }) => {
   const isProduction = mode === 'production' || mode === 'sandbox'
   const useMockApi = !isProduction && (env.VITE_USE_MOCKS === 'true' || mode === 'mock' || mode === 'development')
 
-  if (!useMockApi && (!translationApiOrigin || !salesApiOrigin)) {
+  if (!useMockApi && (!translationApiOrigin || !salesApiOrigin || !naasAgentBackendUrl)) {
     throw new Error(
-      'Missing VITE_TRANSLATION_API_ORIGIN or VITE_SALES_API_ORIGIN in .env file. ' +
-        'Copy .env.example to .env.development or configure your environment variables.',
+      'Missing VITE_TRANSLATION_API_ORIGIN, VITE_SALES_API_ORIGIN, or ' +
+        'VITE_NAAS_AGENT_BACKEND_URL in .env file. Copy .env.example to ' +
+        '.env.development or configure your environment variables.',
     )
   }
 
@@ -114,6 +116,20 @@ export default defineConfig(({ mode }) => {
             ...translationProxyTls,
             configure: (proxy: DevProxyServer) => {
               proxyAuthHeaders(proxy, hostFromOrigin(salesApiOrigin), mode === 'development')
+            },
+          },
+        } : {}),
+        // naas-mcp's own routes have no /api/v1 prefix (bare /agents, /chat,
+        // /admin/tickets/*), unlike translation/sales — strip the prefix
+        // entirely rather than rewriting it to /api.
+        ...(naasAgentBackendUrl ? {
+          '/api/naas/v1': {
+            target: naasAgentBackendUrl,
+            changeOrigin: true,
+            rewrite: (path: string) => path.replace(/^\/api\/naas\/v1/, ''),
+            ...translationProxyTls,
+            configure: (proxy: DevProxyServer) => {
+              proxyAuthHeaders(proxy, hostFromOrigin(naasAgentBackendUrl), mode === 'development')
             },
           },
         } : {}),

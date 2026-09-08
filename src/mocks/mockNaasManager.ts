@@ -1,4 +1,4 @@
-import type { ServiceOrderTicket } from '../naas/api/types.ts';
+import type { ServiceOrderTicket } from '../types/naas.ts';
 
 // Seed data so NaaSAdmin has something to show without ever calling /chat.
 const seedTickets: ServiceOrderTicket[] = [

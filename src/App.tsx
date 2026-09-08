@@ -16,7 +16,7 @@ import ServiceHubPage from './pages/ServiceHubPage';
 import JobTrackerPage from './pages/JobTrackerPage';
 import TranslationPage from './pages/TranslationPage';
 import SalesAgentPage from './pages/SalesAgentPage';
-import NaaSPage from './naas/NaaSPage';
+import NaaSPage from './pages/NaaSPage';
 import './styles/layout.css';
 
 

@@ -1,5 +1,5 @@
 import { useMemo, useState, type MouseEvent } from 'react';
-import './LineChart.css';
+import '../styles/LineChart.css';
 
 interface DataPoint {
   timestamp: string;

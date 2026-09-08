@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import type { InvoiceResult } from './types';
-import './InvoiceCard.css';
+import type { InvoiceResult } from '../types/serviceOrder';
+import '../styles/InvoiceCard.css';
 
 // Drop your logo file here (any of these paths) — the card falls back to
 // a text wordmark automatically until one exists, so nothing looks broken

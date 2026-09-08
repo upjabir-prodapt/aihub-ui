@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
-import InvoiceCard from '../agents/service-order/InvoiceCard';
-import PortSearch from '../agents/service-order/PortSearch';
-import type { InvoiceResult, ListPortsResult } from '../agents/service-order/types';
+import InvoiceCard from './InvoiceCard';
+import PortSearch from './PortSearch';
+import type { InvoiceResult, ListPortsResult } from '../types/serviceOrder';
 
 // Frontend-side companion to leftPanels.tsx, but for the chat stream
 // itself: an agent can optionally render something *before* a given

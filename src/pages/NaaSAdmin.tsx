@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { approveTicket, fetchPendingTickets, fetchTicketHistory } from '../api/client';
-import type { ServiceOrderTicket } from '../api/types';
+import { approveTicket, fetchPendingTickets, fetchTicketHistory } from '../api/naasAgentApi';
+import type { ServiceOrderTicket } from '../types/naas';
+import { useAuth } from '../context/useAuth';
 import './NaaSAdmin.css';
 
 type Tab = 'pending' | 'history';
@@ -14,6 +15,10 @@ function formatAddress(ticket: ServiceOrderTicket): string {
 }
 
 export default function NaaSAdmin({ onBack }: NaaSAdminProps) {
+  // Ticket approval is a mutating admin action, so it's gated on the same
+  // hub login (colt_session) used by Translation/Sales — chatting with an
+  // agent stays open to anyone, but approving requires a signed-in user.
+  const { isAuthenticated } = useAuth();
   const [tab, setTab] = useState<Tab>('pending');
   const [pending, setPending] = useState<ServiceOrderTicket[]>([]);
   const [history, setHistory] = useState<ServiceOrderTicket[]>([]);
@@ -53,6 +58,11 @@ export default function NaaSAdmin({ onBack }: NaaSAdminProps) {
       </header>
 
       {error && <p className="naas-admin-error">{error}</p>}
+      {!isAuthenticated && (
+        <p className="naas-admin-error">
+          Sign in from the Translation or Sales tab to approve tickets.
+        </p>
+      )}
 
       <div className="naas-admin-tabs">
         <button
@@ -104,7 +114,8 @@ export default function NaaSAdmin({ onBack }: NaaSAdminProps) {
                   <td>
                     <button
                       className="naas-admin-approve-btn"
-                      disabled={approvingId === ticket.id}
+                      disabled={!isAuthenticated || approvingId === ticket.id}
+                      title={isAuthenticated ? undefined : 'Sign in to approve tickets'}
                       onClick={() => handleApprove(ticket.id)}
                     >
                       {approvingId === ticket.id ? 'Approving…' : 'Approve'}

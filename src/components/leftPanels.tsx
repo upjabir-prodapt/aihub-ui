@@ -1,7 +1,7 @@
 import type { ComponentType } from 'react';
-import PlaceholderPanel from '../components/PlaceholderPanel';
-import SreMonitorPanel from '../agents/sre-monitor/SreMonitorPanel';
-import ServiceOrderPanel from '../agents/service-order/ServiceOrderPanel';
+import PlaceholderPanel from './PlaceholderPanel';
+import SreMonitorPanel from './SreMonitorPanel';
+import ServiceOrderPanel from './ServiceOrderPanel';
 
 // Every left panel receives the tool_results accumulated so far this
 // conversation (see AgentScreen's mergeToolResults), keyed by tool name.

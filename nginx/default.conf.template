@@ -105,6 +105,26 @@ server {
         proxy_set_header X-Colt-Hub-IAP-Assertion $http_x_goog_iap_jwt_assertion;
     }
 
+    # naas-mcp agent-backend. Same Architecture B pattern as translation/sales
+    # above, except naas-mcp's own routes have no /api/v1 prefix of their own
+    # (bare /agents, /chat, /admin/tickets/*) — the trailing slash on both the
+    # location and proxy_pass strips /api/naas/v1/ entirely rather than
+    # rewriting it to /api/v1/.
+    location /api/naas/v1/ {
+        proxy_pass ${VITE_NAAS_AGENT_BACKEND_URL}/;
+        proxy_ssl_server_name on;
+        proxy_set_header Host ${NAAS_AGENT_BACKEND_HOST};
+        proxy_pass_request_headers on;
+        # Forwarded unchanged from the inbound request — do not strip or rewrite:
+        proxy_set_header Authorization $http_authorization;
+        proxy_set_header x-app-auth $http_x_app_auth;
+        proxy_set_header X-Serverless-Authorization $http_authorization;
+        proxy_set_header X-Goog-IAP-JWT-Assertion $http_x_goog_iap_jwt_assertion;
+        proxy_set_header X-Goog-Authenticated-User-Email $http_x_goog_authenticated_user_email;
+        # GFE-safe relay of the same JWT (see note above) — not an X-Goog-* name:
+        proxy_set_header X-Colt-Hub-IAP-Assertion $http_x_goog_iap_jwt_assertion;
+    }
+
 
     # Hashed Vite build assets — long cache + security headers
     location /assets/ {

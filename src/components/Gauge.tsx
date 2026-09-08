@@ -1,4 +1,4 @@
-import './Gauge.css';
+import '../styles/Gauge.css';
 
 interface GaugeZone {
   /** This zone covers the range up to (and not including) the previous

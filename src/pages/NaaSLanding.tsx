@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { fetchAgents } from '../api/client';
-import type { AgentPublic } from '../api/types';
-import { agentVisuals, defaultAgentVisual } from '../registry/agentVisuals';
+import { fetchAgents } from '../api/naasAgentApi';
+import type { AgentPublic } from '../types/naas';
+import { agentVisuals, defaultAgentVisual } from '../components/agentVisuals';
 import './NaaSLanding.css';
 
 interface NaaSLandingProps {
