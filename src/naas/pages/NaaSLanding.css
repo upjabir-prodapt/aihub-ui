@@ -1,0 +1,166 @@
+.naas-landing-page {
+  min-height: 100%;
+  background: var(--bg-base);
+  overflow-y: auto;
+}
+
+.naas-landing-hero {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, var(--colt-teal-deep) 0%, var(--colt-teal-dark) 100%);
+  padding: 4rem 1.5rem 6.5rem;
+}
+
+.naas-landing-hero-decor {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.naas-decor-circle {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.naas-decor-circle--1 {
+  width: 340px;
+  height: 340px;
+  top: -160px;
+  right: -80px;
+}
+
+.naas-decor-circle--2 {
+  width: 180px;
+  height: 180px;
+  bottom: -100px;
+  right: 240px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.naas-decor-circle--3 {
+  width: 120px;
+  height: 120px;
+  top: 30px;
+  left: -40px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.naas-landing-admin-link {
+  position: absolute;
+  top: 1.5rem;
+  right: 1.5rem;
+  z-index: 1;
+  border: none;
+  color: #ffffff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-family: inherit;
+  background: rgba(255, 255, 255, 0.16);
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.naas-landing-admin-link:hover {
+  background: rgba(255, 255, 255, 0.26);
+}
+
+.naas-landing-hero-content {
+  position: relative;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.naas-landing-hero-content h1 {
+  font-size: 2.5rem;
+  color: #ffffff;
+  margin-bottom: 0.75rem;
+  letter-spacing: -0.02em;
+}
+
+.naas-landing-subtitle {
+  font-size: 1.1rem;
+  color: rgba(255, 255, 255, 0.92);
+  max-width: 620px;
+  line-height: 1.5;
+}
+
+.naas-landing-main {
+  position: relative;
+  max-width: 960px;
+  margin: -3.5rem auto 0;
+  padding: 0 1.5rem 4rem;
+}
+
+.naas-landing-status {
+  color: var(--text-secondary);
+  margin-bottom: 1.5rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  padding: 1rem 1.25rem;
+  border-radius: 12px;
+  box-shadow: var(--shadow-md);
+}
+
+.naas-landing-error {
+  color: var(--text-error);
+}
+
+.naas-agent-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.5rem;
+}
+
+.naas-agent-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  border: 1px solid var(--border-subtle);
+  color: inherit;
+  font-family: inherit;
+  background: var(--bg-card);
+  border-radius: 16px;
+  padding: 1.75rem;
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  transition: transform var(--transition-mid), box-shadow var(--transition-mid), border-color var(--transition-fast);
+}
+
+.naas-agent-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--border-teal);
+}
+
+.naas-agent-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  margin-bottom: 1.1rem;
+}
+
+.naas-agent-card h2 {
+  font-size: 1.15rem;
+  margin-bottom: 0.5rem;
+  color: var(--text-primary);
+}
+
+.naas-agent-card p {
+  font-size: 0.925rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin: 0 0 1.1rem;
+  flex: 1;
+}
+
+.naas-agent-card-cta {
+  font-size: 0.875rem;
+  font-weight: 600;
+}

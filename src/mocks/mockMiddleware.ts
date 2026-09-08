@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { handleTranslationMock, sendJson } from './translationMockRouter.ts';
 import { handleSalesMock } from './salesMockRouter.ts';
+import { handleNaasMock } from './naasMockRouter.ts';
 
 
 export async function handleMockApiRequest(
@@ -54,6 +55,16 @@ export async function handleMockApiRequest(
   // ── Sales Agent Service ───────────────────────────────────────────────────
   if (pathname.startsWith('/api/sales/v1')) {
     const handled = await handleSalesMock(pathname, method, req, res);
+    if (handled) return;
+  }
+
+  // ── NaaS Agent Backend ────────────────────────────────────────────────────
+  if (
+    pathname === '/agents' ||
+    pathname === '/chat' ||
+    pathname.startsWith('/admin/tickets')
+  ) {
+    const handled = await handleNaasMock(pathname, method, req, res);
     if (handled) return;
   }
 

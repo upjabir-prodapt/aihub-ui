@@ -1,0 +1,97 @@
+.naas-agent-screen {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.naas-agent-screen-header {
+  display: flex;
+  align-items: baseline;
+  gap: 1.25rem;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+}
+
+.naas-agent-screen-header h1 {
+  font-size: 1.25rem;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.naas-back-link {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--text-teal);
+  font-family: inherit;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.naas-back-link:hover {
+  text-decoration: underline;
+}
+
+.naas-agent-screen-error {
+  padding: 0.75rem 1.5rem;
+  color: var(--text-error);
+  margin: 0;
+}
+
+.naas-agent-screen-body {
+  flex: 1;
+  display: grid;
+  /* grid-template-columns is set inline (NaaSAgentScreen.tsx) so it can
+     track the divider's drag position. */
+  min-height: 0;
+}
+
+.naas-agent-screen-left {
+  background: var(--bg-elevated);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.naas-agent-screen-right {
+  background: var(--bg-surface);
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.naas-agent-screen-divider {
+  position: relative;
+  background: var(--border-default);
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.naas-agent-screen-divider:hover,
+.naas-agent-screen-divider.is-dragging {
+  background: var(--colt-teal);
+}
+
+/* Widen the draggable hit target well past the 6px visible line — a 6px
+   strip is nearly impossible to grab reliably. */
+.naas-agent-screen-divider::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -6px;
+  right: -6px;
+}
+
+.placeholder-panel {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
