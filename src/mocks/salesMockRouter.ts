@@ -72,5 +72,22 @@ export async function handleSalesMock(
     return true;
   }
 
+  const salesFeedbackMatch = pathname.match(/^\/api\/sales\/v1\/research\/([^/]+)\/feedback$/);
+  if (salesFeedbackMatch && method === 'POST') {
+    const jobId = salesFeedbackMatch[1];
+    const raw = await readBody(req);
+    try {
+      const parsed = JSON.parse(raw) as { feedback?: string };
+      if (!parsed.feedback || !parsed.feedback.trim()) {
+        sendJson(res, 422, { detail: 'feedback is required' });
+      } else {
+        sendJson(res, 200, mockDb.submitSalesFeedback(jobId, parsed.feedback.trim()));
+      }
+    } catch {
+      sendJson(res, 400, { error: { message: 'Invalid feedback payload' } });
+    }
+    return true;
+  }
+
   return false;
 }

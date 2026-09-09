@@ -6,6 +6,7 @@ import type {
   ResearchModelCard,
   ResearchResultResponse,
   ResearchJobListItem,
+  ResearchFeedbackResponse,
 } from '../types/sales';
 import {
   ensureFreshSalesGoogleIdToken,
@@ -29,6 +30,7 @@ export type {
   ResearchModelCard,
   ResearchResultResponse,
   ResearchJobListItem,
+  ResearchFeedbackResponse,
 };
 
 // ── Session storage (isolated from Translation) ────────────────────────────
@@ -328,6 +330,30 @@ export async function cancelResearch(job_id: string): Promise<{ message: string 
   }
 
   return (await res.json().catch(() => ({ message: 'Cancelled' }))) as { message: string };
+}
+
+/**
+ * POST /api/sales/v1/research/{job_id}/feedback
+ *
+ * Unlike Translation's `submitReview`, this backend takes a free-text
+ * comment only — there is no numeric rating field in the Sales Agent
+ * `ResearchFeedbackRequest` schema.
+ */
+export async function submitFeedback(
+  job_id: string,
+  feedback: string,
+): Promise<ResearchFeedbackResponse> {
+  const res = await fetchSalesWithAuth(`${SALES_API_BASE}/research/${job_id}/feedback`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ feedback }),
+  });
+
+  if (!res.ok) {
+    throw new Error(await parseSalesApiError(res, 'Failed to submit feedback'));
+  }
+
+  return (await res.json()) as ResearchFeedbackResponse;
 }
 
 /** GET /api/sales/v1/research/download/{job_id} */

@@ -56,6 +56,10 @@ class MockDatabase {
   public cancelSalesResearch(jobId: string) {
     return this.sales.cancelResearch(jobId);
   }
+
+  public submitSalesFeedback(jobId: string, feedback: string) {
+    return this.sales.submitFeedback(jobId, feedback);
+  }
 }
 
 export const mockDb = new MockDatabase();

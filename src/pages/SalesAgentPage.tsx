@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AlertCircle, X, Search, ShieldCheck, Zap, Globe, PieChart, Hash } from 'lucide-react';
 import { initiateResearch } from '../api/salesAgentApi';
 import { useAuth } from '../context/useAuth';
@@ -7,12 +7,16 @@ import { useServiceJobs } from '../hooks/useServiceJobs';
 import RecentRuns from '../components/RecentRuns';
 import RunJobModal from '../components/RunJobModal';
 import ServiceLanding from '../components/ServiceLanding';
+import SalesFeedbackModal from '../components/SalesFeedbackModal';
 import '../styles/service-detail.css';
 import {
   forceRefreshSalesGoogleIdToken,
   SALES_GOOGLE_TOKEN_REFRESH_INTERVAL_MS,
 } from '../api/salesCloudRunAuth';
 import '../styles/sales-agent.css';
+// SalesFeedbackModal reuses the generic modal/review-* classes defined here
+// alongside Translation's ReviewModal (see src/components/ReviewModal.tsx).
+import '../styles/translation.css';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Main Sales Agent Page
@@ -47,6 +51,9 @@ const SalesAgentPage: React.FC<SalesAgentPageProps> = ({ onOpenTracker, onBack }
   const { registerJob } = useSalesJobs();
   const serviceJobs = useServiceJobs('sales');
   const [runOpen, setRunOpen] = useState(false);
+  const [feedbackJobId, setFeedbackJobId] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ ok: boolean; message: string } | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Research form ──────────────────────────────────────────────────────────
   const [company, setCompany] = useState('');
@@ -82,6 +89,17 @@ const SalesAgentPage: React.FC<SalesAgentPageProps> = ({ onOpenTracker, onBack }
     const intervalId = window.setInterval(refresh, SALES_GOOGLE_TOKEN_REFRESH_INTERVAL_MS);
     return () => window.clearInterval(intervalId);
   }, [isSalesAuthenticated]);
+
+  const showToast = useCallback((ok: boolean, message: string) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast({ ok, message });
+    toastTimer.current = setTimeout(() => setToast(null), 4500);
+  }, []);
+
+  // ── Feedback toast ──
+  const handleFeedbackSubmitted = (ok: boolean, message: string) => {
+    showToast(ok, message);
+  };
 
   // Invoked by RunJobModal's form submit, which already calls preventDefault.
   const startResearch = async () => {
@@ -212,10 +230,44 @@ const SalesAgentPage: React.FC<SalesAgentPageProps> = ({ onOpenTracker, onBack }
           onDownload={serviceJobs.downloadJob}
           onLoadDetail={serviceJobs.loadDetail}
           onOpenTracker={onOpenTracker}
-          // Sales research jobs have no review flow yet — onRate is
-          // intentionally omitted.
+          onFeedback={(job) => setFeedbackJobId(job.id)}
         />
       </div>
+
+      {feedbackJobId && (
+        <SalesFeedbackModal
+          isOpen={!!feedbackJobId}
+          jobId={feedbackJobId}
+          onClose={() => setFeedbackJobId(null)}
+          onSubmitted={handleFeedbackSubmitted}
+        />
+      )}
+
+      {/* Feedback result toast — same markup/classes as Translation's review toast. */}
+      {toast && (
+        <div className={`review-toast ${toast.ok ? 'review-toast--success' : 'review-toast--error'}`} role="status" aria-live="polite">
+          <div className="review-toast-icon">
+            {toast.ok ? (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+            )}
+          </div>
+          <span className="review-toast-message">{toast.message}</span>
+          <button className="review-toast-close" onClick={() => setToast(null)} aria-label="Dismiss">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+      )}
     </div>
   );
 };

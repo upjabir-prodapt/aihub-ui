@@ -5,6 +5,7 @@ import { useTranslationJobs } from '../context/useTranslationJobs';
 import { useSalesJobs } from '../context/useSalesJobs';
 import { translationApi } from '../api/translationApi';
 import { downloadResearchFile, listResearchJobs } from '../api/salesAgentApi';
+import SalesFeedbackModal from '../components/SalesFeedbackModal';
 import {
   normalizeTranslationHistoryItem,
   normalizeTranslationActiveItem,
@@ -75,6 +76,7 @@ const JobTrackerPage: React.FC<JobTrackerPageProps> = ({ serviceFilter: initialS
   const TODAY_BUCKET_LIMIT = 3;
   const [showAllToday, setShowAllToday] = useState(false);
   const [reviewJobId, setReviewJobId] = useState<string | null>(null);
+  const [feedbackJobId, setFeedbackJobId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ ok: boolean; message: string } | null>(null);
 
   /**
@@ -490,7 +492,11 @@ const JobTrackerPage: React.FC<JobTrackerPageProps> = ({ serviceFilter: initialS
                                   type="button"
                                   className="tracker-action-btn"
                                   disabled={busy}
-                                  onClick={() => setReviewJobId(job.id)}
+                                  onClick={() =>
+                                    job.service === 'translation'
+                                      ? setReviewJobId(job.id)
+                                      : setFeedbackJobId(job.id)
+                                  }
                                 >
                                   <MessageSquare size={13} /> Feedback
                                 </button>
@@ -531,6 +537,15 @@ const JobTrackerPage: React.FC<JobTrackerPageProps> = ({ serviceFilter: initialS
           isOpen={!!reviewJobId}
           jobId={reviewJobId}
           onClose={() => setReviewJobId(null)}
+          onSubmitted={handleReviewSubmitted}
+        />
+      )}
+
+      {feedbackJobId && (
+        <SalesFeedbackModal
+          isOpen={!!feedbackJobId}
+          jobId={feedbackJobId}
+          onClose={() => setFeedbackJobId(null)}
           onSubmitted={handleReviewSubmitted}
         />
       )}

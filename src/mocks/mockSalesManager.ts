@@ -93,4 +93,9 @@ export class MockSalesManager {
     job.completed_at = new Date().toISOString();
     return true;
   }
+
+  /** Mirrors the real backend's `POST /research/{job_id}/feedback` — no persistence needed for mocks. */
+  public submitFeedback(jobId: string, feedback: string) {
+    return { job_id: jobId, status: 'SUCCESS', message: 'Feedback submitted successfully', feedback };
+  }
 }
