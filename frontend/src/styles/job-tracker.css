@@ -12,6 +12,7 @@
 }
 
 .tracker-eyebrow {
+  font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.12em;
@@ -79,9 +80,9 @@
   gap: 8px;
   padding: 10px 14px;
   border-radius: 10px;
-  background: rgba(242, 12, 54, 0.08);
-  border: 1px solid rgba(242, 12, 54, 0.2);
-  color: var(--text-error);
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #f87171;
   font-size: 12.5px;
   margin-bottom: 18px;
 }
@@ -110,6 +111,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  font-family: var(--font-mono);
   font-size: 10.5px;
   font-weight: 500;
   letter-spacing: 0.08em;
@@ -131,9 +133,9 @@
 }
 
 .dot-running { background: var(--colt-teal); }
-.dot-queued { background: #FFC43D; }
+.dot-queued { background: #eab308; }
 .dot-completed { background: var(--text-muted); }
-.dot-failed { background: #F20C36; }
+.dot-failed { background: #ef4444; }
 
 /* --- Filters --- */
 .tracker-filters {
@@ -228,6 +230,7 @@
 }
 
 .tracker-group-label {
+  font-family: var(--font-mono);
   font-size: 10.5px;
   font-weight: 600;
   letter-spacing: 0.1em;
@@ -329,6 +332,7 @@
 }
 
 .tracker-badge {
+  font-family: var(--font-mono);
   font-size: 9.5px;
   font-weight: 600;
   letter-spacing: 0.06em;
@@ -339,10 +343,10 @@
 }
 
 .tracker-badge--running { background: var(--colt-teal-light); color: var(--colt-teal); }
-.tracker-badge--queued { background: rgba(255, 196, 61, 0.12); color: #FFC43D; }
+.tracker-badge--queued { background: rgba(234, 179, 8, 0.12); color: #eab308; }
 .tracker-badge--completed { background: var(--bg-hover); color: var(--text-muted); }
 .tracker-badge--failed,
-.tracker-badge--cancelled { background: rgba(242, 12, 54, 0.12); color: #F20C36; }
+.tracker-badge--cancelled { background: rgba(239, 68, 68, 0.12); color: #ef4444; }
 
 .tracker-progress-track {
   height: 3px;
@@ -376,9 +380,9 @@
 .tracker-detail-error {
   padding: 10px 12px;
   border-radius: 8px;
-  background: rgba(242, 12, 54, 0.08);
-  border: 1px solid rgba(242, 12, 54, 0.2);
-  color: var(--text-error);
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #f87171;
   font-size: 12.5px;
   line-height: 1.5;
   margin-bottom: 12px;
@@ -399,6 +403,7 @@
 }
 
 .tracker-detail-label {
+  font-family: var(--font-mono);
   font-size: 9.5px;
   font-weight: 600;
   letter-spacing: 0.08em;
@@ -408,10 +413,6 @@
 }
 
 .tracker-detail-value {
-  /* Run IDs, token counts, costs, timestamps — the technical values
-     monospace exists for. The labels beside them are ordinary UI chrome
-     and stay in Urbanist. */
-  font-family: var(--font-mono);
   font-size: 12.5px;
   color: var(--text-primary);
   word-break: break-word;
@@ -449,8 +450,8 @@
 }
 
 .tracker-action-btn--danger:hover:not(:disabled) {
-  border-color: #F20C36;
-  color: #F20C36;
+  border-color: #ef4444;
+  color: #ef4444;
 }
 
 .tracker-detail-hint {

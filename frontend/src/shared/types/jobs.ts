@@ -31,7 +31,7 @@ export interface UnifiedJob {
   errorMessage: string | null;
   canCancel: boolean;
   canDownload: boolean;
-  /** True once a completed job (Translation or Sales Agent) can accept feedback/review. */
+  /** Completed translation jobs can be rated; other services have no review flow yet. */
   canReview: boolean;
   startedBy: string | null;
   /** Cost/tokens/time/model — present once fetched from the job's detail endpoint. */

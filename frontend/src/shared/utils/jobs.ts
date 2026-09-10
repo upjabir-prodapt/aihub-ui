@@ -4,7 +4,6 @@ import type { ResearchJobListItem } from '../../features/sales/api';
 import type { SalesJobRecord } from '../../features/sales/useSalesJobsState';
 import type { UnifiedJob, UnifiedJobDetail, UnifiedJobStatus } from '../types/jobs';
 import { translationApi } from '../../features/translation/api';
-import { getResearchResult } from '../../features/sales/api';
 
 // ── Shared formatting helpers (cost/tokens/time/model), used anywhere a job's
 //    full detail is rendered — Recent runs and Job Tracker expanded rows. ──
@@ -58,6 +57,12 @@ export function extractTranslationDetail(job: JobStatusResponse): UnifiedJobDeta
     modelVersion: meta?.model_version ?? null,
     qualityScore: typeof meta?.quality_score === 'number' ? meta.quality_score : null,
   };
+}
+
+function toFinitePercent(value: unknown): number | null {
+  const n = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(n)) return null;
+  return Math.max(0, Math.min(100, n));
 }
 
 /** Converts the backend's 0.0–1.0 progress fraction to a 0–100 percentage. */
@@ -176,17 +181,13 @@ export function normalizeSalesHistoryItem(item: ResearchJobListItem): UnifiedJob
       ? `Sales research · Account ${item.account_id}`
       : 'Sales research',
     status,
-    // The backend reports progress as a 0.0-1.0 fraction, same convention as
-    // Translation — this used to be passed straight through unscaled, which
-    // rendered a 50%-complete job's progress bar at 0.5% width (effectively
-    // invisible).
-    progress: fractionToPercent(item.progress),
+    progress: toFinitePercent(item.progress),
     createdAt: item.created_at ?? null,
     completedAt: item.completed_at ?? null,
     errorMessage: item.error_message ?? null,
     canCancel: status === 'queued' || status === 'running',
     canDownload: status === 'completed',
-    canReview: status === 'completed',
+    canReview: false,
     startedBy: null,
   };
 }
@@ -208,40 +209,23 @@ export function normalizeSalesJob(item: SalesJobRecord): UnifiedJob {
     errorMessage: item.errorMessage,
     canCancel: status === 'queued' || status === 'running',
     canDownload: status === 'completed',
-    canReview: status === 'completed',
+    canReview: false,
     startedBy: null,
   };
 }
 
 /**
- * Builds a sales research job's cost/tokens/time/model + full report detail
- * from its result endpoint (the only one that carries `model_card` and the
- * report body) — mirrors `extractTranslationDetail` for the other service.
- */
-function extractSalesDetail(res: Awaited<ReturnType<typeof getResearchResult>>): UnifiedJobDetail {
-  const card = res.model_card ?? null;
-  const latency = typeof card?.latency_seconds === 'number' ? card.latency_seconds : null;
-  return {
-    costUsd: typeof card?.cost_usd === 'number' ? card.cost_usd : null,
-    tokenCount: typeof card?.tokens_used === 'number' ? Math.round(card.tokens_used) : null,
-    processingTimeSeconds: latency !== null && latency > 0 ? latency : null,
-    modelUsed: card?.model_version?.trim() || null,
-    modelVersion: null,
-    qualityScore: null,
-  };
-}
-
-/**
- * Lazily fetches and merges a job's cost/tokens/time/model detail into
- * whichever state array (Recent runs' local list, Job Tracker's history)
+ * Lazily fetches and merges a translation job's cost/tokens/time/model detail
+ * into whichever state array (Recent runs' local list, Job Tracker's history)
  * holds it — called on row expand, and cached so repeat expands are free.
- * For sales, the report body itself is intentionally not surfaced here —
- * Download is the only way to get it.
+ * No-op for sales jobs or jobs whose detail is already loaded/loading, since
+ * the sales research history endpoint has no equivalent per-job detail call.
  */
 export async function loadJobDetail(
   job: UnifiedJob,
   setJobs: Dispatch<SetStateAction<UnifiedJob[]>>,
 ): Promise<void> {
+  if (job.service !== 'translation') return;
   if (job.detailStatus === 'loading' || job.detailStatus === 'loaded') return;
 
   setJobs((prev) =>
@@ -249,10 +233,8 @@ export async function loadJobDetail(
   );
 
   try {
-    const detail =
-      job.service === 'translation'
-        ? extractTranslationDetail(await translationApi.getJobStatus(job.id))
-        : extractSalesDetail(await getResearchResult(job.id));
+    const data = await translationApi.getJobStatus(job.id);
+    const detail = extractTranslationDetail(data);
     setJobs((prev) =>
       prev.map((j) => (j.key === job.key ? { ...j, detail, detailStatus: 'loaded' } : j)),
     );

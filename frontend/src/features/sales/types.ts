@@ -59,16 +59,3 @@ export interface ResearchJobListItem {
   error_message?: string | null;
   progress?: number | null;
 }
-
-// POST /research/{job_id}/feedback → 200
-// Unlike Translation's review endpoint, Sales Agent has no numeric rating —
-// it's a free-text comment only (see backend `ResearchFeedbackRequest`).
-export interface ResearchFeedbackRequest {
-  feedback: string; // 1–1000 chars
-}
-
-export interface ResearchFeedbackResponse {
-  job_id: string;
-  status: string;
-  message: string;
-}
