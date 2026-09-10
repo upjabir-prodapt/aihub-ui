@@ -1,0 +1,85 @@
+.line-chart-card {
+  position: relative;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  padding: 1.1rem 1.1rem 0.75rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.line-chart-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+}
+
+.line-chart-svg {
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.line-chart-empty {
+  height: 110px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.line-chart-gridline {
+  stroke: var(--border-default);
+  stroke-width: 1;
+}
+
+.line-chart-axis-label {
+  font-size: 6.5px;
+  fill: var(--text-muted);
+}
+
+.line-chart-area {
+  fill-opacity: 0.1;
+}
+
+.line-chart-line {
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.line-chart-crosshair {
+  stroke: var(--text-muted);
+  stroke-width: 1;
+}
+
+.line-chart-dot {
+  stroke: var(--bg-card);
+  stroke-width: 2;
+}
+
+.line-chart-tooltip {
+  position: absolute;
+  top: 0.75rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  padding: 0.4rem 0.6rem;
+  box-shadow: var(--shadow-md);
+  pointer-events: none;
+  text-align: right;
+}
+
+.line-chart-tooltip-value {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+
+.line-chart-tooltip-date {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-top: 0.1rem;
+}

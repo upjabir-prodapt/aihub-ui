@@ -68,6 +68,17 @@ const NAV_ITEMS: SidebarItem[] = [
     ),
   },
   {
+    id: 'naas',
+    label: 'On-Demand NaaS',
+    icon: (
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/>
+        <rect x="9" y="14" width="6" height="6" rx="1"/>
+        <path d="M7 10v2a2 2 0 0 0 2 2h1"/><path d="M17 10v2a2 2 0 0 1-2 2h-1"/>
+      </svg>
+    ),
+  },
+  {
     id: 'translation',
     label: 'Translation',
     icon: (

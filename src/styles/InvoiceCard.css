@@ -1,0 +1,110 @@
+.invoice-card {
+  align-self: stretch;
+  /* Fills .chat-extra's full width (see ChatPanel.css) rather than
+     capping at a fixed pixel value, so dragging AgentScreen's resizable
+     divider to give the chat pane more room actually grows this card. */
+  width: 100%;
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: 14px;
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+
+.invoice-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 1rem 1.25rem;
+  background: linear-gradient(135deg, var(--colt-teal-deep) 0%, var(--colt-teal-dark) 100%);
+  color: #ffffff;
+}
+
+.invoice-card-logo {
+  height: 28px;
+  width: auto;
+  flex-shrink: 0;
+}
+
+.invoice-card-wordmark {
+  flex-shrink: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #ffffff;
+}
+
+.invoice-card-heading {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.invoice-card-title {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.invoice-card-id {
+  font-size: 1rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+
+.invoice-card-status {
+  flex-shrink: 0;
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.invoice-card-status--pending {
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+}
+
+.invoice-card-status--confirmed {
+  background: #ffffff;
+  color: var(--colt-teal-deep);
+}
+
+.invoice-card-service {
+  padding: 0.85rem 1.25rem 0.25rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.invoice-card-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.5rem 0 1rem;
+  font-size: 0.875rem;
+}
+
+.invoice-card-table th,
+.invoice-card-table td {
+  text-align: left;
+  padding: 0.55rem 1.25rem;
+  border-top: 1px solid var(--border-subtle);
+  vertical-align: top;
+}
+
+.invoice-card-table th {
+  width: 40%;
+  color: var(--text-muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.invoice-card-table td {
+  color: var(--text-primary);
+  font-weight: 500;
+  word-break: break-word;
+}

@@ -23,6 +23,10 @@ export const config = {
     apiBase: '/api/sales/v1',
     cloudRunUrl: getEnvVar('VITE_SALES_CLOUD_RUN_URL'),
   },
+  naas: {
+    apiBase: '/api/naas/v1',
+    cloudRunUrl: getEnvVar('VITE_NAAS_AGENT_BACKEND_URL'),
+  },
   contracts: {
     apiBase: getEnvVar('VITE_CONTRACTS_API_BASE'),
   },

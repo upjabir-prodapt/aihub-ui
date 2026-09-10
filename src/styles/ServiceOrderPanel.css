@@ -1,0 +1,252 @@
+.service-order-panel {
+  padding: 1.25rem;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.service-order-panel--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 1.5rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.service-order-panel-title {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  margin: 0 0 0.75rem;
+}
+
+/* --- Progress header --- */
+
+.service-order-progress {
+  margin-bottom: 1.25rem;
+}
+
+.service-order-progress-track {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--bg-active);
+  overflow: hidden;
+}
+
+.service-order-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--colt-teal-dark), var(--colt-teal));
+  border-radius: 999px;
+  transition: width var(--transition-mid);
+}
+
+.service-order-progress-label {
+  display: block;
+  margin-top: 0.4rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* --- Flow diagram --- */
+
+.flow {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.flow-node {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: 12px;
+  padding: 0.6rem 0.75rem;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--transition-fast), border-color var(--transition-fast);
+}
+
+.flow-node-icon {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-hover);
+  color: var(--text-muted);
+}
+
+.flow-node-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding-top: 0.1rem;
+}
+
+.flow-node-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  line-height: 1.3;
+}
+
+.flow-node-detail {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+
+.flow-node-status {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 0.15rem;
+}
+
+/* status: done — fixed semantic green, not themed (matches the SRE Monitor
+   panel's status palette convention). */
+.flow-node--done .flow-node-icon {
+  background: rgba(12, 163, 12, 0.14);
+  color: #0ca30c;
+}
+.flow-node-status--done {
+  background: #0ca30c;
+  color: #ffffff;
+}
+
+/* status: current — brand teal */
+.flow-node--current {
+  border-color: var(--colt-teal);
+  box-shadow: 0 0 0 3px var(--colt-teal-mid), var(--shadow-sm);
+}
+.flow-node--current .flow-node-icon {
+  background: var(--colt-teal-mid);
+  color: var(--colt-teal);
+}
+.flow-node--current .flow-node-label {
+  color: var(--colt-teal);
+}
+.flow-node-status--current {
+  background: var(--colt-teal);
+  color: #121212;
+  animation: flow-pulse 1.6s ease-in-out infinite;
+}
+
+/* status: upcoming */
+.flow-node--upcoming {
+  opacity: 0.55;
+}
+.flow-node-status--upcoming {
+  background: var(--bg-active);
+  color: var(--text-muted);
+}
+
+/* status: blocked — fixed semantic red, not themed */
+.flow-node--blocked .flow-node-icon {
+  background: rgba(208, 59, 59, 0.14);
+  color: #d03b3b;
+}
+.flow-node--blocked .flow-node-detail {
+  color: #d03b3b;
+}
+.flow-node-status--blocked {
+  background: #d03b3b;
+  color: #ffffff;
+}
+
+/* status: skipped */
+.flow-node--skipped {
+  opacity: 0.4;
+}
+.flow-node--skipped .flow-node-label {
+  text-decoration: line-through;
+}
+.flow-node-status--skipped {
+  background: var(--bg-active);
+  color: var(--text-muted);
+}
+
+@keyframes flow-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 var(--colt-teal-mid);
+  }
+  50% {
+    box-shadow: 0 0 0 4px var(--colt-teal-light);
+  }
+}
+
+/* --- Connectors --- */
+
+.flow-connector {
+  position: relative;
+  width: 2px;
+  height: 1.35rem;
+  background: var(--border-strong);
+  margin-left: 1.9rem;
+}
+
+.flow-connector::after {
+  content: '';
+  position: absolute;
+  left: -3px;
+  bottom: -1px;
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid var(--border-strong);
+  border-bottom: 2px solid var(--border-strong);
+  transform: rotate(45deg);
+}
+
+.flow-nested {
+  margin-left: 2.55rem;
+  padding-left: 0.9rem;
+  border-left: 2px dashed var(--border-strong);
+  display: flex;
+  flex-direction: column;
+}
+
+/* --- Branch (fork) --- */
+
+.flow-branch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.flow-branch-joint {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--bg-hover);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0.4rem 0;
+}
+
+.flow-branch-options {
+  display: flex;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.flow-branch-option {
+  flex: 1;
+  min-width: 0;
+}
+
+.flow-branch-option .flow-node {
+  height: 100%;
+}
