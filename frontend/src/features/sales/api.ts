@@ -4,6 +4,7 @@ import type {
   ResearchModelCard,
   ResearchResultResponse,
   ResearchJobListItem,
+  ResearchFeedbackResponse,
 } from './types';
 import { apiDownload, apiJson, apiPostJson } from '../../shared/api/client';
 
@@ -13,6 +14,7 @@ export type {
   ResearchModelCard,
   ResearchResultResponse,
   ResearchJobListItem,
+  ResearchFeedbackResponse,
 };
 
 /**
@@ -79,4 +81,16 @@ export async function cancelResearch(job_id: string): Promise<{ message: string 
 /** `GET /research/download/{job_id}` */
 export async function downloadResearchFile(job_id: string): Promise<void> {
   await apiDownload(`${API_BASE}/research/download/${job_id}`, `research-${job_id}.md`);
+}
+
+/** `POST /research/{job_id}/feedback` — free-text feedback on a completed run. */
+export async function submitFeedback(
+  job_id: string,
+  feedback: string,
+): Promise<ResearchFeedbackResponse> {
+  return await apiPostJson<ResearchFeedbackResponse>(
+    `${API_BASE}/research/${job_id}/feedback`,
+    { feedback },
+    { errorMessage: 'Failed to submit feedback' },
+  );
 }

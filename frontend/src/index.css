@@ -1,4 +1,7 @@
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+/* Fonts are requested once, from index.html's <link> with its preconnects.
+   A duplicate @import here would cost a second render-blocking round trip for
+   byte-identical families, and a slower one: @import is only discovered after
+   this stylesheet itself has been fetched and parsed. */
 
 /* ===== CSS RESET & BASE ===== */
 *, *::before, *::after {
@@ -8,18 +11,32 @@
 }
 
 :root {
-  /* Colt Brand Colors - Consistent across themes */
+  /* ── Colt Primary Brand Swatches ── */
   --colt-teal: #00D7BD;
-  --colt-teal-dark: #00b09c;
-  --colt-teal-light: #00d7bd1a;
-  --colt-teal-mid: #00d7bd33;
+  --colt-teal-dark: #00A59B;          /* Colt Dusk — accessible links */
+  --colt-teal-deep: #0C554F;          /* Colt Dark Green / Dark Teal */
+  --colt-teal-light: rgba(0, 215, 189, 0.10);
+  --colt-teal-mid: rgba(0, 215, 189, 0.20);
+  --colt-black: #121212;
+  --colt-black-deep: #0A0A0A;
+  --colt-yellow: #FFC43D;
+  --colt-grey-dark: #484A47;           /* Colt Charcoal */
+  --colt-ash: #F5F5F5;
+  --colt-white: #FFFFFF;
 
-  /* Typography — Instrument Sans (body/UI) + Fraunces (headings) + JetBrains
-     Mono (eyebrows/labels/tags), matching the Service Hub mockup's type
-     system. Colors stay Colt's own tokens below — only the typefaces change. */
-  --font-sans: 'Instrument Sans', system-ui, -apple-system, sans-serif;
-  --font-serif: 'Fraunces', Georgia, serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  /* ── Semantic / Data-Only Colours ── */
+  --colt-tomato: #F20C36;
+  --colt-orange: #FF7A00;
+
+  /* ── Typography — Official Colt Brand: Urbanist + IBM Plex Mono ── */
+  --font-primary: 'Urbanist', Arial, system-ui, -apple-system, sans-serif;
+  /* IBM Plex Mono is NOT a Colt brand font — the system sanctions only
+     Urbanist, Meiryo UI (Japanese) and Arial, and defines no monospace at
+     all. It is kept as a deliberate internal-tool exception, restricted to
+     genuinely technical values: run IDs, token counts, costs, timestamps,
+     counters. It must not be used for headings, labels, badges or body copy.
+     Pending Brand Team sign-off (CMOBrandDigital@colt.net). */
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 
   /* Sizes */
   --sidebar-width: 256px;
@@ -30,73 +47,100 @@
   --transition-fast: 150ms ease;
   --transition-mid: 250ms ease;
 
-  font-family: var(--font-sans);
+  font-family: var(--font-primary);
   font-size: 14px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Headings default to the serif display face app-wide; any page that already
-   sets its own font-family on a heading class (e.g. .hero-title) keeps that
-   choice, since a class selector always outranks this bare tag selector. */
-h1, h2, h3 {
-  font-family: var(--font-serif);
+/* ── Heading hierarchy — Urbanist Black for main headings ──
+   Brand: "Urbanist ... recommended in two weights: Regular and Black —
+   Black for main headings." h1/h2 are the main headings and take Black;
+   h3–h6 are subordinate and stay at Bold so the hierarchy remains readable
+   rather than uniformly heavy. */
+h1, h2 {
+  font-family: var(--font-primary);
+  font-weight: 900;
 }
 
-/* Default Dark Theme */
+h3, h4, h5, h6 {
+  font-family: var(--font-primary);
+  font-weight: 700;
+}
+
+/* ══════ Default Dark Theme — Colt Digital ══════ */
 :root, [data-theme='dark'] {
-  --bg-base: #09090f;
-  --bg-surface: #11111c;
-  --bg-elevated: #18182a;
-  --bg-card: #1e1e30;
-  --bg-hover: #24243a;
-  --bg-active: #2a2a42;
+  --bg-base: #0A0A0A;
+  --bg-surface: #121212;
+  --bg-elevated: #181919;
+  --bg-card: #151717;
+  --bg-hover: #1E2221;
+  --bg-active: #242928;
 
-  --border-subtle: rgba(255, 255, 255, 0.06);
-  --border-default: rgba(255, 255, 255, 0.10);
-  --border-strong: rgba(255, 255, 255, 0.16);
-  --border-teal: rgba(0, 215, 189, 0.3);
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-default: rgba(255, 255, 255, 0.14);
+  --border-strong: rgba(255, 255, 255, 0.22);
+  --border-teal: rgba(0, 215, 189, 0.35);
 
-  --text-primary: #f0f0f8;
-  --text-secondary: #9090b0;
-  --text-muted: #5a5a78;
+  --text-primary: #FFFFFF;
+  --text-secondary: #C8CDCC;
+  /* Nudged up from #7E8584, which fell to 4.27:1 on --bg-hover. Now clears
+     4.5:1 on every dark surface in use. */
+  --text-muted: #828988;
   --text-teal: #00D7BD;
+  /* Tint of Colt Tomato, hue preserved, lightened for dark surfaces.
+     Colt Tomato itself only reaches 4.18:1 on --bg-card and 4.60:1 on
+     --bg-base, so it fails AA for normal text exactly where error copy
+     lives. This tint clears 5.4:1 on every dark surface in use. */
+  --text-error: #F8637E;
 
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6);
-  --shadow-teal: 0 0 24px rgba(0, 215, 189, 0.12);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.8);
+  --shadow-teal: 0 0 20px rgba(0, 215, 189, 0.10);
 
   --scrollbar-thumb: rgba(255, 255, 255, 0.12);
-  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.2);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.22);
 }
 
-/* Light Theme */
+/* ══════ Light Theme — Colt Services Fresh ══════ */
 [data-theme='light'] {
-  --bg-base: #f8fafc;
-  --bg-surface: #ffffff;
-  --bg-elevated: #f1f5f9;
-  --bg-card: #ffffff;
-  --bg-hover: #f1f5f9;
-  --bg-active: #e2e8f0;
+  --bg-base: #F5F5F5;
+  --bg-surface: #FFFFFF;
+  --bg-elevated: #EBEBEB;
+  --bg-card: #FFFFFF;
+  --bg-hover: #EDEDED;
+  --bg-active: #E0E0E0;
 
-  --border-subtle: rgba(0, 0, 0, 0.04);
-  --border-default: rgba(0, 0, 0, 0.08);
-  --border-strong: rgba(0, 0, 0, 0.12);
-  --border-teal: rgba(0, 215, 189, 0.4);
+  --border-subtle: rgba(0, 0, 0, 0.06);
+  --border-default: rgba(0, 0, 0, 0.12);
+  --border-strong: rgba(0, 0, 0, 0.20);
+  --border-teal: rgba(0, 165, 155, 0.4);
 
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --text-muted: #64748b;
-  --text-teal: #00b09c;
+  --text-primary: #121212;
+  --text-secondary: #484A47;
+  /* Darkened from #767875, which reached only 4.46:1 on white and 3.74:1 on
+     --bg-elevated. Now clears 4.5:1 on every light surface in use. */
+  --text-muted: #696B68;
+  /* Darkened from Colt Dusk #00A59B. Dusk is the brand's recommended link
+     colour but manages only 3.06:1 on white and 2.57:1 on --bg-elevated,
+     well under AA for normal text. This is a darker step in the same brand
+     family (between Dusk and Colt Dark Green #0C554F), which is precisely
+     what the brand asks for: "use our darker brand colours for links, it's
+     better for accessibility". Clears 4.5:1 on every light surface. */
+  --text-teal: #007770;
+  /* Darkened Colt Tomato. The brand hex reaches only 4.30:1 on white and
+     3.61:1 on --bg-elevated, under AA for normal text; this clears 4.5:1 on
+     every light surface in use. */
+  --text-error: #D40A2F;
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  --shadow-teal: 0 0 20px rgba(0, 215, 189, 0.08);
+  --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.12);
+  --shadow-teal: 0 0 16px rgba(0, 165, 155, 0.06);
 
-  --scrollbar-thumb: rgba(0, 0, 0, 0.1);
-  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.2);
+  --scrollbar-thumb: rgba(0, 0, 0, 0.10);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.20);
 }
 
 body {
@@ -114,16 +158,16 @@ body {
 }
 
 [data-theme='light'] .lang-select {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23484A47' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
 }
 
 [data-theme='light'] .hero-banner {
-  background: linear-gradient(135deg, #ffffff 0%, rgba(0, 215, 189, 0.08) 100%);
+  background: linear-gradient(135deg, #FFFFFF 0%, rgba(0, 215, 189, 0.06) 100%);
   box-shadow: var(--shadow-md);
 }
 
 [data-theme='light'] .drop-zone {
-  background: #f8fafc;
+  background: #F5F5F5;
 }
 
 
@@ -140,7 +184,7 @@ html, body, #root {
 ::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
 
 
-/* ===== FOCUS RESET ===== */
+/* ===== FOCUS RESET — WCAG 2.1 AA ===== */
 button:focus-visible, a:focus-visible, select:focus-visible, textarea:focus-visible {
   outline: 2px solid var(--colt-teal);
   outline-offset: 2px;
@@ -157,6 +201,7 @@ button, a, select { cursor: pointer; }
   border: 1px solid var(--border-default);
   background: transparent;
   color: var(--text-secondary);
+  font-family: var(--font-primary);
   font-size: 12px;
   font-weight: 500;
   transition: all var(--transition-fast);
@@ -169,23 +214,23 @@ button, a, select { cursor: pointer; }
 }
 
 .output-action-btn.copied {
-  border-color: #4ade80;
-  color: #4ade80;
-  background: rgba(74, 222, 128, 0.08);
+  border-color: #00D7BD;
+  color: #00D7BD;
+  background: rgba(0, 215, 189, 0.08);
 }
 
 .output-action-btn.primary {
   background: var(--colt-teal);
   border-color: var(--colt-teal);
-  color: #ffffff;
+  color: #121212;
   font-weight: 600;
 }
 
 .output-action-btn.primary:hover {
   background: var(--colt-teal);
-  filter: brightness(1.1);
+  filter: brightness(1.08);
   border-color: var(--colt-teal);
-  color: #ffffff;
+  color: #121212;
 }
 
 /* Icon-only compact variant */
@@ -240,4 +285,6 @@ button svg,
     padding: 4px 8px;
   }
 }
+
+
 

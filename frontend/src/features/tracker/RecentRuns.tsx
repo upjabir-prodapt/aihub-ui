@@ -116,7 +116,7 @@ const RecentRuns: React.FC<RecentRunsProps> = ({
                   {job.subtitle} · {timeAgo(job.createdAt)}
                 </div>
 
-                {job.status === 'running' && (
+                {(job.status === 'running' || job.status === 'queued') && (
                   <div className="recent-run-progress-track">
                     <div
                       className={`recent-run-progress-fill ${job.progress === null ? 'indeterminate' : ''}`}

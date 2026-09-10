@@ -52,7 +52,7 @@ export class ErrorBoundary extends Component<Props, State> {
             width: '100%',
             boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
           }}>
-            <h2 style={{ fontSize: '20px', fontWeight: 600, marginBottom: '12px', color: '#f87171' }}>
+            <h2 style={{ fontSize: '20px', fontWeight: 600, marginBottom: '12px', color: 'var(--text-error)' }}>
               Something went wrong
             </h2>
             <p style={{ fontSize: '14px', color: '#94a3b8', marginBottom: '20px', lineHeight: 1.5 }}>

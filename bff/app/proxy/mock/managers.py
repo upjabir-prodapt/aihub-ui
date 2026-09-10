@@ -353,6 +353,15 @@ class MockSalesManager:
         job.completed_deadline = None
         return True
 
+    def submit_feedback(self, job_id: str, feedback: str) -> dict[str, Any]:
+        """Mirrors ``POST /research/{job_id}/feedback`` -- no persistence needed for mocks."""
+        return {
+            "job_id": job_id,
+            "status": "SUCCESS",
+            "message": "Feedback submitted successfully",
+            "feedback": feedback,
+        }
+
 
 class MockDatabase:
     """Port of ``mockDb.ts``. One instance per BFF process."""

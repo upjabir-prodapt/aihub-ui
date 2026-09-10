@@ -35,6 +35,7 @@ REVIEW_ID = re.compile(r"^reviews/([^/]+)$")
 SALES_STATUS = re.compile(r"^research/status/([^/]+)$")
 SALES_RESULT = re.compile(r"^research/result/([^/]+)$")
 SALES_DOWNLOAD = re.compile(r"^research/download/([^/]+)$")
+SALES_FEEDBACK = re.compile(r"^research/([^/]+)/feedback$")
 SALES_JOB = re.compile(r"^research/([^/]+)$")
 
 MOCK_FILE_BODY = (
@@ -211,6 +212,18 @@ async def _sales(path: str, method: str, request: Request) -> Response | None:
             media_type="text/markdown; charset=utf-8",
             headers={"Content-Disposition": f'attachment; filename="sales-research-{job_id}.md"'},
         )
+
+    match = SALES_FEEDBACK.match(path)
+    if match and method == "POST":
+        job_id = match.group(1)
+        try:
+            payload = await _json_body(request) or {}
+        except json.JSONDecodeError:
+            return _error(400, "Invalid feedback payload")
+        feedback = str(payload.get("feedback") or "").strip()
+        if not feedback:
+            return _error(422, "feedback is required")
+        return JSONResponse(_db.sales.submit_feedback(job_id, feedback))
 
     match = SALES_JOB.match(path)
     if match and method == "DELETE":

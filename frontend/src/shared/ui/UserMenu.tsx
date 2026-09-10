@@ -63,9 +63,6 @@ const UserMenu: React.FC = () => {
         <div className="user-menu-dropdown" role="menu">
           <div className="user-menu-header">
             <div className="user-menu-header-email">{email}</div>
-            {user?.department && (
-              <div className="user-menu-header-meta">{user.department}</div>
-            )}
           </div>
 
           <button

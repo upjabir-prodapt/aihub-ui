@@ -6,6 +6,7 @@ import { useTranslationJobs } from '../translation/useTranslationJobs';
 import { useSalesJobs } from '../sales/useSalesJobs';
 import { translationApi } from '../translation/api';
 import { downloadResearchFile, listResearchJobs } from '../sales/api';
+import SalesFeedbackModal from '../sales/SalesFeedbackModal';
 import {
   normalizeTranslationHistoryItem,
   normalizeTranslationActiveItem,
@@ -81,6 +82,7 @@ const JobTrackerPage: React.FC = () => {
   const TODAY_BUCKET_LIMIT = 3;
   const [showAllToday, setShowAllToday] = useState(false);
   const [reviewJobId, setReviewJobId] = useState<string | null>(null);
+  const [feedbackJobId, setFeedbackJobId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ ok: boolean; message: string } | null>(null);
 
   /**
@@ -404,11 +406,13 @@ const JobTrackerPage: React.FC = () => {
                             </span>
                           </span>
                           <span className="tracker-row-right">
-                            {job.status === 'running' && job.progress !== null ? `${job.progress}%` : null}
+                            {(job.status === 'running' || job.status === 'queued') && job.progress !== null
+                              ? `${job.progress}%`
+                              : null}
                           </span>
                         </button>
 
-                        {job.status === 'running' && (
+                        {(job.status === 'running' || job.status === 'queued') && (
                           <div className="tracker-progress-track">
                             <div
                               className={`tracker-progress-fill ${job.progress === null ? 'indeterminate' : ''}`}
@@ -494,7 +498,11 @@ const JobTrackerPage: React.FC = () => {
                                   type="button"
                                   className="tracker-action-btn"
                                   disabled={busy}
-                                  onClick={() => setReviewJobId(job.id)}
+                                  onClick={() =>
+                                    job.service === 'translation'
+                                      ? setReviewJobId(job.id)
+                                      : setFeedbackJobId(job.id)
+                                  }
                                 >
                                   <MessageSquare size={13} /> Feedback
                                 </button>
@@ -535,6 +543,15 @@ const JobTrackerPage: React.FC = () => {
           isOpen={!!reviewJobId}
           jobId={reviewJobId}
           onClose={() => setReviewJobId(null)}
+          onSubmitted={handleReviewSubmitted}
+        />
+      )}
+
+      {feedbackJobId && (
+        <SalesFeedbackModal
+          isOpen={!!feedbackJobId}
+          jobId={feedbackJobId}
+          onClose={() => setFeedbackJobId(null)}
           onSubmitted={handleReviewSubmitted}
         />
       )}
