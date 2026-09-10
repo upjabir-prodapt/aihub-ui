@@ -36,7 +36,11 @@ GITLAB_CI_VARIABLES.md
 *.log
 
 # Certificates and local server config
-certs/
+certs/*
+# Exception: Colt's internal CA chain (public cert material, no private key)
+# baked into the runtime image by the Dockerfile - see certs/README.md.
+!certs/colt-internal-ca.pem
+!certs/README.md
 
 # Python / BFF
 __pycache__/

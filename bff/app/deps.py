@@ -8,7 +8,9 @@ OIDC discovery cache, the outbound httpx clients — is built once per process i
 from __future__ import annotations
 
 import logging
+import ssl
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any
 
 import httpx
@@ -26,6 +28,28 @@ if TYPE_CHECKING:  # pragma: no cover
     from app.auth.oidc import OidcClient
 
 logger = logging.getLogger(__name__)
+
+
+def _upstream_verify(ca_bundle_path: str) -> ssl.SSLContext | bool:
+    """SSL trust for the ``upstream_http`` client (Apigee and friends).
+
+    Apigee's northbound LB (AICOE-Terraform GAP-REGISTER R-06) serves a cert
+    signed by Colt's internal CA, which is not in any public trust store.
+    ``ssl.create_default_context()`` starts from the OS/certifi trust store
+    (public CAs) and ``load_verify_locations`` *adds* to it rather than
+    replacing it, so this keeps trusting public CAs too if Apigee is ever
+    swapped for something else.
+
+    Missing file (local dev, ``UPSTREAM_MODE=mock``, or before the image is
+    rebuilt with it) falls back to ``True`` — httpx's normal default trust
+    store — rather than failing startup; the resulting behaviour is exactly
+    what it was before this was added.
+    """
+    if not ca_bundle_path or not Path(ca_bundle_path).is_file():
+        return True
+    ctx = ssl.create_default_context()
+    ctx.load_verify_locations(cafile=ca_bundle_path)
+    return ctx
 
 
 @dataclass
@@ -78,6 +102,7 @@ class Services:
             timeout=httpx.Timeout(settings.upstream_timeout_seconds, connect=10.0),
             follow_redirects=False,
             limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
+            verify=_upstream_verify(settings.upstream_ca_bundle_path),
         )
 
         services = cls(

@@ -72,6 +72,10 @@ COPY --from=pydeps /opt/venv /opt/venv
 WORKDIR /srv
 COPY --chown=root:root bff/app /srv/app
 COPY --from=frontend --chown=root:root /build/dist /srv/static
+# Colt-internal-CA chain that signs Apigee's northbound LB (AICOE-Terraform
+# GAP-REGISTER R-06) - loaded by app/deps.py in addition to, not instead of,
+# the system trust store. Public CA material, no private key, safe to bake in.
+COPY --chown=root:root certs/colt-internal-ca.pem /srv/certs/colt-internal-ca.pem
 
 # Application code is read-only to the runtime user: the process has no reason
 # to modify its own source, and a read-only root filesystem makes that explicit.

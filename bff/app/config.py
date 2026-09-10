@@ -125,6 +125,13 @@ class Settings(BaseSettings):
     # Plan §8 says `x-colt-user-oid`; docs 18 §3.2 reference impl says `x-colt-user-id`.
     # Configurable so the mismatch can be resolved without a code change.
     apigee_user_oid_header: str = "x-colt-user-oid"
+    # Apigee's northbound LB serves a cert signed by Colt's internal CA (AICOE-
+    # Terraform GAP-REGISTER R-06), which is not in any public trust store. This
+    # is the *chain* (Issuing CA2 V3 -> Root CA V3, no leaf), baked into the
+    # image from certs/colt-internal-ca.pem by the Dockerfile. If the file is
+    # absent (e.g. local dev, mock upstream), `deps.py` falls back to the
+    # system trust store only -- see the comment there.
+    upstream_ca_bundle_path: str = "/srv/certs/colt-internal-ca.pem"
 
     # ── Session lifecycle (docs 13) ──────────────────────────────────────────
     session_absolute_ttl_seconds: int = 28_800
