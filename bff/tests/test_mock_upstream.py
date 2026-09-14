@@ -32,8 +32,18 @@ async def test_list_translation_jobs(client: httpx.AsyncClient) -> None:
     assert isinstance(body["jobs"], list)
     assert len(body["jobs"]) >= 4
     assert body["total"] == len(body["jobs"])
-    assert body["limit"] == 50
+    # Paging echoes the request. The service defaults `limit` to 10, which is
+    # why the frontend now asks for it explicitly.
+    assert body["limit"] == 10
     assert body["offset"] == 0
+
+
+async def test_translation_job_list_echoes_requested_paging(
+    client: httpx.AsyncClient,
+) -> None:
+    body = (await client.get("/api/translation/v1/jobs?limit=100&offset=2")).json()
+    assert body["limit"] == 100
+    assert body["offset"] == 2
 
 
 async def test_translation_job_list_item_shape(client: httpx.AsyncClient) -> None:
@@ -159,15 +169,10 @@ async def test_review_returns_201(client: httpx.AsyncClient, signed_in: dict[str
     body = response.json()
 
     assert response.status_code == 201
-    assert set(body) == {
-        "review_id",
-        "job_id",
-        "rating",
-        "comment",
-        "reviewer_email",
-        "created_at",
-        "updated_at",
-    }
+    # ReviewSubmitResponse — the service acknowledges the write rather than
+    # echoing the stored review, which only `GET /reviews/{job_id}` returns.
+    assert set(body) == {"status", "review_id"}
+    assert body["review_id"]
 
 
 async def test_cancel_translation_job(
@@ -193,10 +198,10 @@ async def test_list_sales_jobs(client: httpx.AsyncClient) -> None:
     body = response.json()
 
     assert response.status_code == 200
-    assert isinstance(body["jobs"], list)
-    assert body["total"] == len(body["jobs"])
+    # The service returns a bare list, not an envelope.
+    assert isinstance(body, list)
     # `company` duplicates `company_name`; the page reads both.
-    assert body["jobs"][0]["company"] == body["jobs"][0]["company_name"]
+    assert body[0]["company"] == body[0]["company_name"]
 
 
 async def test_initiate_sales_research(
@@ -224,7 +229,7 @@ async def test_initiate_derives_an_account_id_when_absent(
     )
     job_id = created.json()["job_id"]
 
-    listed = (await client.get("/api/sales/v1/research/jobs")).json()["jobs"]
+    listed = (await client.get("/api/sales/v1/research/jobs")).json()
     match = next(j for j in listed if j["job_id"] == job_id)
     assert match["account_id"] == "ACC-VOD-101"
 
@@ -245,11 +250,14 @@ async def test_sales_result_and_status_shapes(client: httpx.AsyncClient) -> None
     assert result["model_card"]["model_version"] == "gemini-2.5-pro"
 
 
-async def test_sales_download_is_markdown(client: httpx.AsyncClient) -> None:
+async def test_sales_download_is_a_pdf(client: httpx.AsyncClient) -> None:
+    """The service streams application/pdf, so the mock must too."""
     response = await client.get("/api/sales/v1/research/download/sales-job-7002")
     assert response.status_code == 200
-    assert response.headers["content-type"].startswith("text/markdown")
-    assert response.text == DEUTSCHE_TELEKOM_REPORT
+    assert response.headers["content-type"].startswith("application/pdf")
+    assert response.content.startswith(b"%PDF-")
+    assert "Research_Report_" in response.headers["content-disposition"]
+    assert response.headers["content-disposition"].endswith('.pdf"')
 
 
 async def test_unknown_sales_job_is_404(client: httpx.AsyncClient) -> None:
@@ -261,7 +269,7 @@ async def test_unknown_sales_job_is_404(client: httpx.AsyncClient) -> None:
 async def test_failed_seed_job_keeps_its_error_message(
     client: httpx.AsyncClient,
 ) -> None:
-    jobs = (await client.get("/api/sales/v1/research/jobs")).json()["jobs"]
+    jobs = (await client.get("/api/sales/v1/research/jobs")).json()
     failed = next(j for j in jobs if j["status"] == "FAILED")
     assert failed["error_message"].startswith("Public intelligence extraction failed")
 

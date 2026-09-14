@@ -128,7 +128,7 @@ async def test_proxy_serves_a_signed_in_user(
 ) -> None:
     response = await client.get("/api/translation/v1/jobs")
     assert response.status_code == 200
-    assert len(response.json()["jobs"]) == 4
+    assert len(response.json()["jobs"]) == 5
 
 
 # ── CSRF (gap G21) ───────────────────────────────────────────────────────────
@@ -193,7 +193,8 @@ async def test_mutating_request_with_valid_csrf_succeeds(
         headers=same_origin_headers(str(signed_in["csrfToken"])),
     )
     assert response.status_code == 201
-    assert response.json()["rating"] == 5
+    # ReviewSubmitResponse acknowledges the write; it does not echo the review.
+    assert response.json()["review_id"]
 
 
 async def test_safe_methods_need_no_csrf_token(

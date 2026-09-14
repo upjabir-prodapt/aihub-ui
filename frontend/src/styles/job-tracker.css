@@ -133,6 +133,7 @@
 .dot-running { background: var(--colt-teal); }
 .dot-queued { background: #FFC43D; }
 .dot-completed { background: var(--text-muted); }
+.dot-review { background: var(--colt-yellow); }
 .dot-failed { background: #F20C36; }
 
 /* --- Filters --- */
@@ -341,6 +342,8 @@
 .tracker-badge--running { background: var(--colt-teal-light); color: var(--colt-teal); }
 .tracker-badge--queued { background: rgba(255, 196, 61, 0.12); color: #FFC43D; }
 .tracker-badge--completed { background: var(--bg-hover); color: var(--text-muted); }
+/* Terminal but not a success — the backend refuses a download for these. */
+.tracker-badge--review { background: rgba(255, 196, 61, 0.12); color: var(--colt-yellow); }
 .tracker-badge--failed,
 .tracker-badge--cancelled { background: rgba(242, 12, 54, 0.12); color: #F20C36; }
 

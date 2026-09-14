@@ -30,6 +30,7 @@ const STATUS_LABEL: Record<UnifiedJobStatus, string> = {
   queued: 'Queued',
   running: 'Running',
   completed: 'Completed',
+  review: 'Needs review',
   failed: 'Failed',
   cancelled: 'Cancelled',
 };

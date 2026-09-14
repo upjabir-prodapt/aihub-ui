@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { getResearchStatus, cancelResearch } from './api';
+import type { SalesJobStatus } from './types';
 
 /**
  * In-session registry of Sales Agent research runs started in this tab.
@@ -15,13 +16,7 @@ import { getResearchStatus, cancelResearch } from './api';
  * already dropped and contradict the rolling-week view.
  */
 
-export type SalesJobStatus =
-  | 'PENDING'
-  | 'QUEUED'
-  | 'PROCESSING'
-  | 'COMPLETED'
-  | 'FAILED'
-  | 'CANCELLED';
+export type { SalesJobStatus } from './types';
 
 export interface SalesJobRecord {
   job_id: string;

@@ -5,10 +5,10 @@ import type {
   JobStatusResponse,
   DownloadUrlResponse,
   ReviewRequest,
-  ReviewResponse,
+  ReviewSubmitResponse,
   LegacyJobStatusResponse,
 } from './types';
-import { apiDownload, apiFetch, apiJson, apiPostJson } from '../../shared/api/client';
+import { apiFetch, apiJson, apiPostJson } from '../../shared/api/client';
 
 /**
  * Same-origin `/api/translation/v1/*`, proxied by the BFF to Apigee.
@@ -66,7 +66,11 @@ export const translationApi = {
    */
   async listJobs(): Promise<LegacyJobStatusResponse[]> {
     const data = await apiJson<{ jobs?: LegacyJobStatusResponse[] } | LegacyJobStatusResponse[]>(
-      `${API_BASE}/jobs`,
+      // `limit` is explicit because the service defaults it to 10, which
+      // silently truncated the Job Tracker's history. 100 is the server max.
+      // No `status` filter: the backend's filter regex rejects
+      // `human_review_required`, so filtering happens client-side.
+      `${API_BASE}/jobs?limit=100`,
       { errorMessage: 'Failed to fetch job history' },
     );
     if (Array.isArray(data)) return data;
@@ -82,8 +86,8 @@ export const translationApi = {
     );
   },
 
-  async submitReview(jobId: string, review: ReviewRequest): Promise<ReviewResponse> {
-    return await apiPostJson<ReviewResponse>(`${API_BASE}/reviews/${jobId}`, review, {
+  async submitReview(jobId: string, review: ReviewRequest): Promise<ReviewSubmitResponse> {
+    return await apiPostJson<ReviewSubmitResponse>(`${API_BASE}/reviews/${jobId}`, review, {
       errorMessage: 'Failed to submit review',
     });
   },
@@ -121,10 +125,6 @@ export const translationApi = {
     if (!response.ok) {
       throw new Error(`Upload to storage failed (HTTP ${response.status})`);
     }
-  },
-
-  async downloadTranslatedFile(jobId: string): Promise<void> {
-    await apiDownload(`${API_BASE}/jobs/${jobId}/file`, `translated-${jobId}.txt`);
   },
 
   /** Escape hatch for callers that need the raw `Response`. */

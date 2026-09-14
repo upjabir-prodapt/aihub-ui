@@ -41,7 +41,19 @@ export interface MultiJobStatusRequest {
 export interface MultiJobStatusItem {
   job_id: string;
   target_language: string;
-  status: 'queued' | 'processing' | 'completed' | 'failed' | 'cancelled';
+  /**
+   * `human_review_required` is terminal on the backend
+   * (Translation `src/shared/job_status.py` lists it in TERMINAL_STATUSES)
+   * but is NOT downloadable: the download route rejects anything other
+   * than `completed` with a 400.
+   */
+  status:
+    | 'queued'
+    | 'processing'
+    | 'completed'
+    | 'human_review_required'
+    | 'failed'
+    | 'cancelled';
   download_url?: string | null;
   download_filename?: string | null;
   error_message?: string | null;
@@ -81,7 +93,19 @@ export interface TranslationResult {
 // GET /api/v1/translate/{job_id} → 200
 export interface JobStatusResponse {
   job_id: string;
-  status: 'queued' | 'processing' | 'completed' | 'failed' | 'cancelled';
+  /**
+   * `human_review_required` is terminal on the backend
+   * (Translation `src/shared/job_status.py` lists it in TERMINAL_STATUSES)
+   * but is NOT downloadable: the download route rejects anything other
+   * than `completed` with a 400.
+   */
+  status:
+    | 'queued'
+    | 'processing'
+    | 'completed'
+    | 'human_review_required'
+    | 'failed'
+    | 'cancelled';
   submitted_at: string;
   completed_at?: string | null;
   result?: TranslationResult | null;
@@ -133,12 +157,13 @@ export interface ReviewRequest {
   comment?: string; // max 2000 chars
 }
 
-export interface ReviewResponse {
+/**
+ * What `POST /reviews/{job_id}` actually returns (201) — the service's
+ * ReviewSubmitResponse, an acknowledgement rather than the stored review.
+ * The full record is only available from `GET /reviews/{job_id}`, which no UI
+ * surface uses yet.
+ */
+export interface ReviewSubmitResponse {
+  status: string;
   review_id: string;
-  job_id: string;
-  rating: number;
-  comment: string | null;
-  reviewer_email: string;
-  created_at: string;
-  updated_at: string;
 }

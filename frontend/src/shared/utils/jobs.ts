@@ -78,6 +78,7 @@ const TRANSLATION_STATUS_MAP: Record<string, UnifiedJobStatus> = {
   processing: 'running',
   running: 'running',
   completed: 'completed',
+  human_review_required: 'review',
   failed: 'failed',
   cancelled: 'cancelled',
 };

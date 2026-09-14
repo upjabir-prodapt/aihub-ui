@@ -45,7 +45,8 @@ class MockTranslationJob:
     source_language: str
     target_language: str
     domain: str
-    status: str  # queued | processing | completed | failed | cancelled
+    status: str  # queued | processing | completed | human_review_required
+    #            | failed | cancelled
     progress: float
     submitted_at: str
     completed_at: str | None = None
@@ -186,6 +187,24 @@ def initial_translation_jobs() -> list[MockTranslationJob]:
             error_message=(
                 "Unsupported layout format: nested macro worksheets could not be parsed."
             ),
+            result=None,
+        ),
+        MockTranslationJob(
+            job_id="trans-job-8905",
+            batch_id="batch-8905",
+            filename="Colt_On_Demand_Reseller_Agreement_FR.docx",
+            source_language="en",
+            target_language="fr",
+            domain="legal",
+            # Terminal, but not downloadable: the service's download route
+            # rejects anything other than `completed` with a 400. Seeded so the
+            # status is actually exercised in mock mode -- the UI used to poll
+            # it forever and render it as Queued.
+            status="human_review_required",
+            progress=1.0,
+            submitted_at=hours_ago(5),
+            completed_at=hours_ago(4),
+            error_message=None,
             result=None,
         ),
     ]

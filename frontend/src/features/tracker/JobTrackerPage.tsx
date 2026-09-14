@@ -38,11 +38,12 @@ const STATUS_LABEL: Record<UnifiedJobStatus, string> = {
   queued: 'Queued',
   running: 'Running',
   completed: 'Completed',
+  review: 'Needs review',
   failed: 'Failed',
   cancelled: 'Cancelled',
 };
 
-const STATUS_FILTERS: StatusFilter[] = ['all', 'running', 'queued', 'completed', 'failed'];
+const STATUS_FILTERS: StatusFilter[] = ['all', 'running', 'queued', 'completed', 'review', 'failed'];
 
 function readServiceParam(value: string | null): ServiceFilter {
   return value === 'translation' || value === 'sales' ? value : 'all';

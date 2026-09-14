@@ -78,5 +78,8 @@ export async function cancelResearch(job_id: string): Promise<{ message: string 
 
 /** `GET /research/download/{job_id}` */
 export async function downloadResearchFile(job_id: string): Promise<void> {
-  await apiDownload(`${API_BASE}/research/download/${job_id}`, `research-${job_id}.md`);
+  // Fallback only: the service sends Content-Disposition with the real name
+  // (Research_Report_<Company>.pdf), which apiDownload prefers. It streams
+  // application/pdf, so the fallback must not claim .md.
+  await apiDownload(`${API_BASE}/research/download/${job_id}`, `research-${job_id}.pdf`);
 }

@@ -1,5 +1,12 @@
 /** Cross-service job status, normalized for the Service Hub / Job Tracker UI. */
-export type UnifiedJobStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+export type UnifiedJobStatus =
+  | 'queued'
+  | 'running'
+  | 'completed'
+  /** Terminal, but not a success: awaiting a human translator's review. */
+  | 'review'
+  | 'failed'
+  | 'cancelled';
 
 /**
  * Metadata only available from a job's full detail endpoint (e.g.

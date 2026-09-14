@@ -15,6 +15,18 @@ export type TranslationStatus =
   | 'failed'
   | 'partial';
 
+/**
+ * Statuses the backend will never move a job out of. Mirrors TERMINAL_STATUSES
+ * in the Translation service (`src/shared/job_status.py`).
+ *
+ * `human_review_required` is terminal but NOT a success, and it is the reason
+ * this list is shared rather than re-spelled at each call site: it was missing
+ * from all three, so such a job polled forever and showed as Queued.
+ */
+const TERMINAL_STATUSES = ['completed', 'human_review_required', 'failed', 'cancelled'];
+
+const isTerminal = (status: string): boolean => TERMINAL_STATUSES.includes(status);
+
 // ── Retry helper ───────────────────────────────────────────────────────────
 
 const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -126,12 +138,14 @@ export const useTranslation = () => {
     const allCompleted = values.every((j) => j.status === 'completed');
     if (allCompleted) return 'completed';
 
-    const terminal = values.filter(
-      (j) => j.status === 'completed' || j.status === 'failed' || j.status === 'cancelled',
-    );
+    const terminal = values.filter((j) => isTerminal(j.status));
     if (terminal.length === values.length) {
-      const anyCompleted = terminal.some((j) => j.status === 'completed');
-      return anyCompleted ? 'partial' : 'failed';
+      // A job held for human review produced output; it is not a failure, so
+      // only a run with nothing but failed/cancelled jobs reports as failed.
+      const anyDelivered = terminal.some(
+        (j) => j.status === 'completed' || j.status === 'human_review_required',
+      );
+      return anyDelivered ? 'partial' : 'failed';
     }
 
     return 'polling';
@@ -403,9 +417,7 @@ export const useTranslation = () => {
 
     jobsRef.current = { ...jobsRef.current, ...rehydratedJobs };
 
-    const nonTerminal = statusItems.filter(
-      (item) => !['completed', 'failed', 'cancelled'].includes(item.status),
-    );
+    const nonTerminal = statusItems.filter((item) => !isTerminal(item.status));
 
     if (nonTerminal.length > 0) {
       ensurePolling();
@@ -437,7 +449,7 @@ export const useTranslation = () => {
    */
   const retryOrReset = useCallback(() => {
     const remaining = Object.values(jobsRef.current)
-      .filter((j) => j.status !== 'completed' && j.status !== 'failed' && j.status !== 'cancelled')
+      .filter((j) => !isTerminal(j.status))
       .map((j) => j.job_id);
 
     if (remaining.length > 0) {

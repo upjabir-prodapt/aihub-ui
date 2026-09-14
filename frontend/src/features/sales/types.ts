@@ -18,9 +18,23 @@ export interface InitiateResearchResponse {
   [key: string]: unknown;
 }
 
+/**
+ * Research run statuses, as emitted by the Sales Agent service (uppercase,
+ * unlike Translation's lowercase set). `CANCELLED` is returned after
+ * `DELETE /research/{job_id}` and was previously missing here, so the two
+ * frontend spellings of this union disagreed.
+ */
+export type SalesJobStatus =
+  | 'PENDING'
+  | 'QUEUED'
+  | 'PROCESSING'
+  | 'COMPLETED'
+  | 'FAILED'
+  | 'CANCELLED';
+
 export interface ResearchStatusResponse {
   job_id: string;
-  status: 'PENDING' | 'QUEUED' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+  status: SalesJobStatus;
   [key: string]: unknown;
 }
 
