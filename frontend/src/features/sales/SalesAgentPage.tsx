@@ -1,28 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import ReactMarkdown from 'react-markdown';
-import {
-  Search,
-  RefreshCw,
-  CheckCircle2,
-  AlertCircle,
-  FileText,
-  ShieldCheck,
-  Zap,
-  Globe,
-  PieChart,
-  Download,
-  Hash,
-  Cpu,
-  Clock,
-  Coins,
-} from 'lucide-react';
-import {
-  initiateResearch,
-  getResearchStatus,
-  getResearchResult,
-  downloadResearchFile,
-} from './api';
-import type { ResearchModelCard } from './api';
+import React, { useState } from 'react';
+import { Search, AlertCircle, ShieldCheck, Zap, Globe, PieChart, Hash } from 'lucide-react';
+import { initiateResearch } from './api';
 import { useEntitlements } from '../auth/useAuth';
 import { useSalesJobs } from './useSalesJobs';
 import { useServiceJobs } from '../../shared/hooks/useServiceJobs';
@@ -32,77 +10,16 @@ import ServiceLanding from '../hub/ServiceLanding';
 import '../../styles/service-detail.css';
 import '../../styles/sales-agent.css';
 
-// ── Types ──────────────────────────────────────────────────────────────────
-
-// Note: the backend persists the initial job state as 'QUEUED' even though the
-// initiate response reports 'PENDING', so both must be treated as in-progress.
-type Status = 'IDLE' | 'PENDING' | 'QUEUED' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
-
-// Statuses for which we should keep polling / show the progress tracker.
-const IN_PROGRESS: ReadonlySet<Status> = new Set<Status>(['PENDING', 'QUEUED', 'PROCESSING']);
-
-/** Status poll interval — jobs often run 20–30+ minutes. */
-const STATUS_POLL_INTERVAL_MS = 2 * 60 * 1000;
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-// Human-readable duration from a number of seconds.
-function formatDuration(seconds: number): string {
-  if (seconds < 60) return `${seconds.toFixed(1)}s`;
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.round(seconds % 60);
-  return `${mins}m ${secs}s`;
-}
-
-function asFiniteNumber(value: unknown): number | null {
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
-  if (typeof value === 'string' && value.trim() !== '') {
-    const parsed = Number(value);
-    if (Number.isFinite(parsed)) return parsed;
-  }
-  return null;
-}
-
-// The model that produced the report, e.g. "gemini-2.5-pro".
-function formatModelName(card: ResearchModelCard | null): string {
-  const version = card?.model_version?.trim();
-  return version || 'Unknown';
-}
-
-// Prefer the backend's model_card.latency_seconds; when it is missing, fall
-// back to the client-measured elapsed time (start → completion) so the report
-// never renders a bare unit or nothing at all.
-function getResearchDuration(
-  card: ResearchModelCard | null,
-  startedAt: Date | null,
-  completedAt: Date | null,
-): string {
-  const latency = asFiniteNumber(card?.latency_seconds);
-  if (latency !== null && latency > 0) {
-    return formatDuration(latency);
-  }
-  if (startedAt && completedAt) {
-    const diffSec = (completedAt.getTime() - startedAt.getTime()) / 1000;
-    if (diffSec > 0) return formatDuration(diffSec);
-  }
-  return 'N/A';
-}
-
-function formatTokens(card: ResearchModelCard | null): string {
-  const tokens = asFiniteNumber(card?.tokens_used);
-  if (tokens !== null) {
-    return Math.round(tokens).toLocaleString();
-  }
-  return 'N/A';
-}
-
-function formatCost(card: ResearchModelCard | null): string {
-  const cost = asFiniteNumber(card?.cost_usd);
-  if (cost !== null) {
-    return `$${cost.toFixed(4)}`;
-  }
-  return 'N/A';
-}
+/**
+ * This page launches research runs; it does not display their results.
+ *
+ * Results live in Recent runs (and the Job Tracker), one row per run, the same
+ * arrangement Translation uses. The page previously rendered a progress
+ * tracker and the full markdown report for a single "current" run, which meant
+ * starting a second run replaced the first one's report on screen. Per-run
+ * cost/tokens/time/model now come from expanding a row — see
+ * `extractSalesDetail` in shared/utils/jobs.ts.
+ */
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Main Sales Agent Page
@@ -134,139 +51,46 @@ interface SalesAgentPageProps {
 
 const SalesAgentPage: React.FC<SalesAgentPageProps> = ({ onOpenTracker, onBack }) => {
   const { sales: canSales } = useEntitlements();
-  const { registerJob } = useSalesJobs();
+  const { registerJob, jobOrder } = useSalesJobs();
   const serviceJobs = useServiceJobs('sales');
   const [runOpen, setRunOpen] = useState(false);
 
-  // ── Research state ─────────────────────────────────────────────────────────
-  const [company,    setCompany]    = useState('');
-  const [accountId,  setAccountId]  = useState('');
-  const [jobId,      setJobId]      = useState<string | null>(null);
-  const [status,     setStatus]     = useState<Status>('IDLE');
-  const [report,     setReport]     = useState<string | null>(null);
-  const [error,      setError]      = useState<string | null>(null);
-  const [lastCheck,  setLastCheck]  = useState<Date | null>(null);
-  const [downloading, setDownloading] = useState(false);
+  const [company, setCompany] = useState('');
+  const [accountId, setAccountId] = useState('');
+  /** Submit-time failure only. Per-run failures surface on the run's own row. */
+  const [error, setError] = useState<string | null>(null);
   /**
    * True only while `POST /research/initiate` is in flight.
    *
-   * Deliberately NOT the running job's status: gating the run dialog on
-   * IN_PROGRESS meant a second research run could not be started until the
-   * first finished. The registry in useSalesJobsState already tracks and
-   * polls any number of concurrent runs, so the only limit was this button.
+   * Deliberately NOT the running job's status: gating the run dialog on that
+   * meant a second research run could not be started until the first finished.
+   * The registry in useSalesJobsState already tracks and polls any number of
+   * concurrent runs, so the only limit was this button.
    */
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [modelCard,  setModelCard]  = useState<ResearchModelCard | null>(null);
-  const [startedAt,  setStartedAt]  = useState<Date | null>(null);
-  const [completedAt, setCompletedAt] = useState<Date | null>(null);
-
-  const fetchResult = useCallback(async () => {
-    if (!jobId || !canSales) return;
-    try {
-      const res = await getResearchResult(jobId);
-      // Canonical key is `report_content` (FastAPI ResearchResultResponse, no
-      // alias; the dev/nginx proxy is a pure path-rewrite pass-through and does
-      // not remap the body). `report_markdown` kept only as a legacy fallback.
-      setReport(res.report_content ?? res.report_markdown ?? 'No report content available.');
-      setModelCard(res.model_card ?? null);
-    } catch (err) {
-      console.error('Result fetch error:', err);
-      setError('Failed to fetch research results.');
-    }
-  }, [jobId, canSales]);
-
-  const checkStatus = useCallback(async () => {
-    if (!jobId || !canSales) return;
-    try {
-      const res = await getResearchStatus(jobId);
-      const newStatus = res.status as Status;
-      setStatus(newStatus);
-      setLastCheck(new Date());
-      if (newStatus === 'COMPLETED') {
-        // Stamp completion once, as a fallback source for elapsed time.
-        setCompletedAt((prev) => prev ?? new Date());
-        void fetchResult();
-      }
-    } catch (err) {
-      console.error('Status check error:', err);
-    }
-  }, [jobId, canSales, fetchResult]);
-
-  // The background Cloud Run invoker-token refresh that used to live here is
-  // gone. Token lifetime is the BFF's problem now: it refreshes the Entra
-  // access token at 80% of its life behind a Firestore lease (docs 13 §3), and
-  // the browser holds no token to keep fresh.
-
-  useEffect(() => {
-    let interval: ReturnType<typeof setInterval> | undefined;
-    let immediate: ReturnType<typeof setTimeout> | undefined;
-    if (IN_PROGRESS.has(status) && jobId && canSales) {
-      immediate = setTimeout(() => void checkStatus(), 0);
-      interval = setInterval(() => void checkStatus(), STATUS_POLL_INTERVAL_MS);
-    }
-    return () => {
-      if (immediate) clearTimeout(immediate);
-      if (interval) clearInterval(interval);
-    };
-  }, [status, jobId, canSales, checkStatus]);
-
-  const resetResearch = () => {
-    setCompany('');
-    setAccountId('');
-    setJobId(null);
-    setStatus('IDLE');
-    setReport(null);
-    setError(null);
-    setLastCheck(null);
-    setModelCard(null);
-    setStartedAt(null);
-    setCompletedAt(null);
-  };
 
   // Invoked by RunJobModal's form submit, which already calls preventDefault.
   const startResearch = async () => {
     if (!company.trim() || !accountId.trim() || !canSales) return;
 
-    // Close the run dialog immediately — progress and the report render on
-    // the page itself once the job is in flight.
+    // Close the run dialog immediately — the new run appears as a row in
+    // Recent runs below, which is where its progress and result live.
     setRunOpen(false);
-    setStatus('PENDING');
     setError(null);
-    setReport(null);
-    setJobId(null);
-    setModelCard(null);
-    setCompletedAt(null);
-    setStartedAt(new Date());
-
     setIsSubmitting(true);
+
     try {
       const res = await initiateResearch(accountId.trim(), company.trim());
-      setJobId(res.job_id);
-      setStatus((res.status as Status) || 'PENDING');
-      // Register with the shared registry so Service Hub / Job Tracker can
-      // see this run too (see useSalesJobsState.ts). This is also what keeps
-      // an earlier run polling once the page's own view has moved on to a
-      // newer one — the registry, not this page, owns concurrent runs.
+      // Register with the shared registry so Recent runs, the Service Hub and
+      // the Job Tracker pick the run up immediately, and so it keeps polling
+      // regardless of what else is started afterwards.
       registerJob(res.job_id, company.trim(), accountId.trim());
+      setCompany('');
+      setAccountId('');
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to start research.';
-      setError(msg);
-      setStatus('FAILED');
+      setError(err instanceof Error ? err.message : 'Failed to start research.');
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  const handleDownload = async () => {
-    if (!jobId || !canSales) return;
-    setDownloading(true);
-    try {
-      await downloadResearchFile(jobId);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Download failed.';
-      setError(msg);
-    } finally {
-      setDownloading(false);
     }
   };
 
@@ -335,118 +159,19 @@ const SalesAgentPage: React.FC<SalesAgentPageProps> = ({ onOpenTracker, onBack }
         </div>
       </RunJobModal>
 
-      {/* ── Body ───────────────────────────────────────────────────────────── */}
-      <main className="sa-body">
-        {/* ── PENDING / QUEUED / PROCESSING: Status tracker ───────────────── */}
-        {IN_PROGRESS.has(status) && (
-          <section className="sa-tracker">
-            <div className="sa-tracker-head">
-              <div className="sa-tracker-pulse"><RefreshCw className="spin" size={18} /></div>
-              <div>
-                <h3 className="sa-tracker-title">Researching {company}</h3>
-                <p className="sa-tracker-meta">Job {jobId} · Account {accountId}</p>
-              </div>
-            </div>
-
-            <div className="sa-steps">
-              <div className={`sa-step ${status === 'PROCESSING' ? 'done' : 'active'}`}>
-                <div className="sa-step-icon">
-                  {status === 'PROCESSING'
-                    ? <CheckCircle2 size={16} />
-                    : <RefreshCw className="spin" size={15} />}
-                </div>
-                <div className="sa-step-label">Initializing agent</div>
-              </div>
-              <div className={`sa-step ${status === 'PROCESSING' ? 'active' : ''}`}>
-                <div className="sa-step-icon">
-                  {status === 'PROCESSING'
-                    ? <RefreshCw className="spin" size={15} />
-                    : <span className="sa-step-dot" />}
-                </div>
-                <div className="sa-step-label">Parallel data extraction (10+ agents)</div>
-              </div>
-              <div className="sa-step">
-                <div className="sa-step-icon"><span className="sa-step-dot" /></div>
-                <div className="sa-step-label">Markdown report compilation</div>
-              </div>
-            </div>
-
-            {lastCheck && (
-              <div className="sa-tracker-foot">
-                <span className="sa-live-dot" /> Last updated {lastCheck.toLocaleTimeString()}
-              </div>
-            )}
-          </section>
-        )}
-
-        {/* ── FAILED ──────────────────────────────────────────────────────── */}
-        {status === 'FAILED' && (
-          <section className="sa-error">
-            <div className="sa-error-icon"><AlertCircle size={30} /></div>
-            <h3 className="sa-error-title">Research failed</h3>
-            <p className="sa-error-msg">{error}</p>
-            <button onClick={resetResearch} className="sa-cta sa-cta--ghost">
-              Start new research
-            </button>
-          </section>
-        )}
-
-        {/* ── COMPLETED: Report ────────────────────────────────────────────── */}
-        {status === 'COMPLETED' && report && (
-          <section className="sa-report">
-            <div className="sa-report-toolbar">
-              <div className="sa-report-title">
-                <div className="sa-report-title-icon"><FileText size={18} /></div>
-                <div className="sa-report-title-copy">
-                  <h3>Research report · {company}</h3>
-                  <span>Job {jobId} · Account {accountId}</span>
-                  <div className="sa-report-meta">
-                    <span className="sa-report-meta-item" title="Model used for this research run">
-                      <Cpu size={12} /> {formatModelName(modelCard)}
-                    </span>
-                    <span className="sa-report-meta-item" title="End-to-end processing time">
-                      <Clock size={12} /> {getResearchDuration(modelCard, startedAt, completedAt)}
-                    </span>
-                    <span className="sa-report-meta-item" title="Total tokens consumed">
-                      <Hash size={12} /> {formatTokens(modelCard)}
-                    </span>
-                    <span className="sa-report-meta-item" title="Estimated cost in USD">
-                      <Coins size={12} /> {formatCost(modelCard)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <div className="sa-report-actions">
-                <button
-                  id="res-download-btn"
-                  className="sa-btn download-btn"
-                  onClick={handleDownload}
-                  disabled={downloading}
-                  title="Download research report file"
-                >
-                  {downloading
-                    ? <><RefreshCw size={14} className="spin" /> <span className="btn-label">Downloading…</span></>
-                    : <><Download size={15} /> <span className="btn-label">Download</span></>}
-                </button>
-                <button className="sa-btn sa-btn--primary" onClick={resetResearch}>
-                  New research
-                </button>
-              </div>
-            </div>
-            <div className="sa-report-body markdown-content">
-              <ReactMarkdown>{report}</ReactMarkdown>
-            </div>
-          </section>
-        )}
-
-        {/* ── COMPLETED but report not yet loaded ──────────────────────────── */}
-        {status === 'COMPLETED' && !report && (
-          <section className="sa-loading">
-            <RefreshCw className="spin" size={30} />
-            <p>Compiling final markdown report…</p>
-          </section>
-        )}
-      </main>
+      {/* A submit that never produced a run. Once any run exists, failures
+          belong to that run and are shown on its row in Recent runs, which is
+          how Translation handles the same case. */}
+      {error && jobOrder.length === 0 && (
+        <section className="sa-error">
+          <div className="sa-error-icon"><AlertCircle size={30} /></div>
+          <h3 className="sa-error-title">Could not start research</h3>
+          <p className="sa-error-msg">{error}</p>
+          <button onClick={() => setRunOpen(true)} className="sa-cta sa-cta--ghost">
+            Try again
+          </button>
+        </section>
+      )}
 
       <RecentRuns
         jobs={serviceJobs.jobs}
@@ -458,8 +183,11 @@ const SalesAgentPage: React.FC<SalesAgentPageProps> = ({ onOpenTracker, onBack }
         onCancel={serviceJobs.cancelJob}
         onDownload={serviceJobs.downloadJob}
         onOpenTracker={onOpenTracker}
-        // Sales research jobs have no per-job detail endpoint or review flow
-        // yet — onLoadDetail/onRate are intentionally omitted.
+        // Expanding a completed row now loads the run's model/tokens/time/cost
+        // from GET /research/result — the figures the removed report panel used
+        // to show. There is still no review flow for research runs, so onRate
+        // stays omitted.
+        onLoadDetail={serviceJobs.loadDetail}
       />
     </div>
   );

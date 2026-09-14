@@ -1,9 +1,11 @@
 import type { Dispatch, SetStateAction } from 'react';
 import type { JobStatusResponse, LegacyJobStatusResponse } from '../../features/translation/types';
 import type { ResearchJobListItem } from '../../features/sales/api';
+import type { ResearchResultResponse } from '../../features/sales/types';
 import type { SalesJobRecord } from '../../features/sales/useSalesJobsState';
 import type { UnifiedJob, UnifiedJobDetail, UnifiedJobStatus } from '../types/jobs';
 import { translationApi } from '../../features/translation/api';
+import { getResearchResult } from '../../features/sales/api';
 
 // ── Shared formatting helpers (cost/tokens/time/model), used anywhere a job's
 //    full detail is rendered — Recent runs and Job Tracker expanded rows. ──
@@ -226,7 +228,6 @@ export async function loadJobDetail(
   job: UnifiedJob,
   setJobs: Dispatch<SetStateAction<UnifiedJob[]>>,
 ): Promise<void> {
-  if (job.service !== 'translation') return;
   if (job.detailStatus === 'loading' || job.detailStatus === 'loaded') return;
 
   setJobs((prev) =>
@@ -234,8 +235,10 @@ export async function loadJobDetail(
   );
 
   try {
-    const data = await translationApi.getJobStatus(job.id);
-    const detail = extractTranslationDetail(data);
+    const detail =
+      job.service === 'translation'
+        ? extractTranslationDetail(await translationApi.getJobStatus(job.id))
+        : extractSalesDetail(await getResearchResult(job.id));
     setJobs((prev) =>
       prev.map((j) => (j.key === job.key ? { ...j, detail, detailStatus: 'loaded' } : j)),
     );
@@ -244,6 +247,30 @@ export async function loadJobDetail(
       prev.map((j) => (j.key === job.key ? { ...j, detailStatus: 'error' } : j)),
     );
   }
+}
+
+/**
+ * Sales equivalent of `extractTranslationDetail`, mapping the service's
+ * `model_card` onto the same shape so a research row expands to the same
+ * cost/tokens/time/model detail a translation row does.
+ *
+ * The Sales page used to show these in its own inline report panel. That panel
+ * only ever described the newest run, so the numbers are surfaced per row here
+ * instead — the same place Translation has always put them.
+ */
+export function extractSalesDetail(result: ResearchResultResponse): UnifiedJobDetail {
+  const card = result.model_card;
+  return {
+    costUsd: typeof card?.cost_usd === 'number' ? card.cost_usd : null,
+    tokenCount: typeof card?.tokens_used === 'number' ? card.tokens_used : null,
+    processingTimeSeconds:
+      typeof card?.latency_seconds === 'number' ? card.latency_seconds : null,
+    // The service reports one `model_version` rather than a name/version pair.
+    modelUsed: card?.model_version ?? null,
+    modelVersion: card?.model_version ?? null,
+    // No per-run quality score in the research pipeline.
+    qualityScore: null,
+  };
 }
 
 /** Merges job lists by key; later lists win over earlier ones for the same job, then sorts newest-first. */

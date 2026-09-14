@@ -103,7 +103,18 @@ describe('SalesAgentPage concurrency', () => {
     await waitFor(() => expect(initiateResearch).toHaveBeenCalledTimes(1));
 
     fireEvent.click(screen.getByRole('button', { name: /run research/i }));
+
+    // The dialog must be dismissable even though a run is still in progress —
+    // RunJobModal ties Cancel, Escape and backdrop-dismiss to the same
+    // `submitting` prop that used to be driven by the job's status.
     expect(screen.getByRole('button', { name: /^cancel$/i })).toBeEnabled();
+
+    // A successful submit clears the form, so Start is disabled until the next
+    // run is described — then it must be live again, not blocked by the run
+    // already going.
+    expect(screen.getByRole('button', { name: /start job/i })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText(/account id/i), { target: { value: 'ACC-2' } });
+    fireEvent.change(screen.getByLabelText(/company name/i), { target: { value: 'Third Co' } });
     expect(screen.getByRole('button', { name: /start job/i })).toBeEnabled();
   });
 });
