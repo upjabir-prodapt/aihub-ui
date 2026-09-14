@@ -309,3 +309,61 @@ async def test_legacy_browser_auth_endpoints_are_gone(client: httpx.AsyncClient,
     """Decisions D6/D7 delete the per-service handshake and the metadata token."""
     response = await client.get(path)
     assert response.status_code == 404
+
+
+async def test_research_feedback_is_accepted(
+    client: httpx.AsyncClient, signed_in: dict[str, object]
+) -> None:
+    response = await client.post(
+        "/api/sales/v1/research/sales-job-7002/feedback",
+        json={"feedback": "The tech-stack section was the most useful part."},
+        headers=same_origin_headers(str(signed_in["csrfToken"])),
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["job_id"] == "sales-job-7002"
+    assert set(body) == {"job_id", "status", "message"}
+
+
+async def test_research_feedback_rejects_an_empty_body(
+    client: httpx.AsyncClient, signed_in: dict[str, object]
+) -> None:
+    """Mirrors the service's `min_length=1`, which whitespace-only text fails."""
+    response = await client.post(
+        "/api/sales/v1/research/sales-job-7002/feedback",
+        json={"feedback": ""},
+        headers=same_origin_headers(str(signed_in["csrfToken"])),
+    )
+    assert response.status_code == 422
+
+
+async def test_research_feedback_rejects_a_rating(
+    client: httpx.AsyncClient, signed_in: dict[str, object]
+) -> None:
+    """The schema is `extra="forbid"`: research feedback has no rating field,
+    unlike a translation review, so sending one must not silently succeed."""
+    response = await client.post(
+        "/api/sales/v1/research/sales-job-7002/feedback",
+        json={"feedback": "Good brief.", "rating": 5},
+        headers=same_origin_headers(str(signed_in["csrfToken"])),
+    )
+    assert response.status_code == 422
+
+
+async def test_feedback_path_is_not_mistaken_for_a_cancel(
+    client: httpx.AsyncClient, signed_in: dict[str, object]
+) -> None:
+    """`research/{id}` would match `research/{id}/feedback` if ordered wrongly."""
+    listed = (await client.get("/api/sales/v1/research/jobs")).json()
+    before = {j["job_id"]: j["status"] for j in listed}
+
+    await client.post(
+        "/api/sales/v1/research/sales-job-7001/feedback",
+        json={"feedback": "Accurate and timely."},
+        headers=same_origin_headers(str(signed_in["csrfToken"])),
+    )
+
+    after = {
+        j["job_id"]: j["status"] for j in (await client.get("/api/sales/v1/research/jobs")).json()
+    }
+    assert after["sales-job-7001"] == before["sales-job-7001"]

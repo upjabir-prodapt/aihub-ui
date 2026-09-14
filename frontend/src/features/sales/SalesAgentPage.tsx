@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Search, AlertCircle, ShieldCheck, Zap, Globe, PieChart, Hash } from 'lucide-react';
+import React, { useCallback, useRef, useState } from 'react';
+import { Search, ShieldCheck, Zap, Globe, PieChart, Hash } from 'lucide-react';
 import { initiateResearch } from './api';
 import { useEntitlements } from '../auth/useAuth';
 import { useSalesJobs } from './useSalesJobs';
@@ -7,6 +7,9 @@ import { useServiceJobs } from '../../shared/hooks/useServiceJobs';
 import RecentRuns from '../tracker/RecentRuns';
 import RunJobModal from '../translation/RunJobModal';
 import ServiceLanding from '../hub/ServiceLanding';
+import SubmitErrorModal from '../../shared/ui/SubmitErrorModal';
+import FeedbackToast, { type ToastState } from '../../shared/ui/FeedbackToast';
+import FeedbackModal from './FeedbackModal';
 import '../../styles/service-detail.css';
 import '../../styles/sales-agent.css';
 
@@ -51,7 +54,7 @@ interface SalesAgentPageProps {
 
 const SalesAgentPage: React.FC<SalesAgentPageProps> = ({ onOpenTracker, onBack }) => {
   const { sales: canSales } = useEntitlements();
-  const { registerJob, jobOrder } = useSalesJobs();
+  const { registerJob } = useSalesJobs();
   const serviceJobs = useServiceJobs('sales');
   const [runOpen, setRunOpen] = useState(false);
 
@@ -68,6 +71,17 @@ const SalesAgentPage: React.FC<SalesAgentPageProps> = ({ onOpenTracker, onBack }
    * concurrent runs, so the only limit was this button.
    */
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  /** Which completed run's feedback dialog is open. */
+  const [feedbackJobId, setFeedbackJobId] = useState<string | null>(null);
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = useCallback((ok: boolean, message: string) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast({ ok, message });
+    toastTimer.current = setTimeout(() => setToast(null), 4500);
+  }, []);
 
   // Invoked by RunJobModal's form submit, which already calls preventDefault.
   const startResearch = async () => {
@@ -159,19 +173,19 @@ const SalesAgentPage: React.FC<SalesAgentPageProps> = ({ onOpenTracker, onBack }
         </div>
       </RunJobModal>
 
-      {/* A submit that never produced a run. Once any run exists, failures
-          belong to that run and are shown on its row in Recent runs, which is
-          how Translation handles the same case. */}
-      {error && jobOrder.length === 0 && (
-        <section className="sa-error">
-          <div className="sa-error-icon"><AlertCircle size={30} /></div>
-          <h3 className="sa-error-title">Could not start research</h3>
-          <p className="sa-error-msg">{error}</p>
-          <button onClick={() => setRunOpen(true)} className="sa-cta sa-cta--ghost">
-            Try again
-          </button>
-        </section>
-      )}
+      {/* A submit that never produced a run, so there is no row to carry the
+          message. Once any run exists its failures belong to that run and show
+          on its row instead. */}
+      <SubmitErrorModal
+        isOpen={!!error}
+        serviceName="Sales Agent"
+        message={error ?? ''}
+        onClose={() => setError(null)}
+        onRetry={() => {
+          setError(null);
+          setRunOpen(true);
+        }}
+      />
 
       <RecentRuns
         jobs={serviceJobs.jobs}
@@ -183,12 +197,22 @@ const SalesAgentPage: React.FC<SalesAgentPageProps> = ({ onOpenTracker, onBack }
         onCancel={serviceJobs.cancelJob}
         onDownload={serviceJobs.downloadJob}
         onOpenTracker={onOpenTracker}
-        // Expanding a completed row now loads the run's model/tokens/time/cost
-        // from GET /research/result — the figures the removed report panel used
-        // to show. There is still no review flow for research runs, so onRate
-        // stays omitted.
+        // Expanding a completed row loads the run's model/tokens/time/cost from
+        // GET /research/result — the figures the removed report panel showed.
         onLoadDetail={serviceJobs.loadDetail}
+        onFeedback={(job) => setFeedbackJobId(job.id)}
       />
+
+      {feedbackJobId && (
+        <FeedbackModal
+          isOpen
+          jobId={feedbackJobId}
+          onClose={() => setFeedbackJobId(null)}
+          onSubmitted={showToast}
+        />
+      )}
+
+      <FeedbackToast toast={toast} onDismiss={() => setToast(null)} />
     </div>
   );
 };

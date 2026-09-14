@@ -4,6 +4,8 @@ import type {
   ResearchModelCard,
   ResearchResultResponse,
   ResearchJobListItem,
+  ResearchFeedbackRequest,
+  ResearchFeedbackResponse,
 } from './types';
 import { apiDownload, apiJson, apiPostJson } from '../../shared/api/client';
 
@@ -13,6 +15,8 @@ export type {
   ResearchModelCard,
   ResearchResultResponse,
   ResearchJobListItem,
+  ResearchFeedbackRequest,
+  ResearchFeedbackResponse,
 };
 
 /**
@@ -82,4 +86,20 @@ export async function downloadResearchFile(job_id: string): Promise<void> {
   // (Research_Report_<Company>.pdf), which apiDownload prefers. It streams
   // application/pdf, so the fallback must not claim .md.
   await apiDownload(`${API_BASE}/research/download/${job_id}`, `research-${job_id}.pdf`);
+}
+
+/** Maximum feedback length the service accepts. */
+export const MAX_RESEARCH_FEEDBACK = 1000;
+
+/** `POST /research/{job_id}/feedback` — free-text feedback on a finished run. */
+export async function submitResearchFeedback(
+  job_id: string,
+  feedback: string,
+): Promise<ResearchFeedbackResponse> {
+  const body: ResearchFeedbackRequest = { feedback };
+  return await apiPostJson<ResearchFeedbackResponse>(
+    `${API_BASE}/research/${job_id}/feedback`,
+    body,
+    { errorMessage: 'Failed to submit feedback' },
+  );
 }

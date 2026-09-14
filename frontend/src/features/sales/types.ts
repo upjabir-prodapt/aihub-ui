@@ -73,3 +73,22 @@ export interface ResearchJobListItem {
   error_message?: string | null;
   progress?: number | null;
 }
+
+/**
+ * `POST /research/{job_id}/feedback` — free text only.
+ *
+ * Deliberately unlike Translation's review, which is a 1-5 rating plus an
+ * optional comment: the research service has no rating field, so there is
+ * nothing for stars to submit. `extra="forbid"` upstream means sending one
+ * anyway would 422.
+ */
+export interface ResearchFeedbackRequest {
+  /** 1-1000 characters, enforced by the service. */
+  feedback: string;
+}
+
+export interface ResearchFeedbackResponse {
+  job_id: string;
+  status: string;
+  message: string;
+}

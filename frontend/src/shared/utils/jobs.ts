@@ -190,7 +190,8 @@ export function normalizeSalesHistoryItem(item: ResearchJobListItem): UnifiedJob
     errorMessage: item.error_message ?? null,
     canCancel: status === 'queued' || status === 'running',
     canDownload: status === 'completed',
-    canReview: false,
+    // Research runs take free-text feedback (no rating) — see FeedbackModal.
+    canReview: status === 'completed',
     startedBy: null,
   };
 }
@@ -212,7 +213,8 @@ export function normalizeSalesJob(item: SalesJobRecord): UnifiedJob {
     errorMessage: item.errorMessage,
     canCancel: status === 'queued' || status === 'running',
     canDownload: status === 'completed',
-    canReview: false,
+    // Research runs take free-text feedback (no rating) — see FeedbackModal.
+    canReview: status === 'completed',
     startedBy: null,
   };
 }

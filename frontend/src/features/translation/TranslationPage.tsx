@@ -3,6 +3,8 @@ import { useDropzone, type FileRejection } from 'react-dropzone';
 import { useTranslationJobs } from './useTranslationJobs';
 import { useServiceJobs } from '../../shared/hooks/useServiceJobs';
 import ReviewModal from './ReviewModal';
+import SubmitErrorModal from '../../shared/ui/SubmitErrorModal';
+import FeedbackToast from '../../shared/ui/FeedbackToast';
 import RecentRuns from '../tracker/RecentRuns';
 import RunJobModal from './RunJobModal';
 import ServiceLanding from '../hub/ServiceLanding';
@@ -648,36 +650,20 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onOpenTracker, onBack
         </div>
       )}
 
-      {/* Batch-level failure panel — shown only when submission itself was
-          rejected before any job existed (validation errors: password-
-          protected file, scanned/image-only document, oversized file,
-          etc.). Once job(s) exist, a failure is a pipeline-side outcome for
-          one or more of them, and is shown per-row in Recent runs below
-          (status badge + inline error message) — this panel and its
-          Try Again/Resume/Start Over actions are intentionally not shown in
-          that case; a failed job is not retried. */}
-      {status === 'failed' && jobOrder.length === 0 && (
-        <div className="workspace workspace--output">
-          <div className="panel">
-            <div className="output-error">
-              <div className="error-icon">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10"/>
-                  <line x1="12" y1="8" x2="12" y2="12"/>
-                  <line x1="12" y1="16" x2="12.01" y2="16"/>
-                </svg>
-              </div>
-              <p className="error-title">Translation Failed</p>
-              <p className="error-message">{error}</p>
-              <div className="error-actions">
-                <button className="retry-btn" onClick={retryOrReset} id="retry-btn">
-                  Try Again
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* A submit that never produced a run, so there is no row to carry the
+          message. A batch that started and then failed is not shown here: that
+          failure belongs to the individual jobs and appears per-row in Recent
+          runs below, and a failed job is not retried. */}
+      <SubmitErrorModal
+        isOpen={status === 'failed' && jobOrder.length === 0}
+        serviceName="Translation"
+        message={error ?? 'The translation job could not be started.'}
+        onClose={retryOrReset}
+        onRetry={() => {
+          retryOrReset();
+          setRunOpen(true);
+        }}
+      />
 
       <div ref={resultRef}>
         <RecentRuns
@@ -704,31 +690,7 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onOpenTracker, onBack
         />
       )}
 
-      {/* Review result toast */}
-      {toast && (
-        <div className={`review-toast ${toast.ok ? 'review-toast--success' : 'review-toast--error'}`} role="status" aria-live="polite">
-          <div className="review-toast-icon">
-            {toast.ok ? (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                <polyline points="22 4 12 14.01 9 11.01" />
-              </svg>
-            ) : (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="8" x2="12" y2="12" />
-                <line x1="12" y1="16" x2="12.01" y2="16" />
-              </svg>
-            )}
-          </div>
-          <span className="review-toast-message">{toast.message}</span>
-          <button className="review-toast-close" onClick={() => setToast(null)} aria-label="Dismiss">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
-      )}
+      <FeedbackToast toast={toast} onDismiss={() => setToast(null)} />
     </div>
   );
 };

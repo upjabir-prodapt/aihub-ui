@@ -36,6 +36,7 @@ SALES_STATUS = re.compile(r"^research/status/([^/]+)$")
 SALES_RESULT = re.compile(r"^research/result/([^/]+)$")
 SALES_DOWNLOAD = re.compile(r"^research/download/([^/]+)$")
 SALES_JOB = re.compile(r"^research/([^/]+)$")
+SALES_FEEDBACK = re.compile(r"^research/([^/]+)/feedback$")
 
 MOCK_FILE_BODY = (
     "--- Translated Document (Mock Output: {job_id}) ---\n\n"
@@ -269,6 +270,29 @@ async def _sales(path: str, method: str, request: Request) -> Response | None:
                     f'attachment; filename="Research_Report_{safe_company}.pdf"'
                 )
             },
+        )
+
+    # Must be tried before SALES_JOB, whose pattern would otherwise swallow
+    # "<job_id>/feedback" as a job id.
+    match = SALES_FEEDBACK.match(path)
+    if match and method == "POST":
+        job_id = match.group(1)
+        try:
+            payload = await _json_body(request) or {}
+        except json.JSONDecodeError:
+            return _error(400, "Invalid JSON payload")
+        feedback = payload.get("feedback")
+        # Mirrors ResearchFeedbackRequest: required, 1-1000 chars, extra forbidden.
+        if not isinstance(feedback, str) or not 1 <= len(feedback) <= 1000:
+            return _error(422, "feedback must be a string of 1-1000 characters")
+        if set(payload) - {"feedback"}:
+            return _error(422, "unexpected fields in feedback payload")
+        return JSONResponse(
+            {
+                "job_id": job_id,
+                "status": "SUCCESS",
+                "message": "Feedback submitted successfully",
+            }
         )
 
     match = SALES_JOB.match(path)

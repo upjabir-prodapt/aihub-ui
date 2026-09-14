@@ -18,6 +18,8 @@ import {
   formatCost,
 } from '../../shared/utils/jobs';
 import ReviewModal from '../translation/ReviewModal';
+import FeedbackModal from '../sales/FeedbackModal';
+import FeedbackToast from '../../shared/ui/FeedbackToast';
 import type { ResearchJobListItem } from '../sales/api';
 import type { LegacyJobStatusResponse } from '../translation/types';
 import type { UnifiedJob, UnifiedJobStatus } from '../../shared/types/jobs';
@@ -81,7 +83,11 @@ const JobTrackerPage: React.FC = () => {
   // the list scannable; older-day buckets are small enough to show in full.
   const TODAY_BUCKET_LIMIT = 3;
   const [showAllToday, setShowAllToday] = useState(false);
-  const [reviewJobId, setReviewJobId] = useState<string | null>(null);
+  /** Which run's feedback dialog is open, and which service it belongs to —
+   *  the two services take different feedback shapes (see FeedbackModal). */
+  const [reviewJob, setReviewJob] = useState<{ id: string; service: UnifiedJob['service'] } | null>(
+    null,
+  );
   const [toast, setToast] = useState<{ ok: boolean; message: string } | null>(null);
 
   /**
@@ -500,7 +506,7 @@ const JobTrackerPage: React.FC = () => {
                                   type="button"
                                   className="tracker-action-btn"
                                   disabled={busy}
-                                  onClick={() => setReviewJobId(job.id)}
+                                  onClick={() => setReviewJob({ id: job.id, service: job.service })}
                                 >
                                   <MessageSquare size={13} /> Feedback
                                 </button>
@@ -536,39 +542,25 @@ const JobTrackerPage: React.FC = () => {
         )}
       </div>
 
-      {reviewJobId && (
+      {reviewJob?.service === 'translation' && (
         <ReviewModal
-          isOpen={!!reviewJobId}
-          jobId={reviewJobId}
-          onClose={() => setReviewJobId(null)}
+          isOpen
+          jobId={reviewJob.id}
+          onClose={() => setReviewJob(null)}
           onSubmitted={handleReviewSubmitted}
         />
       )}
 
-      {toast && (
-        <div className={`review-toast ${toast.ok ? 'review-toast--success' : 'review-toast--error'}`} role="status" aria-live="polite">
-          <div className="review-toast-icon">
-            {toast.ok ? (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                <polyline points="22 4 12 14.01 9 11.01" />
-              </svg>
-            ) : (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="8" x2="12" y2="12" />
-                <line x1="12" y1="16" x2="12.01" y2="16" />
-              </svg>
-            )}
-          </div>
-          <span className="review-toast-message">{toast.message}</span>
-          <button className="review-toast-close" onClick={() => setToast(null)} aria-label="Dismiss">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
+      {reviewJob?.service === 'sales' && (
+        <FeedbackModal
+          isOpen
+          jobId={reviewJob.id}
+          onClose={() => setReviewJob(null)}
+          onSubmitted={handleReviewSubmitted}
+        />
       )}
+
+      <FeedbackToast toast={toast} onDismiss={() => setToast(null)} />
     </div>
   );
 };
