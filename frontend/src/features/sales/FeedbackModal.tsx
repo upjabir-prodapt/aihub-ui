@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { MAX_RESEARCH_FEEDBACK, submitResearchFeedback } from './api';
+import StarRating from '../../shared/ui/StarRating';
 
 interface FeedbackModalProps {
   isOpen: boolean;
@@ -27,11 +28,11 @@ const EXAMPLE_FEEDBACK_ITEMS: { topic: string; example: string }[] = [
 /**
  * Feedback on a completed research run.
  *
- * This is the Sales counterpart to Translation's ReviewModal and is reached the
- * same way — the Feedback action on a run's row. It has no star rating because
- * the research service has no rating field: `POST /research/{job_id}/feedback`
- * takes free text only, and its schema is `extra="forbid"`, so sending a rating
- * would be rejected outright.
+ * The Sales counterpart to Translation's ReviewModal, reached the same way (the
+ * Feedback action on a run's row) and now carrying the same 1-5 rating: the
+ * research service gained a `rating` field, so the two services collect
+ * feedback in the same shape. The rating is required and the comment optional,
+ * as in a translation review.
  */
 const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, jobId, onClose, onSubmitted }) => {
   if (!isOpen) return null;
@@ -43,6 +44,7 @@ const FeedbackModalPanel: React.FC<Omit<FeedbackModalProps, 'isOpen'>> = ({
   onClose,
   onSubmitted,
 }) => {
+  const [rating, setRating] = useState(0);
   const [feedback, setFeedback] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -62,12 +64,13 @@ const FeedbackModalPanel: React.FC<Omit<FeedbackModalProps, 'isOpen'>> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // The service requires at least one character; whitespace alone would 422.
-    if (!trimmed || submitting) return;
+    if (rating === 0 || submitting) return;
 
     setSubmitting(true);
     try {
-      await submitResearchFeedback(jobId, trimmed);
+      // The comment is optional; an empty one is omitted rather than sent as
+      // "" , which the service rejects.
+      await submitResearchFeedback(jobId, rating, trimmed || undefined);
       onSubmitted(true, 'Your feedback was submitted. Thank you!');
       onClose();
     } catch (err: unknown) {
@@ -113,6 +116,8 @@ const FeedbackModalPanel: React.FC<Omit<FeedbackModalProps, 'isOpen'>> = ({
               How useful was this research brief?
             </p>
 
+            <StarRating value={rating} onChange={setRating} disabled={submitting} />
+
             <div className="review-guidance">
               <span className="review-guidance-heading">Example feedback:</span>
               <ul className="review-guidance-list">
@@ -127,7 +132,7 @@ const FeedbackModalPanel: React.FC<Omit<FeedbackModalProps, 'isOpen'>> = ({
 
             <div className="login-field">
               <label className="login-label" htmlFor="research-feedback">
-                Feedback
+                Comment <span className="review-optional">(optional)</span>
               </label>
               <textarea
                 id="research-feedback"
@@ -148,7 +153,7 @@ const FeedbackModalPanel: React.FC<Omit<FeedbackModalProps, 'isOpen'>> = ({
             </div>
 
             <div className="review-actions">
-              <button type="submit" className="review-submit-btn" disabled={!trimmed || submitting}>
+              <button type="submit" className="review-submit-btn" disabled={rating === 0 || submitting}>
                 {submitting ? (
                   <>
                     <span className="spinner" />

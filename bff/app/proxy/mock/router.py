@@ -281,12 +281,18 @@ async def _sales(path: str, method: str, request: Request) -> Response | None:
             payload = await _json_body(request) or {}
         except json.JSONDecodeError:
             return _error(400, "Invalid JSON payload")
-        feedback = payload.get("feedback")
-        # Mirrors ResearchFeedbackRequest: required, 1-1000 chars, extra forbidden.
-        if not isinstance(feedback, str) or not 1 <= len(feedback) <= 1000:
-            return _error(422, "feedback must be a string of 1-1000 characters")
-        if set(payload) - {"feedback"}:
+        # Mirrors ResearchFeedbackRequest: a required 1-5 rating, an optional
+        # 1-1000 char comment, and extra="forbid". Kept strict so mock mode
+        # catches a malformed body the way the service would.
+        if set(payload) - {"rating", "feedback"}:
             return _error(422, "unexpected fields in feedback payload")
+        rating = payload.get("rating")
+        if not isinstance(rating, int) or isinstance(rating, bool) or not 1 <= rating <= 5:
+            return _error(422, "rating must be an integer between 1 and 5")
+        if "feedback" in payload:
+            feedback = payload["feedback"]
+            if not isinstance(feedback, str) or not 1 <= len(feedback) <= 1000:
+                return _error(422, "feedback must be a string of 1-1000 characters")
         return JSONResponse(
             {
                 "job_id": job_id,

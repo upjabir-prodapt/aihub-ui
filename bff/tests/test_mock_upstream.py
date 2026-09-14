@@ -316,7 +316,7 @@ async def test_research_feedback_is_accepted(
 ) -> None:
     response = await client.post(
         "/api/sales/v1/research/sales-job-7002/feedback",
-        json={"feedback": "The tech-stack section was the most useful part."},
+        json={"rating": 5, "feedback": "The tech-stack section was the most useful part."},
         headers=same_origin_headers(str(signed_in["csrfToken"])),
     )
     assert response.status_code == 200
@@ -325,26 +325,60 @@ async def test_research_feedback_is_accepted(
     assert set(body) == {"job_id", "status", "message"}
 
 
-async def test_research_feedback_rejects_an_empty_body(
+async def test_research_feedback_rejects_an_empty_comment(
     client: httpx.AsyncClient, signed_in: dict[str, object]
 ) -> None:
-    """Mirrors the service's `min_length=1`, which whitespace-only text fails."""
+    """The comment is optional, but an empty one is malformed, not absent."""
     response = await client.post(
         "/api/sales/v1/research/sales-job-7002/feedback",
-        json={"feedback": ""},
+        json={"rating": 3, "feedback": ""},
         headers=same_origin_headers(str(signed_in["csrfToken"])),
     )
     assert response.status_code == 422
 
 
-async def test_research_feedback_rejects_a_rating(
+async def test_research_feedback_accepts_a_rating_alone(
     client: httpx.AsyncClient, signed_in: dict[str, object]
 ) -> None:
-    """The schema is `extra="forbid"`: research feedback has no rating field,
-    unlike a translation review, so sending one must not silently succeed."""
     response = await client.post(
         "/api/sales/v1/research/sales-job-7002/feedback",
-        json={"feedback": "Good brief.", "rating": 5},
+        json={"rating": 4},
+        headers=same_origin_headers(str(signed_in["csrfToken"])),
+    )
+    assert response.status_code == 200
+
+
+@pytest.mark.parametrize("rating", [0, 6, -1, "five", True, None])
+async def test_research_feedback_rejects_a_bad_rating(
+    client: httpx.AsyncClient, signed_in: dict[str, object], rating: object
+) -> None:
+    response = await client.post(
+        "/api/sales/v1/research/sales-job-7002/feedback",
+        json={"rating": rating},
+        headers=same_origin_headers(str(signed_in["csrfToken"])),
+    )
+    assert response.status_code == 422
+
+
+async def test_research_feedback_requires_a_rating(
+    client: httpx.AsyncClient, signed_in: dict[str, object]
+) -> None:
+    """A comment on its own is not enough — the rating is the mandatory part."""
+    response = await client.post(
+        "/api/sales/v1/research/sales-job-7002/feedback",
+        json={"feedback": "Good brief."},
+        headers=same_origin_headers(str(signed_in["csrfToken"])),
+    )
+    assert response.status_code == 422
+
+
+async def test_research_feedback_rejects_unknown_fields(
+    client: httpx.AsyncClient, signed_in: dict[str, object]
+) -> None:
+    """The schema is `extra="forbid"` upstream."""
+    response = await client.post(
+        "/api/sales/v1/research/sales-job-7002/feedback",
+        json={"rating": 5, "feedback": "Good brief.", "stars": 5},
         headers=same_origin_headers(str(signed_in["csrfToken"])),
     )
     assert response.status_code == 422
@@ -359,7 +393,7 @@ async def test_feedback_path_is_not_mistaken_for_a_cancel(
 
     await client.post(
         "/api/sales/v1/research/sales-job-7001/feedback",
-        json={"feedback": "Accurate and timely."},
+        json={"rating": 5, "feedback": "Accurate and timely."},
         headers=same_origin_headers(str(signed_in["csrfToken"])),
     )
 

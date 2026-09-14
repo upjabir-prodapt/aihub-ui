@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { translationApi } from './api';
+import StarRating from '../../shared/ui/StarRating';
 
 const MAX_COMMENT = 2000;
 
@@ -9,37 +10,6 @@ interface ReviewModalProps {
   onClose: () => void;
   onSubmitted: (ok: boolean, message: string) => void;
 }
-
-const StarIcon: React.FC<{ filled: boolean }> = ({ filled }) => (
-  <svg
-    width="28"
-    height="28"
-    viewBox="0 0 24 24"
-    fill={filled ? 'currentColor' : 'none'}
-    stroke="currentColor"
-    strokeWidth="1.8"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-  </svg>
-);
-
-const RATING_LABELS: Record<number, string> = {
-  1: 'Poor',
-  2: 'Fair',
-  3: 'Good',
-  4: 'Very Good',
-  5: 'Excellent',
-};
-
-const RATING_CLASSES: Record<number, string> = {
-  1: 'rating-poor',
-  2: 'rating-fair',
-  3: 'rating-good',
-  4: 'rating-great',
-  5: 'rating-excellent',
-};
 
 interface FeedbackExampleItem {
   topic: string;
@@ -76,7 +46,6 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ isOpen, jobId, onClose, onSub
 
 const ReviewModalPanel: React.FC<Omit<ReviewModalProps, 'isOpen'>> = ({ jobId, onClose, onSubmitted }) => {
   const [rating, setRating] = useState(0);
-  const [hovered, setHovered] = useState(0);
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -111,7 +80,6 @@ const ReviewModalPanel: React.FC<Omit<ReviewModalProps, 'isOpen'>> = ({ jobId, o
     }
   };
 
-  const displayRating = hovered || rating;
 
   return (
     <div
@@ -148,31 +116,7 @@ const ReviewModalPanel: React.FC<Omit<ReviewModalProps, 'isOpen'>> = ({ jobId, o
               How would you rate the quality of this translation?
             </p>
 
-            {/* Stars */}
-            <div className="review-stars-row" role="group" aria-label="Rating">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <button
-                  key={star}
-                  type="button"
-                  className={`review-star-btn ${star <= displayRating ? 'active' : ''}`}
-                  onClick={() => setRating(star)}
-                  onMouseEnter={() => setHovered(star)}
-                  onMouseLeave={() => setHovered(0)}
-                  aria-label={`${star} star${star !== 1 ? 's' : ''}`}
-                  disabled={submitting}
-                >
-                  <StarIcon filled={star <= displayRating} />
-                </button>
-              ))}
-            </div>
-
-            {/* Rating label */}
-            <div className="review-rating-label" aria-live="polite">
-              {displayRating === 0
-                ? <span className="rating-hint">Select a rating</span>
-                : <span className={RATING_CLASSES[displayRating]}>{RATING_LABELS[displayRating]}</span>
-              }
-            </div>
+            <StarRating value={rating} onChange={setRating} disabled={submitting} />
 
             {/* Example Feedback Guidance */}
             <div className="review-guidance">

@@ -91,12 +91,21 @@ export async function downloadResearchFile(job_id: string): Promise<void> {
 /** Maximum feedback length the service accepts. */
 export const MAX_RESEARCH_FEEDBACK = 1000;
 
-/** `POST /research/{job_id}/feedback` — free-text feedback on a finished run. */
+/**
+ * `POST /research/{job_id}/feedback` — rate a finished run, optionally with a
+ * comment.
+ *
+ * `feedback` is omitted from the body rather than sent empty: the service
+ * rejects an empty string, and `extra="forbid"` means we cannot send `null`
+ * either.
+ */
 export async function submitResearchFeedback(
   job_id: string,
-  feedback: string,
+  rating: number,
+  feedback?: string,
 ): Promise<ResearchFeedbackResponse> {
-  const body: ResearchFeedbackRequest = { feedback };
+  const comment = feedback?.trim();
+  const body: ResearchFeedbackRequest = comment ? { rating, feedback: comment } : { rating };
   return await apiPostJson<ResearchFeedbackResponse>(
     `${API_BASE}/research/${job_id}/feedback`,
     body,

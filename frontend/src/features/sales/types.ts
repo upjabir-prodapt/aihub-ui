@@ -75,16 +75,18 @@ export interface ResearchJobListItem {
 }
 
 /**
- * `POST /research/{job_id}/feedback` — free text only.
+ * `POST /research/{job_id}/feedback` — a 1-5 rating plus an optional comment,
+ * matching the shape of a Translation review.
  *
- * Deliberately unlike Translation's review, which is a 1-5 rating plus an
- * optional comment: the research service has no rating field, so there is
- * nothing for stars to submit. `extra="forbid"` upstream means sending one
- * anyway would 422.
+ * The schema is `extra="forbid"` upstream, so only these two fields may be
+ * sent. Omit `feedback` entirely to leave no comment: an empty string is
+ * rejected as a malformed comment rather than treated as an absent one.
  */
 export interface ResearchFeedbackRequest {
-  /** 1-1000 characters, enforced by the service. */
-  feedback: string;
+  /** 1-5 inclusive; required. */
+  rating: number;
+  /** Optional. When present, 1-1000 characters. */
+  feedback?: string;
 }
 
 export interface ResearchFeedbackResponse {
