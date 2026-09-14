@@ -141,26 +141,6 @@ const JobTrackerPage: React.FC = () => {
   // reflects live progress even when it isn't the one that started a run —
   // but only while something is actually in flight, and paused while the tab
   // is hidden so a backgrounded browser tab doesn't keep hammering the API.
-  const hasInFlight = history.some((j) => j.status === 'queued' || j.status === 'running');
-  useEffect(() => {
-    if (!hasInFlight) return undefined;
-
-    const tick = () => {
-      if (document.visibilityState === 'visible') void loadHistory();
-    };
-    const intervalId = setInterval(tick, AUTO_REFRESH_INTERVAL_MS);
-
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') void loadHistory();
-    };
-    document.addEventListener('visibilitychange', handleVisibility);
-
-    return () => {
-      clearInterval(intervalId);
-      document.removeEventListener('visibilitychange', handleVisibility);
-    };
-  }, [hasInFlight, loadHistory]);
-
   /** Lazily fetches cost/tokens/time/model for a completed translation job, on row expand. */
   const loadDetail = useCallback((job: UnifiedJob) => {
     void loadJobDetail(job, setHistory);
@@ -190,6 +170,31 @@ const JobTrackerPage: React.FC = () => {
     () => mergeJobLists(history, activeTranslationItems, salesItems),
     [history, activeTranslationItems, salesItems],
   );
+
+  // Gated on the MERGED list, not `history` alone: a run submitted in this
+  // session exists only in the in-session items until the next history pull,
+  // so keying off history meant the refresh loop never started for the very
+  // submission that needed it.
+  const hasInFlight = allJobs.some((j) => j.status === 'queued' || j.status === 'running');
+
+  useEffect(() => {
+    if (!hasInFlight) return undefined;
+
+    const tick = () => {
+      if (document.visibilityState === 'visible') void loadHistory();
+    };
+    const intervalId = setInterval(tick, AUTO_REFRESH_INTERVAL_MS);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') void loadHistory();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [hasInFlight, loadHistory]);
 
   const stats = useMemo(
     () => ({

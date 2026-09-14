@@ -147,6 +147,15 @@ const SalesAgentPage: React.FC<SalesAgentPageProps> = ({ onOpenTracker, onBack }
   const [error,      setError]      = useState<string | null>(null);
   const [lastCheck,  setLastCheck]  = useState<Date | null>(null);
   const [downloading, setDownloading] = useState(false);
+  /**
+   * True only while `POST /research/initiate` is in flight.
+   *
+   * Deliberately NOT the running job's status: gating the run dialog on
+   * IN_PROGRESS meant a second research run could not be started until the
+   * first finished. The registry in useSalesJobsState already tracks and
+   * polls any number of concurrent runs, so the only limit was this button.
+   */
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [modelCard,  setModelCard]  = useState<ResearchModelCard | null>(null);
   const [startedAt,  setStartedAt]  = useState<Date | null>(null);
   const [completedAt, setCompletedAt] = useState<Date | null>(null);
@@ -229,17 +238,22 @@ const SalesAgentPage: React.FC<SalesAgentPageProps> = ({ onOpenTracker, onBack }
     setCompletedAt(null);
     setStartedAt(new Date());
 
+    setIsSubmitting(true);
     try {
       const res = await initiateResearch(accountId.trim(), company.trim());
       setJobId(res.job_id);
       setStatus((res.status as Status) || 'PENDING');
       // Register with the shared registry so Service Hub / Job Tracker can
-      // see this run too (see hooks/useSalesJobsState.ts).
+      // see this run too (see useSalesJobsState.ts). This is also what keeps
+      // an earlier run polling once the page's own view has moved on to a
+      // newer one — the registry, not this page, owns concurrent runs.
       registerJob(res.job_id, company.trim(), accountId.trim());
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to start research.';
       setError(msg);
       setStatus('FAILED');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -280,8 +294,8 @@ const SalesAgentPage: React.FC<SalesAgentPageProps> = ({ onOpenTracker, onBack }
         serviceName="Sales Agent"
         serviceIcon={SALES_ICON}
         submitLabel="Start job"
-        submitting={IN_PROGRESS.has(status)}
-        canSubmit={!!company.trim() && !!accountId.trim()}
+        submitting={isSubmitting}
+        canSubmit={!!company.trim() && !!accountId.trim() && !isSubmitting}
         onSubmit={startResearch}
       >
         <div className="sa-field">
