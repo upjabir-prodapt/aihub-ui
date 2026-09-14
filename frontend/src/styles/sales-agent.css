@@ -99,7 +99,7 @@
 
 .sa-header-title {
   font-size: 19px;
-  font-weight: 800;
+  font-weight: 900;
   letter-spacing: -0.4px;
   color: var(--text-primary);
   line-height: 1.2;
@@ -200,8 +200,8 @@
 }
 
 .sa-session-logout:hover {
-  color: #f87171;
-  background: rgba(239, 68, 68, 0.1);
+  color: var(--text-error);
+  background: rgba(242, 12, 54, 0.1);
 }
 
 /* ── Body ────────────────────────────────────────────────────────────────── */
@@ -263,7 +263,7 @@
 
 .sa-hero-title {
   font-size: clamp(28px, 5vw, 44px);
-  font-weight: 800;
+  font-weight: 900;
   letter-spacing: -1px;
   line-height: 1.1;
   color: var(--text-primary);
@@ -557,9 +557,9 @@
   width: 60px;
   height: 60px;
   border-radius: 50%;
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  color: #ef4444;
+  background: rgba(242, 12, 54, 0.1);
+  border: 1px solid rgba(242, 12, 54, 0.3);
+  color: #F20C36;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -574,8 +574,8 @@
   line-height: 1.5;
   padding: 10px 14px;
   border-radius: 10px;
-  background: rgba(239, 68, 68, 0.06);
-  border: 1px solid rgba(239, 68, 68, 0.15);
+  background: rgba(242, 12, 54, 0.06);
+  border: 1px solid rgba(242, 12, 54, 0.15);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   max-width: 100%;
   word-break: break-word;
@@ -892,7 +892,7 @@
 
 .sa-gate-title {
   font-size: 24px;
-  font-weight: 800;
+  font-weight: 900;
   letter-spacing: -0.5px;
   color: var(--text-primary);
 }

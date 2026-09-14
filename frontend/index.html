@@ -7,7 +7,12 @@
     <meta name="description" content="Colt AI Hub — Intelligent AI-powered tools for Colt Technology Services teams." />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+    <!-- Sole font request for the app. src/index.css deliberately does NOT
+         re-@import these families; doing so cost a second render-blocking
+         round trip for identical bytes. Urbanist weights are limited to those
+         the UI actually uses: 400 body, 500/600/700 UI chrome, 900 (Black)
+         for h1/h2 per the brand's heading guidance. -->
+    <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400;500;600;700;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
     <title>Colt AI Hub</title>
   </head>
   <body>
