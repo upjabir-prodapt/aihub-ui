@@ -170,8 +170,6 @@ body {
   background: #F5F5F5;
 }
 
-
-
 html, body, #root {
   height: 100%;
   overflow: hidden;
@@ -179,16 +177,19 @@ html, body, #root {
 
 /* ===== SCROLLBAR ===== */
 ::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 99px; }
-::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
 
+::-webkit-scrollbar-track { background: transparent; }
+
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 99px; }
+
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
 
 /* ===== FOCUS RESET — WCAG 2.1 AA ===== */
 button:focus-visible, a:focus-visible, select:focus-visible, textarea:focus-visible {
   outline: 2px solid var(--colt-teal);
   outline-offset: 2px;
 }
+
 button, a, select { cursor: pointer; }
 
 /* ===== SHARED ACTION BUTTON ===== */
@@ -240,9 +241,7 @@ button, a, select { cursor: pointer; }
 }
 
 /* Keep icons visible inside buttons on small screens */
-button svg,
-.output-action-btn svg,
-.sa-btn svg {
+button svg, .output-action-btn svg {
   flex-shrink: 0;
 }
 
@@ -271,20 +270,15 @@ button svg,
     display: none;
   }
 
-  .output-action-btn.icon-only,
-  .output-action-btn.download-btn,
-  .sa-btn.download-btn {
+  .output-action-btn.icon-only, .output-action-btn.download-btn {
     padding: 6px;
     justify-content: center;
     min-width: 34px;
     min-height: 34px;
   }
 
-  .output-action-btn {
+.output-action-btn {
     font-size: 11px;
     padding: 4px 8px;
   }
 }
-
-
-
