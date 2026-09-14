@@ -291,8 +291,10 @@ async def _sales(path: str, method: str, request: Request) -> Response | None:
             return _error(422, "rating must be an integer between 1 and 5")
         if "feedback" in payload:
             feedback = payload["feedback"]
-            if not isinstance(feedback, str) or not 1 <= len(feedback) <= 1000:
-                return _error(422, "feedback must be a string of 1-1000 characters")
+            # 2000 matches the Translation review comment; the services were
+            # aligned so the shared dialog has one character limit.
+            if not isinstance(feedback, str) or not 1 <= len(feedback) <= 2000:
+                return _error(422, "feedback must be a string of 1-2000 characters")
         return JSONResponse(
             {
                 "job_id": job_id,

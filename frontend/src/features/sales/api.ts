@@ -88,9 +88,6 @@ export async function downloadResearchFile(job_id: string): Promise<void> {
   await apiDownload(`${API_BASE}/research/download/${job_id}`, `research-${job_id}.pdf`);
 }
 
-/** Maximum feedback length the service accepts. */
-export const MAX_RESEARCH_FEEDBACK = 1000;
-
 /**
  * `POST /research/{job_id}/feedback` — rate a finished run, optionally with a
  * comment.

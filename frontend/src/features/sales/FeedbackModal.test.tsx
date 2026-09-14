@@ -5,7 +5,6 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 const submitResearchFeedback = vi.fn();
 
 vi.mock('./api', () => ({
-  MAX_RESEARCH_FEEDBACK: 1000,
   submitResearchFeedback: (...args: unknown[]) => submitResearchFeedback(...args),
 }));
 
