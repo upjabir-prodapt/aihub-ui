@@ -115,7 +115,7 @@ export function normalizeTranslationHistoryItem(item: LegacyJobStatusResponse): 
     errorMessage: item.error_message ?? null,
     canCancel: status === 'queued' || status === 'running',
     canDownload: status === 'completed',
-    canReview: status === 'completed',
+    canReview: status === 'completed' || status === 'failed',
     startedBy: item.user ?? null,
   };
 }
@@ -141,7 +141,7 @@ export function normalizeTranslationActiveItem(item: JobStatusResponse): Unified
     errorMessage: item.error_message ?? null,
     canCancel: status === 'queued' || status === 'running',
     canDownload: status === 'completed',
-    canReview: status === 'completed',
+    canReview: status === 'completed' || status === 'failed',
     startedBy: null,
     detail: item.result ? extractTranslationDetail(item) : undefined,
     detailStatus: item.result ? 'loaded' : undefined,
@@ -186,7 +186,7 @@ export function normalizeSalesHistoryItem(item: ResearchJobListItem): UnifiedJob
     errorMessage: item.error_message ?? null,
     canCancel: status === 'queued' || status === 'running',
     canDownload: status === 'completed',
-    canReview: status === 'completed',
+    canReview: status === 'completed' || status === 'failed',
     startedBy: null,
   };
 }
@@ -208,7 +208,7 @@ export function normalizeSalesJob(item: SalesJobRecord): UnifiedJob {
     errorMessage: item.errorMessage,
     canCancel: status === 'queued' || status === 'running',
     canDownload: status === 'completed',
-    canReview: status === 'completed',
+    canReview: status === 'completed' || status === 'failed',
     startedBy: null,
   };
 }

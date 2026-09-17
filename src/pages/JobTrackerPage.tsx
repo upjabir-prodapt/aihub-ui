@@ -75,8 +75,9 @@ const JobTrackerPage: React.FC<JobTrackerPageProps> = ({ serviceFilter: initialS
   // the list scannable; older-day buckets are small enough to show in full.
   const TODAY_BUCKET_LIMIT = 3;
   const [showAllToday, setShowAllToday] = useState(false);
-  const [reviewJobId, setReviewJobId] = useState<string | null>(null);
-  const [feedbackJobId, setFeedbackJobId] = useState<string | null>(null);
+  /** Run being reviewed. `failed` switches the modal into failure-report mode. */
+  const [review, setReview] = useState<{ id: string; failed: boolean } | null>(null);
+  const [feedbackJob, setFeedbackJob] = useState<{ id: string; failed: boolean } | null>(null);
   const [toast, setToast] = useState<{ ok: boolean; message: string } | null>(null);
 
   /**
@@ -492,13 +493,14 @@ const JobTrackerPage: React.FC<JobTrackerPageProps> = ({ serviceFilter: initialS
                                   type="button"
                                   className="tracker-action-btn"
                                   disabled={busy}
-                                  onClick={() =>
-                                    job.service === 'translation'
-                                      ? setReviewJobId(job.id)
-                                      : setFeedbackJobId(job.id)
-                                  }
+                                  onClick={() => {
+                                    const target = { id: job.id, failed: job.status === 'failed' };
+                                    if (job.service === 'translation') setReview(target);
+                                    else setFeedbackJob(target);
+                                  }}
                                 >
-                                  <MessageSquare size={13} /> Feedback
+                                  <MessageSquare size={13} />{' '}
+                                  {job.status === 'failed' ? 'Report issue' : 'Feedback'}
                                 </button>
                               )}
                             </div>
@@ -532,20 +534,22 @@ const JobTrackerPage: React.FC<JobTrackerPageProps> = ({ serviceFilter: initialS
         )}
       </div>
 
-      {reviewJobId && (
+      {review && (
         <ReviewModal
-          isOpen={!!reviewJobId}
-          jobId={reviewJobId}
-          onClose={() => setReviewJobId(null)}
+          isOpen={!!review}
+          jobId={review.id}
+          jobFailed={review.failed}
+          onClose={() => setReview(null)}
           onSubmitted={handleReviewSubmitted}
         />
       )}
 
-      {feedbackJobId && (
+      {feedbackJob && (
         <SalesFeedbackModal
-          isOpen={!!feedbackJobId}
-          jobId={feedbackJobId}
-          onClose={() => setFeedbackJobId(null)}
+          isOpen={!!feedbackJob}
+          jobId={feedbackJob.id}
+          jobFailed={feedbackJob.failed}
+          onClose={() => setFeedbackJob(null)}
           onSubmitted={handleReviewSubmitted}
         />
       )}

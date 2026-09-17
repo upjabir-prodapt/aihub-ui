@@ -51,7 +51,8 @@ const SalesAgentPage: React.FC<SalesAgentPageProps> = ({ onOpenTracker, onBack }
   const { registerJob } = useSalesJobs();
   const serviceJobs = useServiceJobs('sales');
   const [runOpen, setRunOpen] = useState(false);
-  const [feedbackJobId, setFeedbackJobId] = useState<string | null>(null);
+  /** Run being reviewed. `failed` switches the modal into failure-report mode. */
+  const [feedbackJob, setFeedbackJob] = useState<{ id: string; failed: boolean } | null>(null);
   const [toast, setToast] = useState<{ ok: boolean; message: string } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -230,15 +231,16 @@ const SalesAgentPage: React.FC<SalesAgentPageProps> = ({ onOpenTracker, onBack }
           onDownload={serviceJobs.downloadJob}
           onLoadDetail={serviceJobs.loadDetail}
           onOpenTracker={onOpenTracker}
-          onFeedback={(job) => setFeedbackJobId(job.id)}
+          onFeedback={(job) => setFeedbackJob({ id: job.id, failed: job.status === 'failed' })}
         />
       </div>
 
-      {feedbackJobId && (
+      {feedbackJob && (
         <SalesFeedbackModal
-          isOpen={!!feedbackJobId}
-          jobId={feedbackJobId}
-          onClose={() => setFeedbackJobId(null)}
+          isOpen={!!feedbackJob}
+          jobId={feedbackJob.id}
+          jobFailed={feedbackJob.failed}
+          onClose={() => setFeedbackJob(null)}
           onSubmitted={handleFeedbackSubmitted}
         />
       )}

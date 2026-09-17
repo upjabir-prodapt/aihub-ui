@@ -16,7 +16,7 @@ interface RecentRunsProps {
   onDownload: (job: UnifiedJob) => void;
   /** Fetches cost/tokens/time/model for a completed job — called on row expand. */
   onLoadDetail?: (job: UnifiedJob) => void;
-  /** Opens the feedback modal for a completed job. */
+  /** Opens the feedback modal for a finished job — completed or failed. */
   onFeedback?: (job: UnifiedJob) => void;
   /** Legacy alias for onFeedback. */
   onRate?: (job: UnifiedJob) => void;
@@ -39,7 +39,8 @@ const STATUS_LABEL: Record<UnifiedJobStatus, string> = {
  * as the Job Tracker, scoped to this service, so you don't have to leave the
  * page to see what you've started. Data comes from the page's useServiceJobs.
  * Rows expand to show cost/tokens/time/model (fetched lazily) and the rate
- * action, mirroring the Job Tracker's expanded detail.
+ * action, mirroring the Job Tracker's expanded detail. Failed runs expose
+ * the same feedback action so a bad run can be reported, not just rated.
  */
 const RecentRuns: React.FC<RecentRunsProps> = ({
   jobs,
@@ -127,7 +128,7 @@ const RecentRuns: React.FC<RecentRunsProps> = ({
 
                 {job.errorMessage && <div className="recent-run-error-msg">{job.errorMessage}</div>}
 
-                {(job.canCancel || job.canDownload) && (
+                {(job.canCancel || job.canDownload || (job.canReview && (onFeedback || onRate))) && (
                   <div className="recent-run-actions">
                     {job.canCancel && (
                       <button
@@ -156,7 +157,7 @@ const RecentRuns: React.FC<RecentRunsProps> = ({
                         disabled={busy}
                         onClick={() => (onFeedback ?? onRate)?.(job)}
                       >
-                        <MessageSquare size={12} /> Feedback
+                        <MessageSquare size={12} /> {job.status === 'failed' ? 'Report issue' : 'Feedback'}
                       </button>
                     )}
                   </div>
