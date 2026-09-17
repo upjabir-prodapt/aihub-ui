@@ -1,0 +1,23 @@
+.ai-analysis-note {
+  background: var(--color-accent-tint-weak);
+  border: 1px solid var(--color-accent-tint-strong);
+  border-radius: 14px;
+  padding: 1rem 1.25rem;
+}
+
+.ai-analysis-note-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--color-accent);
+  margin-bottom: 0.5rem;
+}
+
+.ai-analysis-note p {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--color-text);
+}

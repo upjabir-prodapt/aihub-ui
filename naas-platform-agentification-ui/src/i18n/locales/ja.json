@@ -1,0 +1,187 @@
+{
+  "common": {
+    "index": "番号",
+    "name": "名前",
+    "circuitReference": "回線参照番号",
+    "bandwidth": "帯域幅",
+    "currentBandwidth": "現在の帯域幅",
+    "previousBandwidth": "変更前帯域幅",
+    "newBandwidth": "変更後帯域幅",
+    "status": "ステータス",
+    "type": "種別",
+    "created": "作成日時",
+    "action": "アクション",
+    "rentalCharge": "レンタル料金",
+    "triggeredBy": "トリガー元",
+    "timestamp": "タイムスタンプ",
+    "rule": "ルール",
+    "period": "期間",
+    "portName": "ポート名",
+    "building": "建物",
+    "site": "サイト",
+    "commitmentPeriod": "契約期間",
+    "price": "料金",
+    "cost": "費用",
+    "recommended": "おすすめ",
+    "automatic": "自動",
+    "manual": "手動",
+    "notAvailable": "利用不可",
+    "na": "該当なし",
+    "send": "送信"
+  },
+  "navbar": {
+    "newChat": "新しいチャット",
+    "closeSession": "このセッションを終了してウェルカム画面に戻る",
+    "logoAlt": "Colt On-Demand NaaS 2.0",
+    "activeAgent": "アクティブなエージェント",
+    "admin": "管理者",
+    "agents": {
+      "serviceOrder": "サービスオーダーエージェント",
+      "serviceObservability": "サービス可観測性エージェント",
+      "serviceReliability": "サービス信頼性エージェント"
+    }
+  },
+  "welcome": {
+    "heading": "On-Demand NaaS 2.0 へようこそ",
+    "subheading": "本日はどのようにお手伝いできますか？",
+    "samplePrompts": {
+      "telemetry": "接続のテレメトリを表示して",
+      "rules": "有効な信頼性ルールを表示して",
+      "order": "新しいサービスオーダーの作成を手伝って"
+    }
+  },
+  "chat": {
+    "inputPlaceholder": "メッセージを入力…",
+    "noResponse": "（エージェントからのテキスト応答はありません）",
+    "resizePanels": "エージェントパネルのサイズを変更",
+    "resizeTooltip": "ドラッグしてサイズ変更 — ダブルクリックでリセット"
+  },
+  "theme": {
+    "switchTo": "{{theme}}テーマに切り替え",
+    "light": "ライト",
+    "dark": "ダーク"
+  },
+  "language": {
+    "agentLanguage": "言語",
+    "selectTooltip": "アプリとエージェントとの会話に使用する言語を選択"
+  },
+  "errors": {
+    "circuitLookupUnavailable": "回線情報を一時的に取得できません: ",
+    "portLookupUnavailable": "ポート情報を一時的に取得できません: ",
+    "pricingLookupUnavailable": "料金情報を一時的に取得できません: ",
+    "unknownAgent": "不明なエージェント: {{agentId}}",
+    "loadAgentsFailed": "エージェントの読み込みに失敗しました ({{status}})",
+    "chatUnreachable": "エージェントバックエンドに接続できません: {{message}}",
+    "chatRequestFailed": "チャットリクエストが失敗しました ({{status}})",
+    "loadPendingTicketsFailed": "保留中のチケットの読み込みに失敗しました ({{status}})",
+    "loadTicketHistoryFailed": "履歴チケットの読み込みに失敗しました ({{status}})",
+    "approveTicketFailed": "チケット {{ticketId}} の承認に失敗しました ({{status}})",
+    "simulateHighFailed": "高使用率のシミュレーションに失敗しました ({{status}})",
+    "simulateLowFailed": "低使用率のシミュレーションに失敗しました ({{status}})"
+  },
+  "emptyStates": {
+    "noActiveCircuits": "有効な回線が見つかりません。",
+    "noPortsFound": "ポートが見つかりません。",
+    "noPricingOptions": "この選択に対する料金オプションがありません。",
+    "noEventsYet": "イベントはまだありません。",
+    "noActionsLogged": "記録されたアクションはまだありません。",
+    "noRuleSetYet": "ルール未設定",
+    "noDataAvailable": "この期間のデータはありません。",
+    "notYetProvided": "未入力"
+  },
+  "sreMonitor": {
+    "aboveNormal": "通常範囲外",
+    "normal": "正常",
+    "elevated": "上昇",
+    "aiAnalysis": "AI分析",
+    "noCircuitSelected": "回線が選択されていません",
+    "fields": {
+      "circuitReference": "回線参照番号",
+      "ocn": "OCN",
+      "currentBandwidth": "現在の帯域幅",
+      "baseBandwidth": "基本帯域幅",
+      "connectionType": "接続タイプ",
+      "resiliency": "冗長性",
+      "status": "ステータス"
+    },
+    "bandwidthUtilization": "帯域幅使用率",
+    "bandwidthUtilizationUnavailable": "帯域幅使用率を取得できません",
+    "utilizationTrend": "使用率の推移",
+    "jitter": "ジッター",
+    "jitterUnavailable": "ジッターを取得できません",
+    "jitterTrend": "ジッターの推移"
+  },
+  "circuitRules": {
+    "summary": "有効 — {{increasePct}}%超で{{nextMbps}} Mbpsに増加、{{decreasePct}}%以下で{{baseMbps}} Mbpsに減少"
+  },
+  "sreClosedLoop": {
+    "simulateAria": "監視イベントをシミュレート",
+    "simulation": "シミュレーション",
+    "submitting": "送信中…",
+    "highUtilization": "高使用率",
+    "lowUtilization": "低使用率",
+    "recentEvents": "最近のイベント",
+    "auditLog": "監査ログ",
+    "trigger": "トリガー"
+  },
+  "serviceOrder": {
+    "emptyState": "チャットでイーサネットポートまたはイーサネット接続を依頼すると、ここに注文概要が表示されます。",
+    "orderSummary": "注文概要",
+    "gatheringDetails": "注文の詳細を収集中…",
+    "ethernetConnection": "イーサネット接続",
+    "ethernetPort": "イーサネットポート",
+    "fields": {
+      "sourcePort": "発信元ポート",
+      "destinationPort": "宛先ポート",
+      "bandwidth": "帯域幅",
+      "commitmentPeriod": "契約期間",
+      "price": "料金",
+      "vlan": "VLAN",
+      "location": "所在地",
+      "ipAssignment": "IP割り当て"
+    },
+    "vlanLine": "{{vlanType}} — VLAN {{vlanId}}",
+    "portMap": {
+      "source": "発信元",
+      "destination": "宛先"
+    },
+    "invoiceTitle": "見積もり"
+  },
+  "admin": {
+    "backLink": "NaaSアシスタント",
+    "title": "サービスオーダーチケット",
+    "pendingTab": "保留中 ({{count}})",
+    "historyTab": "履歴 ({{count}})",
+    "table": {
+      "ticket": "チケット",
+      "type": "種別",
+      "address": "住所",
+      "building": "建物",
+      "bandwidth": "帯域幅",
+      "commitment": "契約期間",
+      "rentalCharge": "レンタル料金",
+      "created": "作成日時",
+      "approved": "承認日時"
+    },
+    "noPendingTickets": "保留中のチケットはありません。",
+    "noHistoryTickets": "履歴チケットはありません。",
+    "approve": "承認",
+    "approving": "承認中…",
+    "productTypes": {
+      "ethernetPort": "イーサネットポート",
+      "offnetPort": "Offnetポート",
+      "offnetModification": "Offnetポート変更"
+    }
+  },
+  "agentScreen": {
+    "controlPanel": "コントロールパネル",
+    "unknownAgent": "不明なエージェント: {{agentId}}"
+  },
+  "placeholder": {
+    "unifiedDefault": "注文の依頼、テレメトリの確認、信頼性ルールの管理などをお申し付けください。",
+    "comingSoon": "エージェントUIは近日公開予定です"
+  },
+  "greetings": {
+    "serviceOrder": "こんにちは、サービスオーダーエージェントです。ご用件をお聞かせください！"
+  }
+}

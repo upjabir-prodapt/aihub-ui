@@ -1,0 +1,36 @@
+.stat-card {
+  background: var(--color-surface);
+  border-radius: 14px;
+  padding: 1.1rem 1.25rem;
+  box-shadow: var(--shadow-md);
+}
+
+.stat-card-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  margin-bottom: 0.4rem;
+}
+
+.stat-card-value {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.stat-card-status {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  margin-top: 0.4rem;
+}
+
+.stat-card-status-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}

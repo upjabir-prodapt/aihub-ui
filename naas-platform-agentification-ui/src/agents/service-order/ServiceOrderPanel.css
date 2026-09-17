@@ -1,0 +1,147 @@
+.service-order-panel {
+  padding: 1.25rem;
+  height: 100%;
+  overflow-y: auto;
+}
+
+/* This panel doesn't use flex/gap for its top-level children (unlike
+   SreMonitorPanel.css), so the shared AiAnalysisNote needs its own
+   spacing here — scoped to this panel only, not the shared component
+   itself, so sre-monitor's flex-gap-based spacing is unaffected. */
+.service-order-panel .ai-analysis-note {
+  margin-top: 0.85rem;
+}
+
+.service-order-panel--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 1.5rem;
+  color: var(--color-text-faint);
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.service-order-panel-title {
+  font-size: 0.95rem;
+  color: var(--color-text-secondary);
+  margin: 0 0 0.75rem;
+}
+
+/* Shown below the WorldMap shell while a flow has started but no order
+   details exist yet (see ServiceOrderPanel.tsx's early-return above the
+   Connection/Port branches). */
+.service-order-panel-hint {
+  margin: 0.75rem 0 0;
+  font-size: 0.85rem;
+  color: var(--color-text-faint);
+  text-align: center;
+}
+
+/* --- Connection map (shared CityMap component, see ConnectionMap in
+   ServiceOrderPanel.tsx) --- */
+
+.order-map-row {
+  min-width: 0;
+  margin-bottom: 0.85rem;
+}
+
+.order-map-row .city-map-card {
+  width: 100%;
+}
+
+.order-map-legend {
+  display: flex;
+  gap: 1rem;
+  padding: 0.5rem 0.2rem 0;
+}
+
+.order-map-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+.order-map-legend-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* --- Order summary fields --- */
+
+.order-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.order-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 0.65rem 0.8rem;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.order-field-icon {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-surface-hover);
+  color: var(--color-text-secondary);
+}
+
+.order-field-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding-top: 0.05rem;
+}
+
+.order-field-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #9ca3af;
+}
+
+.order-field-value {
+  font-size: 0.88rem;
+  color: #374151;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+/* filled */
+.order-field--filled .order-field-icon {
+  background: rgba(13, 148, 136, 0.14);
+  color: #0d9488;
+}
+.order-field--filled {
+  border-color: rgba(13, 148, 136, 0.3);
+}
+
+/* pending */
+.order-field--pending {
+  opacity: 0.65;
+}
+.order-field--pending .order-field-value {
+  color: #9ca3af;
+  font-style: italic;
+}
