@@ -26,12 +26,13 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["proxy"])
 
-Service = Literal["translation", "sales"]
+Service = Literal["translation", "sales", "naas"]
 
 # The proxy is a UX guard only; Apigee remains the authority (runbook §19.4).
 SERVICE_ROLES: dict[str, tuple[str, ...]] = {
     "translation": ("Translation.User", "Platform.Admin"),
     "sales": ("SalesAgent.User", "Sales.User", "Platform.Admin"),
+    "naas": ("NaaS.User", "Platform.Admin"),
 }
 
 
@@ -131,3 +132,16 @@ async def sales_proxy(
     session: SessionDep,
 ) -> Response:
     return await _proxy("sales", path, request, services, session)
+
+
+@router.api_route(
+    "/naas/v1/{path:path}",
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"],
+)
+async def naas_proxy(
+    path: str,
+    request: Request,
+    services: ServicesDep,
+    session: SessionDep,
+) -> Response:
+    return await _proxy("naas", path, request, services, session)

@@ -50,6 +50,7 @@ const ROUTE_TABS: Array<{ prefix: string; tab: string }> = [
   { prefix: '/tracker', tab: 'tracker' },
   { prefix: '/translation', tab: 'translation' },
   { prefix: '/sales', tab: 'sales' },
+  { prefix: '/naas', tab: 'naas' },
 ];
 
 function tabForPath(pathname: string): string {

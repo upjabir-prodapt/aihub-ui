@@ -360,7 +360,99 @@ class MockDatabase:
     def __init__(self) -> None:
         self.translation = MockTranslationManager()
         self.sales = MockSalesManager()
+        self.naas = MockNaasManager()
 
     def reset(self) -> None:
         self.translation = MockTranslationManager()
         self.sales = MockSalesManager()
+        self.naas = MockNaasManager()
+
+
+# ── NaaS ─────────────────────────────────────────────────────────────────────
+
+MOCK_AGENTS: list[dict[str, str]] = [
+    {
+        "id": "service-order",
+        "display_name": "Service Order",
+        "description": "Qualify addresses and order Ethernet ports and connections.",
+        "frontend_route": "/service-order",
+    },
+    {
+        "id": "sre-monitor",
+        "display_name": "SRE Monitor",
+        "description": "Monitor network health and investigate incidents.",
+        "frontend_route": "/sre-monitor",
+    },
+    {
+        "id": "sre-closed-loop",
+        "display_name": "SRE Closed Loop",
+        "description": "Automated detect-diagnose-remediate loop for network incidents.",
+        "frontend_route": "/sre-closed-loop",
+    },
+]
+
+
+class MockNaasManager:
+    """Basic stub for the naas-mcp agent-backend — see naas.ts's postChatStream.
+
+    Not a simulation of the real ADK orchestrator/MCP tool flow: /chat always
+    replies with a single canned SSE frame and empty tool_results, so
+    agent-specific left panels stay in their empty state. Enough for
+    UPSTREAM_MODE=mock local dev to exercise the session/CSRF/role path
+    without a real Apigee/backend.
+    """
+
+    def __init__(self) -> None:
+        self.tickets: list[dict[str, Any]] = [
+            {
+                "id": 1,
+                "created_at": "2026-08-28T09:14:00Z",
+                "city": "London",
+                "country": "United Kingdom",
+                "post_code": "EC2A 4DP",
+                "building_id": "BLD-0192",
+                "building_name": "Colt City Point",
+                "location_id": "LOC-4471",
+                "product_id": "ETH-1G",
+                "bandwidth": "1 Gbps",
+                "commitment_period": "24 months",
+                "rental_charge": "£450/mo",
+                "status": "pending",
+                "approved_at": None,
+                "product_type": "ethernet_port",
+            },
+            {
+                "id": 2,
+                "created_at": "2026-08-25T13:02:00Z",
+                "city": "Frankfurt",
+                "country": "Germany",
+                "post_code": "60313",
+                "building_id": "BLD-0044",
+                "building_name": "Colt Datacenter FRA1",
+                "location_id": "LOC-2210",
+                "product_id": "ETH-10G",
+                "bandwidth": "10 Gbps",
+                "commitment_period": "36 months",
+                "rental_charge": "€1,200/mo",
+                "status": "approved",
+                "approved_at": "2026-08-26T08:45:00Z",
+                "product_type": "ethernet_port",
+            },
+        ]
+
+    def get_agents(self) -> list[dict[str, str]]:
+        return MOCK_AGENTS
+
+    def get_pending_tickets(self) -> list[dict[str, Any]]:
+        return [t for t in self.tickets if t["status"] == "pending"]
+
+    def get_ticket_history(self) -> list[dict[str, Any]]:
+        return [t for t in self.tickets if t["status"] == "approved"]
+
+    def approve_ticket(self, ticket_id: int) -> dict[str, Any] | None:
+        ticket = next((t for t in self.tickets if t["id"] == ticket_id), None)
+        if ticket is None:
+            return None
+        ticket["status"] = "approved"
+        ticket["approved_at"] = iso(now())
+        return ticket

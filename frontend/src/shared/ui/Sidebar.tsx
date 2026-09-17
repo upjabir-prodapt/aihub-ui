@@ -4,6 +4,7 @@ import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 export interface ServiceEntitlements {
   translation: boolean;
   sales: boolean;
+  naas: boolean;
 }
 
 interface SidebarItem {
@@ -86,6 +87,15 @@ const NAV_ITEMS: SidebarItem[] = [
       </svg>
     ),
   },
+  {
+    id: 'naas',
+    label: 'On-Demand NaaS',
+    icon: (
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+      </svg>
+    ),
+  },
 ];
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -99,6 +109,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     return NAV_ITEMS.filter((item) => {
       if (item.id === 'translation' && entitlements && !entitlements.translation) return false;
       if (item.id === 'sales' && entitlements && !entitlements.sales) return false;
+      if (item.id === 'naas' && entitlements && !entitlements.naas) return false;
       return true;
     });
   }, [entitlements]);

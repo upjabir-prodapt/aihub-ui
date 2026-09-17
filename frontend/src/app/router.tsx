@@ -5,9 +5,12 @@ import ServiceHubPage from '../features/hub/ServiceHubPage';
 import JobTrackerPage from '../features/tracker/JobTrackerPage';
 import TranslationPage from '../features/translation/TranslationPage';
 import SalesAgentPage from '../features/sales/SalesAgentPage';
+import NaasChatScreen from '../shared/ui/NaasChatScreen';
+import NaasAgentScreen from '../shared/ui/NaasAgentScreen';
+import NaasAdmin from '../shared/ui/NaasAdmin';
 import AccessDenied from '../features/auth/AccessDenied';
 import RequireRole from '../features/auth/RequireRole';
-import { ROLE_SALES, ROLE_TRANSLATION } from '../features/auth/authTypes';
+import { ROLE_NAAS, ROLE_SALES, ROLE_TRANSLATION } from '../features/auth/authTypes';
 import { useEntitlements } from '../features/auth/useAuth';
 
 /**
@@ -19,6 +22,7 @@ import { useEntitlements } from '../features/auth/useAuth';
  *   /tracker     all jobs; `?service=translation|sales` pre-filters
  *   /translation role-gated
  *   /sales       role-gated
+ *   /naas        role-gated (On-Demand NaaS — chat, agent screens, admin)
  *   /denied      terminal, reached from RequireRole
  */
 
@@ -65,6 +69,12 @@ const AppRouter: React.FC = () => (
 
       <Route element={<RequireRole anyOf={ROLE_SALES} service="sales" />}>
         <Route path="sales" element={<SalesRoute />} />
+      </Route>
+
+      <Route element={<RequireRole anyOf={ROLE_NAAS} service="naas" />}>
+        <Route path="naas" element={<NaasChatScreen />} />
+        <Route path="naas/agents/:agentId" element={<NaasAgentScreen />} />
+        <Route path="naas/admin" element={<NaasAdmin />} />
       </Route>
 
       <Route path="denied" element={<AccessDenied />} />

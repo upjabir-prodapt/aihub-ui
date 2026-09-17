@@ -26,7 +26,7 @@ vi.mock('./api', () => ({
 }));
 
 vi.mock('../auth/useAuth', () => ({
-  useEntitlements: () => ({ translation: true, sales: true }),
+  useEntitlements: () => ({ translation: true, sales: true, naas: true }),
 }));
 
 vi.mock('./useSalesJobs', () => ({
