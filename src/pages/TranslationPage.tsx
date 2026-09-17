@@ -62,7 +62,7 @@ const TRANSLATION_FEATURES = [
   },
   {
     title: 'Domain-tuned output',
-    description: 'Pick the domain (legal, finance, HR…) and the model adapts terminology and tone to match it.',
+    description: 'The model adapts terminology and tone to the document it is given — legal, finance, HR and more.',
   },
 ];
 
@@ -89,7 +89,6 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onOpenTracker, onBack
   // Multi-target language selection
   const [sourceLang, setSourceLang] = useState('en');
   const [targetLangs, setTargetLangs] = useState<string[]>(['de']);
-  const [domain, setDomain] = useState('legal');
   // enable_dlp, enable_chunking, and priority are no longer surfaced in the
   // UI -- the backend (Translation service) already applies these exact
   // defaults (enable_dlp=True, enable_chunking=True, priority="standard")
@@ -113,7 +112,8 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onOpenTracker, onBack
   const serviceJobs = useServiceJobs('translation');
   const [runOpen, setRunOpen] = useState(false);
 
-  const [reviewJobId, setReviewJobId] = useState<string | null>(null);
+  /** Run being reviewed. `failed` switches the modal into failure-report mode. */
+  const [review, setReview] = useState<{ id: string; failed: boolean } | null>(null);
   const [toast, setToast] = useState<{ ok: boolean; message: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [targetDropdownOpen, setTargetDropdownOpen] = useState(false);
@@ -236,14 +236,13 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onOpenTracker, onBack
     const currentSourceText = sourceText;
     const currentTargetLangs = [...targetLangs];
     const currentSourceLang = sourceLang;
-    const currentDomain = domain;
 
     // Pass a factory so each retry builds fresh FormData with an unconsumed file stream.
     const buildFormData = () => {
       const fd = new FormData();
       currentTargetLangs.forEach((lang) => fd.append('target_languages', lang));
       if (currentSourceLang) fd.append('source_language', currentSourceLang);
-      fd.append('domain', currentDomain);
+      fd.append('domain', '');
       fd.append(
         'file',
         currentFile ?? new File([currentSourceText], TEXT_INPUT_FILENAME, { type: 'text/plain' }),
@@ -421,18 +420,6 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onOpenTracker, onBack
             )}
           </div>
         </div>
-
-            {/* Domain field */}
-            <div className="form-field">
-              <label className="field-label" htmlFor="tr-domain">Domain <span className="required">*</span></label>
-              <select id="tr-domain" name="domain" className="field-select" value={domain} onChange={(e) => setDomain(e.target.value)}>
-                <option value="commercial">Commercial</option>
-                <option value="legal">Legal</option>
-                <option value="finance">Finance</option>
-                <option value="hr">HR</option>
-                <option value="operations">Operations</option>
-              </select>
-            </div>
 
             {/* Source language */}
             <div className="form-field">
@@ -690,16 +677,17 @@ const TranslationPage: React.FC<TranslationPageProps> = ({ onOpenTracker, onBack
           onCancel={serviceJobs.cancelJob}
           onDownload={serviceJobs.downloadJob}
           onLoadDetail={serviceJobs.loadDetail}
-          onFeedback={(job) => setReviewJobId(job.id)}
+          onFeedback={(job) => setReview({ id: job.id, failed: job.status === 'failed' })}
           onOpenTracker={onOpenTracker}
         />
       </div>
 
-      {reviewJobId && (
+      {review && (
         <ReviewModal
-          isOpen={!!reviewJobId}
-          jobId={reviewJobId}
-          onClose={() => setReviewJobId(null)}
+          isOpen={!!review}
+          jobId={review.id}
+          jobFailed={review.failed}
+          onClose={() => setReview(null)}
           onSubmitted={handleReviewSubmitted}
         />
       )}

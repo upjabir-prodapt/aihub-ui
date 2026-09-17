@@ -27,19 +27,41 @@ const EXAMPLE_FEEDBACK_ITEMS: FeedbackExampleItem[] = [
   },
 ];
 
+/** Failure reports need reproduction detail, not quality judgements. */
+const FAILED_FEEDBACK_ITEMS: FeedbackExampleItem[] = [
+  {
+    topic: 'What you asked for',
+    example: 'Research on Acme Corp, account 4471 — submitted twice, failed both times.',
+  },
+  {
+    topic: 'Where it stopped',
+    example: 'It ran for about a minute on "Gathering sources", then failed with no report.',
+  },
+  {
+    topic: 'Impact',
+    example: 'Needed for a pitch on Thursday — a workaround would help.',
+  },
+];
+
 interface SalesFeedbackModalProps {
   isOpen: boolean;
   jobId: string;
+  /**
+   * True when the run failed. There is no report to comment on, so the modal
+   * asks what went wrong instead — same endpoint either way.
+   */
+  jobFailed?: boolean;
   onClose: () => void;
   onSubmitted: (ok: boolean, message: string) => void;
 }
 
-const SalesFeedbackModal: React.FC<SalesFeedbackModalProps> = ({ isOpen, jobId, onClose, onSubmitted }) => {
+const SalesFeedbackModal: React.FC<SalesFeedbackModalProps> = ({ isOpen, jobId, jobFailed, onClose, onSubmitted }) => {
   if (!isOpen) return null;
   return (
     <SalesFeedbackModalPanel
       key={jobId}
       jobId={jobId}
+      jobFailed={jobFailed}
       onClose={onClose}
       onSubmitted={onSubmitted}
     />
@@ -48,6 +70,7 @@ const SalesFeedbackModal: React.FC<SalesFeedbackModalProps> = ({ isOpen, jobId, 
 
 const SalesFeedbackModalPanel: React.FC<Omit<SalesFeedbackModalProps, 'isOpen'>> = ({
   jobId,
+  jobFailed = false,
   onClose,
   onSubmitted,
 }) => {
@@ -77,7 +100,12 @@ const SalesFeedbackModalPanel: React.FC<Omit<SalesFeedbackModalProps, 'isOpen'>>
     try {
       await submitFeedback(jobId, trimmed);
       onClose();
-      onSubmitted(true, 'Your feedback was submitted. Thank you!');
+      onSubmitted(
+        true,
+        jobFailed
+          ? 'Thanks — your report on this failed run was submitted.'
+          : 'Your feedback was submitted. Thank you!',
+      );
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to submit feedback. Please try again.';
       onClose();
@@ -91,7 +119,7 @@ const SalesFeedbackModalPanel: React.FC<Omit<SalesFeedbackModalProps, 'isOpen'>>
       onClick={() => { if (!submitting) onClose(); }}
       role="dialog"
       aria-modal="true"
-      aria-label="Sales Agent Feedback"
+      aria-label={jobFailed ? 'Report a failed sales research run' : 'Sales Agent Feedback'}
     >
       <div className="modal-panel review-modal-panel" onClick={(e) => e.stopPropagation()}>
         <div className="modal-glow" />
@@ -99,11 +127,20 @@ const SalesFeedbackModalPanel: React.FC<Omit<SalesFeedbackModalProps, 'isOpen'>>
         <div className="modal-header">
           <div className="review-modal-header-left">
             <div className="review-modal-icon">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-              </svg>
+              {jobFailed ? (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+                  <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                </svg>
+              )}
             </div>
-            <span className="review-modal-heading">Sales Agent Feedback</span>
+            <span className="review-modal-heading">
+              {jobFailed ? 'Report a Failed Run' : 'Sales Agent Feedback'}
+            </span>
           </div>
           {!submitting && (
             <button className="modal-close-btn" onClick={onClose} aria-label="Close">
@@ -117,14 +154,18 @@ const SalesFeedbackModalPanel: React.FC<Omit<SalesFeedbackModalProps, 'isOpen'>>
         <div className="modal-body">
           <form onSubmit={handleSubmit} className="review-form" noValidate>
             <p className="review-form-subtitle">
-              How was the quality of this research report?
+              {jobFailed
+                ? 'This run failed before it produced a report. Tell us what you asked for and what went wrong.'
+                : 'How was the quality of this research report?'}
             </p>
 
             {/* Example Feedback Guidance */}
             <div className="review-guidance">
-              <span className="review-guidance-heading">Example feedback:</span>
+              <span className="review-guidance-heading">
+                {jobFailed ? 'Helpful to include:' : 'Example feedback:'}
+              </span>
               <ul className="review-guidance-list">
-                {EXAMPLE_FEEDBACK_ITEMS.map((item, idx) => (
+                {(jobFailed ? FAILED_FEEDBACK_ITEMS : EXAMPLE_FEEDBACK_ITEMS).map((item, idx) => (
                   <li key={idx} className="review-guidance-item">
                     <span className="review-guidance-topic">{item.topic}:</span>{' '}
                     <span className="review-guidance-text">"{item.example}"</span>
@@ -135,14 +176,18 @@ const SalesFeedbackModalPanel: React.FC<Omit<SalesFeedbackModalProps, 'isOpen'>>
 
             <div className="login-field">
               <label className="login-label" htmlFor="sales-feedback-comment">
-                Comment
+                {jobFailed ? 'What went wrong' : 'Comment'}
               </label>
               <textarea
                 id="sales-feedback-comment"
                 className="review-comment-textarea"
                 value={feedback}
                 onChange={(e) => setFeedback(e.target.value.slice(0, MAX_FEEDBACK))}
-                placeholder="Share details about the report's accuracy, depth or relevance…"
+                placeholder={
+                  jobFailed
+                    ? 'Describe the company, the account and the error you saw…'
+                    : "Share details about the report's accuracy, depth or relevance…"
+                }
                 rows={4}
                 disabled={submitting}
                 autoFocus
@@ -168,7 +213,7 @@ const SalesFeedbackModalPanel: React.FC<Omit<SalesFeedbackModalProps, 'isOpen'>>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                       <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
                     </svg>
-                    Submit Feedback
+                    {jobFailed ? 'Submit Report' : 'Submit Feedback'}
                   </>
                 )}
               </button>
