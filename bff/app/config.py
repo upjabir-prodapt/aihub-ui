@@ -119,9 +119,11 @@ class Settings(BaseSettings):
     # Open item §13: the header name Apigee reads the key from is not written down
     # anywhere in the reference docs. `x-apikey` is Apigee's default and is assumed.
     apigee_api_key_header: str = "x-apikey"
-    # Apigee proxy basepaths (docs 15 §B.11 routes /api/translation/* and /api/sales/*).
+    # Apigee proxy basepaths (docs 15 §B.11 routes /api/translation/*, /api/sales/*
+    # and /api/naas/*).
     apigee_translation_path: str = "/api/translation/v1"
     apigee_sales_path: str = "/api/sales/v1"
+    apigee_naas_path: str = "/api/naas/v1"
     # Plan §8 says `x-colt-user-oid`; docs 18 §3.2 reference impl says `x-colt-user-id`.
     # Configurable so the mismatch can be resolved without a code change.
     apigee_user_oid_header: str = "x-colt-user-oid"

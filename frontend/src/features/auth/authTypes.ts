@@ -41,8 +41,13 @@ export interface AuthState {
  */
 export const ROLE_TRANSLATION = ['Translation.User', 'Platform.Admin'] as const;
 export const ROLE_SALES = ['SalesAgent.User', 'Sales.User', 'Platform.Admin'] as const;
+// Assumed Entra App Role name, matching the Translation.User/SalesAgent.User
+// convention — confirm it's actually registered in Entra (or get it
+// created) before this reaches prod.
+export const ROLE_NAAS = ['NaaS.User', 'Platform.Admin'] as const;
 
 export interface ServiceEntitlements {
   translation: boolean;
   sales: boolean;
+  naas: boolean;
 }

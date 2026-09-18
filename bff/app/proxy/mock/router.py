@@ -38,6 +38,9 @@ SALES_DOWNLOAD = re.compile(r"^research/download/([^/]+)$")
 SALES_JOB = re.compile(r"^research/([^/]+)$")
 SALES_FEEDBACK = re.compile(r"^research/([^/]+)/feedback$")
 
+NAAS_TICKET_APPROVE = re.compile(r"^admin/tickets/(\d+)/approve$")
+NAAS_CIRCUIT_ROUTE = re.compile(r"^circuits/([^/]+)/route$")
+
 MOCK_FILE_BODY = (
     "--- Translated Document (Mock Output: {job_id}) ---\n\n"
     "Colt Technology Services - Master Services Agreement (Translated)\n\n"
@@ -312,6 +315,84 @@ async def _sales(path: str, method: str, request: Request) -> Response | None:
     return None
 
 
+# ── naas ─────────────────────────────────────────────────────────────────────
+
+
+def _sse_chat_reply(agent_id: str, message: str, session_id: str | None) -> Response:
+    """One canned SSE frame set — see naas.ts's postChatStream for the shapes.
+
+    Real turns stream text_delta/tool_result events as they happen; the mock
+    sends its whole (short) reply as a single text_delta immediately followed
+    by done, which the frontend's frame parser handles identically to a real
+    multi-chunk turn just without the incremental rendering.
+    """
+    reply = f'[mock] {agent_id} received: "{message}"'
+    frames = [
+        {"type": "text_delta", "text": reply, "agent": agent_id},
+        {"type": "done", "tool_results": {}, "agent": agent_id},
+    ]
+    body = "".join(f"data: {json.dumps(frame)}\n\n" for frame in frames)
+    return Response(body, media_type="text/event-stream")
+
+
+async def _naas(path: str, method: str, request: Request) -> Response | None:  # noqa: C901
+    if path == "agents" and method == "GET":
+        return JSONResponse(_db.naas.get_agents())
+
+    if path == "chat" and method == "POST":
+        payload = await _json_body(request) or {}
+        return _sse_chat_reply(
+            payload.get("agent_id", "orchestrator"),
+            payload.get("message", ""),
+            payload.get("session_id"),
+        )
+
+    if path == "admin/tickets/pending" and method == "GET":
+        return JSONResponse(_db.naas.get_pending_tickets())
+
+    if path == "admin/tickets/history" and method == "GET":
+        return JSONResponse(_db.naas.get_ticket_history())
+
+    match = NAAS_TICKET_APPROVE.match(path)
+    if match and method == "POST":
+        ticket_id = int(match.group(1))
+        ticket = _db.naas.approve_ticket(ticket_id)
+        if ticket is None:
+            return _error(404, f"Ticket {ticket_id} not found")
+        return JSONResponse(ticket)
+
+    # Service Reliability Agent — left-panel dashboard. No Reliability Rule
+    # exists in the mock, so the demo circuit is always empty (the panel's
+    # own WorldMap/disabled-Simulate-buttons fallback handles this — see
+    # DemoCircuit's own null-both-fields comment) and every list is empty.
+    if path == "reliability/demo-circuit" and method == "GET":
+        return JSONResponse({"circuit_reference": None, "name": None})
+
+    if path in {
+        "reliability/simulate/utilization-high",
+        "reliability/simulate/utilization-low",
+    } and method == "POST":
+        return _error(409, "No reliability rule exists to simulate against in mock mode")
+
+    if path == "reliability/rules" and method == "GET":
+        return JSONResponse([])
+
+    if path == "reliability/events" and method == "GET":
+        return JSONResponse([])
+
+    if path == "reliability/audit-log" and method == "GET":
+        return JSONResponse([])
+
+    match = NAAS_CIRCUIT_ROUTE.match(path)
+    if match and method == "GET":
+        return _error(404, f"No route found for circuit {match.group(1)}")
+
+    return None
+
+
+_HANDLERS = {"translation": _translation, "sales": _sales, "naas": _naas}
+
+
 async def handle(service: str, path: str, request: Request) -> Response:
     """Dispatch one proxied request to the mock upstream.
 
@@ -320,7 +401,7 @@ async def handle(service: str, path: str, request: Request) -> Response:
     path = path.strip("/")
     method = request.method.upper()
 
-    handler = _translation if service == "translation" else _sales
+    handler = _HANDLERS[service]
     response = await handler(path, method, request)
     if response is None:
         logger.info("mock_upstream_no_route", extra={"service": service, "mockPath": path})

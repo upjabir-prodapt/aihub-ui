@@ -57,9 +57,9 @@ class ApigeeHeaderInjector:
 
     def base_url_for(self, service: str) -> str:
         base = self._settings.apigee_base_url.rstrip("/")
-        path = (
-            self._settings.apigee_translation_path
-            if service == "translation"
-            else self._settings.apigee_sales_path
-        )
-        return f"{base}{path}"
+        paths = {
+            "translation": self._settings.apigee_translation_path,
+            "sales": self._settings.apigee_sales_path,
+            "naas": self._settings.apigee_naas_path,
+        }
+        return f"{base}{paths[service]}"

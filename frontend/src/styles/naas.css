@@ -1,0 +1,2069 @@
+/*
+ * On-Demand NaaS — consolidated styles for every component under
+ * shared/ui/Naas*.tsx and the shared chat/agent-panel primitives they use
+ * (ChatPanel, Navbar, agent panels, picker tables, charts). Ported from the
+ * standalone naas-platform-agentification-ui app and re-themed onto aihub's
+ * Colt brand tokens (frontend/src/index.css) — every `--color-*`/`--shadow-*`
+ * reference below is one of aihub's own CSS custom properties, not a
+ * reintroduced parallel palette. Imported once per page component that
+ * renders any of this (NaasChatScreen.tsx, NaasAgentScreen.tsx,
+ * NaasAdmin.tsx), same convention as translation.css/sales-agent.css.
+ */
+
+/* ══════════════════════ Chat panel (NaasChatPanel) ══════════════════════ */
+
+.chat-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+/* Pre-chat welcome screen (NaasChatScreen.tsx) — same NaasChatPanel instance
+   as the split chat layout, just visually reduced to a centered input box:
+   the transcript (which already has this session's silent opening greeting
+   in it) stays hidden until the first real turn, at which point the parent
+   switches this back to the default variant and the whole thing reappears
+   as normal. */
+.chat-panel--welcome {
+  height: auto;
+  flex: none;
+  width: 100%;
+  max-width: 720px;
+}
+
+.chat-panel--welcome .chat-messages {
+  display: none;
+}
+
+.chat-panel--welcome .chat-input-row {
+  border-top: none;
+  background: transparent;
+  padding: 0;
+}
+
+.chat-panel--welcome .chat-input {
+  padding: 1rem 1.25rem;
+  border-radius: 16px;
+  font-size: 1rem;
+  box-shadow: var(--shadow-lg);
+}
+
+.chat-panel--welcome .chat-send {
+  padding: 1rem 1.5rem;
+  border-radius: 16px;
+}
+
+.chat-messages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.chat-bubble {
+  max-width: 85%;
+  padding: 0.75rem 1rem;
+  border-radius: 14px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+.chat-bubble--user {
+  align-self: flex-end;
+  background: var(--colt-teal);
+  color: var(--colt-black);
+  border-bottom-right-radius: 4px;
+}
+
+/* Wraps an agent-specific "extra" (e.g. InvoiceCard) rendered above its
+   turn's chat bubble — a direct child of .chat-messages itself (like
+   .chat-bubble) so align-self actually applies; see NaasChatPanel.tsx. */
+.chat-extra {
+  align-self: stretch;
+  display: flex;
+}
+
+.chat-bubble--assistant {
+  align-self: flex-start;
+  background: var(--bg-elevated);
+  border-bottom-left-radius: 4px;
+  /* Stretches to the base class's max-width: 85% instead of shrink-wrapping
+     to its own content — otherwise a bubble with a narrow table (or short
+     text) sizes to its own intrinsic width, so tables in different turns
+     end up visibly different widths. Since 85% is relative to
+     .chat-messages (not a fixed pixel value), this also means dragging
+     the NaasChatScreen divider to resize the panes grows/shrinks every
+     bubble (and the tables inside them) in step, instead of them staying
+     capped at some constant width regardless of how much room is given. */
+  width: 100%;
+}
+
+.chat-bubble--pending {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.9rem 1.1rem;
+}
+
+.chat-typing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  animation: chat-typing 1.2s infinite ease-in-out;
+}
+
+.chat-typing-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.chat-typing-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes chat-typing {
+  0%,
+  60%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+
+/* Markdown content inside bubbles */
+.chat-bubble > *:first-child {
+  margin-top: 0;
+}
+
+.chat-bubble > *:last-child {
+  margin-bottom: 0;
+}
+
+.chat-bubble p {
+  margin: 0 0 0.6rem;
+}
+
+.chat-bubble ul,
+.chat-bubble ol {
+  margin: 0 0 0.6rem;
+  padding-left: 1.25rem;
+}
+
+.chat-bubble strong {
+  font-weight: 700;
+}
+
+.chat-bubble table {
+  width: 100%;
+  table-layout: auto;
+  border-collapse: collapse;
+  margin: 0.5rem 0 0.75rem;
+  font-size: 0.85rem;
+  background: var(--bg-surface);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.chat-bubble--user table {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.chat-bubble th,
+.chat-bubble td {
+  text-align: left;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--border-default);
+  /* Excel-style "shrink to fit" isn't a sane web pattern for arbitrary
+     text (it'd mean measuring and rescaling font-size per cell in JS) —
+     wrapping is the equivalent that actually works with table-layout:
+     fixed: the column width stays fixed, and the full word/value grows
+     the row's height instead of being cut off with an ellipsis. */
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  vertical-align: top;
+}
+
+.chat-bubble--user th,
+.chat-bubble--user td {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.chat-bubble th {
+  background: var(--border-default);
+  font-weight: 600;
+}
+
+.chat-bubble--user th {
+  color: #ffffff;
+  border-bottom-color: rgba(255, 255, 255, 0.35);
+}
+
+.chat-bubble tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.chat-bubble th:first-child,
+.chat-bubble td:first-child {
+  white-space: nowrap;
+  width: 1%;
+}
+
+.chat-bubble td:first-child {
+  font-weight: 700;
+}
+
+/* Service Reliability Agent + Service Observability Agent (for now) — a
+   cleaner, borderless table style: no vertical column lines/cell grid,
+   just a header underline and a faint row divider for scannability on
+   multi-row tables. The heading that sits above each table comes from the
+   agent's own markdown text, not from CSS — this only controls the table
+   itself. */
+.chat-panel--sre-closed-loop .chat-bubble table,
+.chat-panel--sre-monitor .chat-bubble table {
+  border-radius: 0;
+  background: transparent;
+}
+
+.chat-panel--sre-closed-loop .chat-bubble th,
+.chat-panel--sre-closed-loop .chat-bubble td,
+.chat-panel--sre-monitor .chat-bubble th,
+.chat-panel--sre-monitor .chat-bubble td {
+  border: none;
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 0.5rem 0.75rem;
+}
+
+.chat-panel--sre-closed-loop .chat-bubble th,
+.chat-panel--sre-monitor .chat-bubble th {
+  background: transparent;
+  font-weight: 700;
+  border-bottom: 2px solid var(--border-strong);
+}
+
+.chat-panel--sre-closed-loop .chat-bubble tr:last-child td,
+.chat-panel--sre-monitor .chat-bubble tr:last-child td {
+  border-bottom: none;
+}
+
+.chat-bubble code {
+  background: rgba(127, 127, 127, 0.2);
+  border-radius: 4px;
+  padding: 0.1rem 0.35rem;
+  font-size: 0.85em;
+  font-family: var(--font-mono);
+}
+
+.chat-bubble--user code {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.chat-input-row {
+  display: flex;
+  gap: 0.6rem;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--border-default);
+  background: var(--bg-surface);
+}
+
+.chat-input {
+  flex: 1;
+  padding: 0.65rem 0.9rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  font-size: 0.9rem;
+  outline: none;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.chat-input:focus {
+  border-color: var(--colt-teal);
+  box-shadow: 0 0 0 3px var(--colt-teal-light);
+}
+
+.chat-send {
+  padding: 0.65rem 1.25rem;
+  border: none;
+  border-radius: 10px;
+  background: var(--colt-teal);
+  color: var(--colt-black);
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.chat-send:hover:not(:disabled) {
+  background: var(--colt-teal-dark);
+}
+
+.chat-send:disabled {
+  background: var(--text-muted);
+  cursor: not-allowed;
+}
+
+/* ══════════════════════ Navbar (NaasNavbar) ══════════════════════ */
+
+/* Fixed Colt brand gradient — never theme-reactive (unlike --colt-teal,
+   which is the same in both themes anyway, but this bar's whole look is
+   deliberately constant), so every child below uses a fixed
+   white/translucent-white treatment (LanguageSelect's variant="on-hero")
+   rather than aihub's surface tokens. */
+.navbar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 1.1rem 2rem;
+  background: linear-gradient(135deg, #0c554f 0%, #00a59b 100%);
+  flex-shrink: 0;
+}
+
+/* overflow: hidden lives here (clipping the circles below, which extend
+   past the bar's own edges via negative offsets) rather than on .navbar
+   itself — see the comment in NaasNavbar.tsx. */
+.navbar-decor {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.navbar-decor-circle {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.navbar-decor-circle--1 {
+  width: 200px;
+  height: 200px;
+  top: -130px;
+  right: -50px;
+}
+
+.navbar-decor-circle--2 {
+  width: 70px;
+  height: 70px;
+  bottom: -45px;
+  left: 12%;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.navbar-left {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  flex-shrink: 0;
+}
+
+/* The logo's own art (a teal ring/mark plus dark wordmark) has too little
+   contrast against this navbar's teal gradient on its own — a small white
+   card behind it (rather than trying to strip its background out) is the
+   standard fix for a colored logo on a same-hued surface, and reads
+   cleanly regardless of exactly which teal is behind it. */
+.navbar-logo {
+  height: 52px;
+  width: auto;
+  display: block;
+  padding: 6px 12px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+}
+
+.navbar-back {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.navbar-back:hover {
+  background: rgba(255, 255, 255, 0.26);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.navbar-agents {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.navbar-agent-pill {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #ffffff;
+  opacity: 0.65;
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  white-space: nowrap;
+  transition: opacity 0.2s ease, background 0.2s ease;
+}
+
+.navbar-agent-pill.is-active {
+  opacity: 1;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.navbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  flex-shrink: 0;
+}
+
+/* Scoped to .navbar-actions rather than raised on LanguageSelect's own base
+   rules — that component is shared with a plain, smaller surface
+   elsewhere, so the bigger banner-appropriate sizing here needs to stay
+   local to this navbar instead of growing it everywhere. */
+.navbar-actions .language-select-trigger {
+  height: 46px;
+  padding: 0 1.1rem;
+}
+
+.navbar-actions .language-select-label,
+.navbar-actions .language-select-value {
+  font-size: 0.9rem;
+}
+
+.navbar-admin-link {
+  color: #ffffff;
+  text-decoration: none;
+  font-size: 0.95rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.16);
+  padding: 0.65rem 1.25rem;
+  border-radius: 999px;
+  white-space: nowrap;
+  transition: background 0.15s ease;
+}
+
+.navbar-admin-link:hover {
+  background: rgba(255, 255, 255, 0.26);
+}
+
+/* ══════════════════════ Language select ══════════════════════ */
+
+.language-select {
+  position: relative;
+}
+
+.language-select-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  height: 36px;
+  padding: 0 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.language-select-trigger:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+
+.language-select-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.language-select-value {
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  margin-left: auto;
+}
+
+.language-select-chevron {
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+
+.language-select-chevron.is-open {
+  transform: rotate(180deg);
+}
+
+/* Dropdown panel — spans the trigger's full width (left: 0, width: 100%
+   of .language-select, which wraps the full-width trigger button above)
+   rather than a native <select>'s own narrower, right-anchored sizing.
+   Always aihub's own theme tokens, so it's in sync with light/dark —
+   unlike a native <select> list, which is OS-rendered and mostly ignores
+   CSS regardless of the trigger's own styling. */
+.language-select-menu {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  left: 0;
+  width: 100%;
+  min-width: max-content;
+  margin: 0;
+  padding: 0.35rem;
+  list-style: none;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  z-index: 30;
+}
+
+.language-select-option {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.55rem 0.7rem;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.language-select-option:hover {
+  background: var(--bg-hover);
+}
+
+.language-select-option.is-selected {
+  background: var(--colt-teal-light);
+  color: var(--text-teal);
+  font-weight: 700;
+}
+
+/* On the chat Navbar's teal hero, the default surface-colored trigger
+   would disappear against the gradient. The dropdown MENU intentionally
+   does not follow this variant — it always uses the solid
+   .language-select-menu styling above, since it needs to stay readable
+   regardless of whatever's behind it on the page. */
+.language-select--on-hero .language-select-trigger {
+  border-color: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+}
+
+.language-select--on-hero .language-select-trigger:hover {
+  background: rgba(255, 255, 255, 0.26);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+/* ══════════════════════ Shared picker table (agent chat-extras) ══════════════════════ */
+
+/* Shared "picker table" look used by every clickable selection card
+   across agents (Service Order's ports/pricing/recommendations, Service
+   Observability's active-circuits list) — one definition so they all
+   stay visually identical instead of drifting. Column count/widths
+   differ per table, so grid-template-columns is set inline per
+   component rather than here. */
+
+.picker-table-wrap {
+  align-self: stretch;
+  width: 100%;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 14px;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+.picker-table-wrap--error,
+.picker-table-wrap--empty {
+  padding: 0.9rem 1.1rem;
+  font-size: 0.875rem;
+}
+
+.picker-table-wrap--error {
+  color: var(--text-error);
+}
+
+.picker-table-wrap--empty {
+  color: var(--text-muted);
+}
+
+.picker-table-header,
+.picker-table-row {
+  display: grid;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.picker-table-header {
+  padding: 0.6rem 1rem;
+  background: var(--bg-base);
+  border-bottom: 1px solid var(--border-default);
+}
+
+.picker-table-body {
+  max-height: 300px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.picker-table-cell {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.picker-table-header .picker-table-cell {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-size: 0.7rem;
+}
+
+.picker-table-cell--index {
+  text-align: center;
+}
+
+/* Opt-in for a cell whose real values can run long (e.g. PortSearch.tsx's
+   Building/Site columns) — wraps to a second line instead of the default
+   single-line ellipsis truncation, so a longer real value is never
+   silently cut off. */
+.picker-table-cell--wrap {
+  white-space: normal;
+  overflow-wrap: break-word;
+  text-overflow: clip;
+  line-height: 1.3;
+}
+
+.picker-table-row {
+  padding: 0.55rem 1rem;
+  border: none;
+  border-bottom: 1px solid var(--bg-elevated);
+  background: var(--bg-surface);
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+}
+
+.picker-table-row:last-child {
+  border-bottom: none;
+}
+
+.picker-table-row:hover:not(:disabled) {
+  background: var(--colt-teal-light);
+}
+
+.picker-table-row:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.picker-table-row--selected {
+  background: var(--colt-teal-mid);
+  opacity: 1;
+}
+
+.picker-table-row .picker-table-cell:not(.picker-table-cell--index) {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* The clickable/selectable focal point per the table's Index column —
+   every row is already a button, so this is purely the visual cue that
+   the index is what you pick, not a second interactive element. */
+.picker-table-index-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 999px;
+  border: 1.5px solid var(--border-default);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+}
+
+.picker-table-row--selected .picker-table-index-badge {
+  border-color: var(--colt-teal);
+  color: var(--text-teal);
+}
+
+.picker-table-row:hover:not(:disabled) .picker-table-index-badge {
+  border-color: var(--colt-teal);
+  color: var(--text-teal);
+}
+
+/* Two-line cell content used by RecommendationOptions.tsx's label
+   column (value + badge on one line, the reason text below it for the
+   recommended row) — the plain .picker-table-cell truncates to a single
+   line, which doesn't fit this shape. */
+.picker-table-cell--label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.picker-table-row-primary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.picker-table-row-meta {
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--text-secondary);
+  white-space: normal;
+}
+
+/* "Recommended" tag used by RecommendationOptions.tsx (bandwidth /
+   commitment-period recommendations) — the one visual addition beyond
+   the plain ports/pricing table shape. */
+.picker-table-recommended-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-teal);
+  background: var(--colt-teal-light);
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  margin-left: 0.5rem;
+}
+
+.picker-table-row--recommended {
+  background: var(--colt-teal-light);
+}
+
+/* ══════════════════════ Audit log table (sre-closed-loop) ══════════════════════ */
+
+/* Same rounded-card visual language as the picker table above (border/
+   radius/shadow/surface color), but overflow-x: auto instead of hidden —
+   a real <table> with 9 columns needs to scroll sideways within its own
+   card rather than being clipped or crushed to fit a narrow chat column. */
+.audit-log-wrap {
+  align-self: stretch;
+  width: 100%;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 14px;
+  box-shadow: var(--shadow-lg);
+  overflow-x: auto;
+}
+
+.audit-log-wrap--empty {
+  padding: 0.9rem 1.1rem;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.audit-log-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.audit-log-table th {
+  text-align: left;
+  color: var(--text-secondary);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-size: 0.7rem;
+  padding: 0.6rem 0.9rem;
+  background: var(--bg-base);
+  border-bottom: 1px solid var(--border-default);
+  white-space: nowrap;
+}
+
+.audit-log-table td {
+  padding: 0.55rem 0.9rem;
+  border-bottom: 1px solid var(--bg-elevated);
+  color: var(--text-primary);
+  font-weight: 600;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+}
+
+.audit-log-table tr:last-child td {
+  border-bottom: none;
+}
+
+.audit-log-badge {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #ffffff;
+  background: var(--text-muted);
+}
+
+.audit-log-badge--good {
+  background: #0ca30c;
+}
+
+.audit-log-badge--bad {
+  background: var(--text-error);
+}
+
+.audit-log-badge--pending {
+  background: var(--colt-yellow);
+  color: var(--colt-black);
+}
+
+/* ══════════════════════ Generic viz primitives ══════════════════════ */
+
+.ai-analysis-note {
+  background: var(--colt-teal-light);
+  border: 1px solid var(--colt-teal-mid);
+  border-radius: 14px;
+  padding: 1rem 1.25rem;
+}
+
+.ai-analysis-note-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-teal);
+  margin-bottom: 0.5rem;
+}
+
+.ai-analysis-note p {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+.detail-card {
+  background: var(--bg-surface);
+  border-radius: 14px;
+  padding: 1.1rem 1.25rem;
+  box-shadow: var(--shadow-md);
+}
+
+.detail-card-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.6rem;
+}
+
+.detail-card-rows {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.detail-card-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.85rem;
+}
+
+.detail-card-row dt {
+  color: var(--text-muted);
+}
+
+.detail-card-row dd {
+  margin: 0;
+  color: var(--text-primary);
+  font-weight: 600;
+  text-align: right;
+  font-family: var(--font-mono);
+}
+
+.gauge-card {
+  background: var(--bg-surface);
+  border-radius: 14px;
+  padding: 1.25rem 1.25rem 1rem;
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.gauge-card-title {
+  align-self: flex-start;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 0.25rem;
+}
+
+.gauge-svg {
+  width: 100%;
+  max-width: 240px;
+  overflow: visible;
+}
+
+.gauge-track {
+  stroke: var(--border-subtle);
+}
+
+/* Reference bands (e.g. green/yellow/red) — muted so the solid value fill
+   drawn on top of them still reads as the loudest thing on the gauge. */
+.gauge-zone {
+  opacity: 0.22;
+}
+
+.gauge-threshold-tick {
+  stroke: var(--text-muted);
+  stroke-width: 2;
+}
+
+.gauge-scale-label {
+  font-size: 8px;
+  fill: var(--text-muted);
+}
+
+.gauge-needle {
+  stroke: var(--text-primary);
+  stroke-width: 3;
+  stroke-linecap: round;
+  transition: all 0.4s ease;
+}
+
+.gauge-hub {
+  fill: var(--text-primary);
+}
+
+.gauge-value {
+  font-size: 1.75rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-top: -0.5rem;
+  font-family: var(--font-mono);
+}
+
+.gauge-status {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-top: 0.35rem;
+}
+
+.gauge-status-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.stat-card {
+  background: var(--bg-surface);
+  border-radius: 14px;
+  padding: 1.1rem 1.25rem;
+  box-shadow: var(--shadow-md);
+}
+
+.stat-card-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 0.4rem;
+}
+
+.stat-card-value {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+
+.stat-card-status {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-top: 0.4rem;
+}
+
+.stat-card-status-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.line-chart-card {
+  position: relative;
+  background: var(--bg-surface);
+  border-radius: 14px;
+  padding: 1.1rem 1.1rem 0.75rem;
+  box-shadow: var(--shadow-md);
+}
+
+.line-chart-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+}
+
+.line-chart-svg {
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.line-chart-empty {
+  height: 110px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.line-chart-gridline {
+  stroke: var(--border-subtle);
+  stroke-width: 1;
+}
+
+.line-chart-axis-label {
+  font-size: 6.5px;
+  fill: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.line-chart-area {
+  fill-opacity: 0.1;
+}
+
+.line-chart-line {
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.line-chart-crosshair {
+  stroke: var(--text-muted);
+  stroke-width: 1;
+}
+
+.line-chart-dot {
+  stroke: var(--bg-surface);
+  stroke-width: 2;
+}
+
+.line-chart-tooltip {
+  position: absolute;
+  top: 0.75rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  padding: 0.4rem 0.6rem;
+  box-shadow: var(--shadow-lg);
+  pointer-events: none;
+  text-align: right;
+}
+
+.line-chart-tooltip-value {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+
+.line-chart-tooltip-date {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  margin-top: 0.1rem;
+  font-family: var(--font-mono);
+}
+
+.placeholder-panel {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  text-align: center;
+  padding: 0 2rem;
+}
+
+/* ══════════════════════ City map ══════════════════════ */
+
+.city-map-card {
+  background: var(--bg-surface);
+  border-radius: 14px;
+  padding: 0.75rem;
+  box-shadow: var(--shadow-md);
+  display: flex;
+  justify-content: center;
+  /* The map body itself is a fixed 300x170 box (see .city-map) that
+     doesn't grow — when this card is stretched taller to match the
+     detail card beside it, this centers the map vertically within that
+     extra height instead of leaving it pinned to the top. */
+  align-items: center;
+  /* The map itself is a fixed 300px wide (raster tiles are positioned in
+     real pixels, not relative units) — on a left panel dragged narrower
+     than that, clip rather than forcing the whole page to scroll
+     horizontally. Centered, so both edges crop evenly. */
+  max-width: 100%;
+  overflow: hidden;
+  /* Required alongside overflow: hidden above — per the flexbox spec, a
+     flex item with non-visible overflow gets an automatic minimum size
+     of 0 instead of its content size, so inside a flex parent it would
+     otherwise get crushed to a sliver by flex-shrink while siblings
+     without overflow:hidden stay full size. flex-shrink: 0 keeps this
+     card at its natural height regardless. */
+  flex-shrink: 0;
+}
+
+.city-map {
+  position: relative;
+  overflow: hidden;
+  /* Same reasoning as .city-map-card's flex-shrink: 0 above — this is
+     also a flex item (the sole child of .city-map-card's row layout) and
+     also has non-visible overflow, so without this it could still be
+     shrunk toward 0 height on an extremely narrow panel. */
+  flex-shrink: 0;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+}
+
+.city-map-tile {
+  position: absolute;
+  width: 256px;
+  height: 256px;
+  /* Always the light OSM tile style regardless of aihub's own theme
+     toggle — a dark-basemap variant was tried and explicitly reverted in
+     favor of this look. */
+  filter: saturate(0.9);
+}
+
+.city-map-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+.city-map-line {
+  stroke: var(--colt-teal);
+  stroke-width: 3.5;
+}
+
+/* Re-enables pointer events for just the marker (the parent .city-map-
+   overlay SVG disables them so the map underneath stays interactive-free
+   and the line never blocks anything) — needed for the hover-to-show-city
+   label below. Each marker's --city-map-marker-color is set inline per
+   point (CityMap.tsx) — defaults to aihub's teal accent when a caller
+   doesn't specify one, preserving every pre-existing map's look. */
+.city-map-marker {
+  pointer-events: auto;
+}
+
+.city-map-marker-ring {
+  fill: none;
+  stroke: var(--city-map-marker-color, var(--colt-teal));
+  stroke-width: 2;
+  opacity: 0.55;
+}
+
+.city-map-marker-dot {
+  fill: var(--city-map-marker-color, var(--colt-teal));
+  stroke: var(--bg-surface);
+  stroke-width: 1.5;
+}
+
+.city-map-city-label {
+  position: absolute;
+  transform: translate(10px, -8px);
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  background: var(--bg-surface);
+  padding: 0.05rem 0.4rem;
+  border-radius: 4px;
+  box-shadow: var(--shadow-md);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.city-map-attribution {
+  position: absolute;
+  right: 0.4rem;
+  bottom: 0.3rem;
+  font-size: 0.6rem;
+  color: var(--text-secondary);
+  background: var(--bg-surface);
+  padding: 0.05rem 0.35rem;
+  border-radius: 4px;
+  opacity: 0.85;
+}
+
+/* CityMapLoading — same three-dot pulse as the chat panel's pending
+   indicator, centered in the same fixed-size box the real map renders
+   into. */
+.city-map-loading {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+}
+
+.city-map-loading-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  animation: city-map-loading-pulse 1.2s infinite ease-in-out;
+}
+
+.city-map-loading-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.city-map-loading-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes city-map-loading-pulse {
+  0%,
+  60%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+
+/* ══════════════════════ Service Order Agent ══════════════════════ */
+
+.service-order-panel {
+  padding: 1.25rem;
+  height: 100%;
+  overflow-y: auto;
+}
+
+/* This panel doesn't use flex/gap for its top-level children (unlike
+   .sre-monitor-panel), so the shared AiAnalysisNote needs its own spacing
+   here — scoped to this panel only, not the shared component itself, so
+   sre-monitor's flex-gap-based spacing is unaffected. */
+.service-order-panel .ai-analysis-note {
+  margin-top: 0.85rem;
+}
+
+.service-order-panel--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 1.5rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.service-order-panel-title {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  margin: 0 0 0.75rem;
+}
+
+/* Shown below the WorldMap shell while a flow has started but no order
+   details exist yet (see ServiceOrderPanel.tsx's early-return above the
+   Connection/Port branches). */
+.service-order-panel-hint {
+  margin: 0.75rem 0 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* --- Connection map (shared CityMap component, see ConnectionMap in
+   ServiceOrderPanel.tsx) --- */
+
+.order-map-row {
+  min-width: 0;
+  margin-bottom: 0.85rem;
+}
+
+.order-map-row .city-map-card {
+  width: 100%;
+}
+
+.order-map-legend {
+  display: flex;
+  gap: 1rem;
+  padding: 0.5rem 0.2rem 0;
+}
+
+.order-map-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.order-map-legend-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* --- Order summary fields --- */
+
+.order-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.order-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 12px;
+  padding: 0.65rem 0.8rem;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.order-field-icon {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+
+.order-field-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding-top: 0.05rem;
+}
+
+.order-field-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+}
+
+.order-field-value {
+  font-size: 0.88rem;
+  color: var(--text-primary);
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+/* filled */
+.order-field--filled .order-field-icon {
+  background: var(--colt-teal-light);
+  color: var(--text-teal);
+}
+.order-field--filled {
+  border-color: var(--colt-teal-mid);
+}
+
+/* pending */
+.order-field--pending {
+  opacity: 0.65;
+}
+.order-field--pending .order-field-value {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* ══════════════════════ Invoice card (service order) ══════════════════════ */
+
+.invoice-card {
+  align-self: stretch;
+  /* Fills .chat-extra's full width rather than capping at a fixed pixel
+     value, so dragging NaasChatScreen's resizable divider to give the
+     chat pane more room actually grows this card. */
+  width: 100%;
+  /* Deliberately fixed dark literals, not theme tokens — this is a
+     document-style "Quote" card meant to look the same regardless of the
+     surrounding app theme, same as a real printed invoice would. */
+  background: #111827;
+  border: 1px solid #1f2937;
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+}
+
+.invoice-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 1rem 1.25rem;
+  background: linear-gradient(135deg, #0c554f 0%, #00a59b 100%);
+  color: #ffffff;
+}
+
+.invoice-card-logo {
+  height: 28px;
+  width: auto;
+  flex-shrink: 0;
+}
+
+.invoice-card-wordmark {
+  flex-shrink: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #ffffff;
+}
+
+.invoice-card-heading {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.invoice-card-title {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.invoice-card-id {
+  font-size: 1rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+
+.invoice-card-status {
+  flex-shrink: 0;
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.invoice-card-status--pending {
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+}
+
+.invoice-card-status--confirmed {
+  background: #ffffff;
+  color: #0c554f;
+}
+
+.invoice-card-service {
+  padding: 0.85rem 1.25rem 0.25rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.invoice-card-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.5rem 0 1rem;
+  font-size: 0.875rem;
+}
+
+.invoice-card-table th,
+.invoice-card-table td {
+  text-align: left;
+  padding: 0.55rem 1.25rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  vertical-align: top;
+}
+
+.invoice-card-table th {
+  width: 40%;
+  color: #94a3b8;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.invoice-card-table td {
+  color: #f1f5f9;
+  font-weight: 500;
+  word-break: break-word;
+  font-family: var(--font-mono);
+}
+
+/* ══════════════════════ SRE Monitor Agent ══════════════════════ */
+
+.sre-monitor-panel {
+  height: 100%;
+  overflow-y: auto;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Route map, full width, above the detail card — SreMonitorPanel.tsx
+   measures this row's actual rendered width (ResizeObserver) and feeds it
+   straight into CityMap's pixel-based tile sizing, so the map's own
+   .city-map-card (normally shrink-wrapped to its fixed-size content)
+   needs to become full-width here too rather than staying centered at
+   its intrinsic size. */
+.sre-monitor-map-row {
+  min-width: 0;
+}
+
+.sre-monitor-map-row .city-map-card {
+  width: 100%;
+}
+
+.sre-monitor-unavailable {
+  background: var(--bg-surface);
+  border-radius: 14px;
+  padding: 1.1rem 1.25rem;
+  box-shadow: var(--shadow-md);
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+/* ══════════════════════ SRE Closed-Loop Agent ══════════════════════ */
+
+.scl-panel {
+  height: 100%;
+  overflow-y: auto;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.scl-card {
+  background: var(--bg-surface);
+  border-radius: 14px;
+  padding: 1.1rem 1.25rem;
+  box-shadow: var(--shadow-md);
+}
+
+/* The route map is always visible, full width, at the very top of the
+   panel — Recent Events/Audit Log are always visible below it (no
+   view-switching, no hamburger-controlled show/hide for either). Only
+   the small Simulate popup itself is hamburger-controlled, floating on
+   top of the map's corner rather than taking any layout space of its
+   own. justify-content: center is what centers the (fixed-size) map
+   within this full-width area. */
+.scl-map-area {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.scl-hamburger-wrap {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 20;
+}
+
+.scl-hamburger-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  border-radius: 10px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+}
+
+.scl-hamburger-btn:hover {
+  background: var(--bg-hover);
+}
+
+/* Small floating window, not a full-width card — appears on hover/click
+   of the hamburger button and disappears the moment the cursor leaves
+   the button+popup area, independent of the map underneath it. */
+.scl-simulate-popup {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  z-index: 20;
+  width: 220px;
+  padding: 0.85rem;
+  background: var(--bg-surface);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+}
+
+.scl-simulate-popup-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.scl-card-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.6rem;
+}
+
+.scl-demo-circuit {
+  margin: 0 0 0.7rem;
+  font-size: 0.82rem;
+  color: var(--text-primary);
+}
+
+.scl-muted {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+/* Stacked, compact — the popup itself is only 220px wide, too narrow for
+   the two buttons side by side. */
+.scl-simulate-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.scl-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  width: 100%;
+  border: none;
+  border-radius: 8px;
+  padding: 0.5rem 0.7rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: #ffffff;
+  transition: opacity 0.15s ease;
+}
+
+.scl-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.scl-btn--high {
+  background: var(--text-error);
+}
+
+.scl-btn--low {
+  background: var(--colt-teal);
+  color: var(--colt-black);
+}
+
+.scl-error {
+  background: rgba(242, 12, 54, 0.12);
+  color: var(--text-error);
+  border-radius: 10px;
+  padding: 0.6rem 0.9rem;
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+/* Both tables can be wider than the left panel itself (7 columns for the
+   Audit Log, at a 30%-of-window default split) — this scrolls sideways
+   inside its own card rather than the table's columns being squeezed
+   below their content's natural width. */
+.scl-table-wrap {
+  overflow-x: auto;
+}
+
+.scl-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.scl-table th {
+  text-align: left;
+  color: var(--text-muted);
+  font-weight: 600;
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid var(--border-subtle);
+  white-space: nowrap;
+}
+
+.scl-table td {
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  white-space: nowrap;
+  font-family: var(--font-mono);
+}
+
+.scl-empty {
+  color: var(--text-muted);
+  text-align: center;
+  padding: 0.9rem 0.5rem;
+}
+
+.scl-badge {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #ffffff;
+  background: var(--text-muted);
+}
+
+.scl-badge--pending {
+  background: var(--colt-yellow);
+  color: var(--colt-black);
+}
+
+.scl-badge--claimed {
+  background: var(--colt-yellow);
+  color: var(--colt-black);
+}
+
+.scl-badge--good {
+  background: #0ca30c;
+}
+
+.scl-badge--bad {
+  background: var(--text-error);
+}
+
+.scl-badge--neutral {
+  background: var(--text-muted);
+}
+
+/* ══════════════════════ Admin (ticket approval) ══════════════════════ */
+
+.admin-page {
+  min-height: 100vh;
+  background: var(--bg-base);
+  padding: 0 1.5rem 3rem;
+}
+
+.admin-header {
+  display: flex;
+  align-items: baseline;
+  gap: 1.25rem;
+  padding: 1.5rem 0 1rem;
+}
+
+.admin-header h1 {
+  flex: 1;
+  font-size: 1.5rem;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.back-link {
+  color: var(--text-teal);
+  text-decoration: none;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.back-link:hover {
+  text-decoration: underline;
+}
+
+.admin-error {
+  color: var(--text-error);
+  margin: 0 0 1rem;
+}
+
+.admin-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.admin-tab {
+  border: none;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  padding: 0.6rem 1.1rem;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+}
+
+.admin-tab--active {
+  background: var(--colt-teal);
+  color: var(--colt-black);
+}
+
+.admin-table-wrap {
+  background: var(--bg-surface);
+  border-radius: 16px;
+  box-shadow: var(--shadow-lg);
+  overflow-x: auto;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.admin-table th,
+.admin-table td {
+  text-align: left;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--border-default);
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+
+.admin-table td {
+  font-family: var(--font-mono);
+}
+
+.admin-table th {
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-family: var(--font-primary);
+}
+
+.admin-table tr:last-child td {
+  border-bottom: none;
+}
+
+.admin-empty {
+  color: var(--text-muted);
+  text-align: center;
+  padding: 2rem 1rem;
+  font-family: var(--font-primary);
+}
+
+.admin-approve-btn {
+  border: none;
+  background: var(--colt-teal);
+  color: var(--colt-black);
+  padding: 0.45rem 0.9rem;
+  border-radius: 8px;
+  font-size: 0.825rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font-primary);
+}
+
+.admin-approve-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* ══════════════════════ Agent screen shell (split left panel / chat) ══════════════════════ */
+
+.agent-screen {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.agent-screen-header {
+  display: flex;
+  align-items: baseline;
+  gap: 1.25rem;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border-default);
+  background: var(--bg-surface);
+}
+
+.agent-screen-header h1 {
+  flex: 1;
+  font-size: 1.25rem;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.agent-screen-error {
+  padding: 0.75rem 1.5rem;
+  color: var(--text-error);
+  margin: 0;
+}
+
+.agent-screen-body {
+  flex: 1;
+  display: grid;
+  /* grid-template-columns is set inline (NaasAgentScreen.tsx/
+     NaasChatScreen.tsx) so it can track the divider's drag position. */
+  min-height: 0;
+}
+
+.agent-screen-left {
+  background: var(--bg-base);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.agent-screen-right {
+  background: var(--bg-surface);
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.agent-screen-divider {
+  position: relative;
+  background: var(--border-default);
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.agent-screen-divider:hover,
+.agent-screen-divider.is-dragging {
+  background: var(--colt-teal);
+}
+
+/* Widen the draggable hit target well past the 6px visible line — a 6px
+   strip is nearly impossible to grab reliably. */
+.agent-screen-divider::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -6px;
+  right: -6px;
+}
+
+/* ══════════════════════ Chat screen (orchestrator, welcome state) ══════════════════════ */
+
+/* "/naas" — Navbar on top, then a single-viewport body below it that's
+   either the centered welcome screen or the split left-panel/chat layout
+   (reuses .agent-screen-body/-left/-right/-divider above — same split
+   behavior as the standalone /naas/agents/:agentId screens). */
+.chat-screen-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.chat-screen-page .agent-screen-body {
+  flex: 1;
+  min-height: 0;
+}
+
+/* Pre-chat: .agent-screen-right is the only grid cell, so this just centers
+   its content — the welcome heading, the compact chat panel, and the
+   sample prompts below it — as one vertically-centered group. */
+.agent-screen-right--welcome {
+  justify-content: center;
+  align-items: center;
+  gap: 0;
+  padding: 2rem;
+  overflow-y: auto;
+}
+
+.chat-welcome-copy {
+  text-align: center;
+  margin-bottom: 1.75rem;
+}
+
+.chat-welcome-copy h1 {
+  font-size: 2rem;
+  color: var(--text-primary);
+  margin: 0 0 0.5rem;
+  letter-spacing: -0.02em;
+}
+
+.chat-welcome-copy p {
+  font-size: 1.05rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.chat-welcome-prompts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  justify-content: center;
+  max-width: 720px;
+  margin-top: 1.5rem;
+}
+
+.chat-welcome-prompt {
+  padding: 0.55rem 1rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.chat-welcome-prompt:hover {
+  background: var(--bg-elevated);
+  border-color: var(--colt-teal);
+  color: var(--text-primary);
+}

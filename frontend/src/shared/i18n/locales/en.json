@@ -1,0 +1,187 @@
+{
+  "common": {
+    "index": "Index",
+    "name": "Name",
+    "circuitReference": "Circuit Reference",
+    "bandwidth": "Bandwidth",
+    "currentBandwidth": "Current Bandwidth",
+    "previousBandwidth": "Previous Bandwidth",
+    "newBandwidth": "New Bandwidth",
+    "status": "Status",
+    "type": "Type",
+    "created": "Created",
+    "action": "Action",
+    "rentalCharge": "Rental Charge",
+    "triggeredBy": "Triggered By",
+    "timestamp": "Timestamp",
+    "rule": "Rule",
+    "period": "Period",
+    "portName": "Port Name",
+    "building": "Building",
+    "site": "Site",
+    "commitmentPeriod": "Commitment Period",
+    "price": "Price",
+    "cost": "Cost",
+    "recommended": "Recommended",
+    "automatic": "Automatic",
+    "manual": "Manual",
+    "notAvailable": "Not Available",
+    "na": "N/A",
+    "send": "Send"
+  },
+  "navbar": {
+    "newChat": "New chat",
+    "closeSession": "Close this session and return to the welcome screen",
+    "logoAlt": "Colt On-Demand NaaS 2.0",
+    "activeAgent": "Active agent",
+    "admin": "Admin",
+    "agents": {
+      "serviceOrder": "Service Order Agent",
+      "serviceObservability": "Service Observability Agent",
+      "serviceReliability": "Service Reliability Agent"
+    }
+  },
+  "welcome": {
+    "heading": "Welcome to On-Demand NaaS 2.0",
+    "subheading": "How can I help you today?",
+    "samplePrompts": {
+      "telemetry": "Show the telemetry for my connections",
+      "rules": "Show my active reliability rules",
+      "order": "Help me place a new service order"
+    }
+  },
+  "chat": {
+    "inputPlaceholder": "Type a message…",
+    "noResponse": "(agent produced no text response)",
+    "resizePanels": "Resize agent panels",
+    "resizeTooltip": "Drag to resize — double-click to reset"
+  },
+  "theme": {
+    "switchTo": "Switch to {{theme}} theme",
+    "light": "light",
+    "dark": "dark"
+  },
+  "language": {
+    "agentLanguage": "Language",
+    "selectTooltip": "Select the language for the app and agent conversation"
+  },
+  "errors": {
+    "circuitLookupUnavailable": "Circuit lookup is temporarily unavailable: ",
+    "portLookupUnavailable": "Port lookup is temporarily unavailable: ",
+    "pricingLookupUnavailable": "Pricing lookup is temporarily unavailable: ",
+    "unknownAgent": "Unknown agent: {{agentId}}",
+    "loadAgentsFailed": "Failed to load agents ({{status}})",
+    "chatUnreachable": "Could not reach the agent backend: {{message}}",
+    "chatRequestFailed": "Chat request failed ({{status}})",
+    "loadPendingTicketsFailed": "Failed to load pending tickets ({{status}})",
+    "loadTicketHistoryFailed": "Failed to load ticket history ({{status}})",
+    "approveTicketFailed": "Failed to approve ticket {{ticketId}} ({{status}})",
+    "simulateHighFailed": "Failed to simulate high utilization ({{status}})",
+    "simulateLowFailed": "Failed to simulate low utilization ({{status}})"
+  },
+  "emptyStates": {
+    "noActiveCircuits": "No active circuits found.",
+    "noPortsFound": "No ports found.",
+    "noPricingOptions": "No pricing options available for this selection.",
+    "noEventsYet": "No events yet.",
+    "noActionsLogged": "No actions logged yet.",
+    "noRuleSetYet": "No rule set yet",
+    "noDataAvailable": "No data available for this window.",
+    "notYetProvided": "Not yet provided"
+  },
+  "sreMonitor": {
+    "aboveNormal": "Above Normal",
+    "normal": "Normal",
+    "elevated": "Elevated",
+    "aiAnalysis": "AI Analysis",
+    "noCircuitSelected": "No circuit selected yet",
+    "fields": {
+      "circuitReference": "Circuit reference",
+      "ocn": "OCN",
+      "currentBandwidth": "Current bandwidth",
+      "baseBandwidth": "Base bandwidth",
+      "connectionType": "Connection type",
+      "resiliency": "Resiliency",
+      "status": "Status"
+    },
+    "bandwidthUtilization": "Bandwidth Utilization",
+    "bandwidthUtilizationUnavailable": "Bandwidth utilization unavailable",
+    "utilizationTrend": "Utilization Trend",
+    "jitter": "Jitter",
+    "jitterUnavailable": "Jitter unavailable",
+    "jitterTrend": "Jitter Trend"
+  },
+  "circuitRules": {
+    "summary": "Active — increase above {{increasePct}}% to {{nextMbps}} Mbps, decrease at/below {{decreasePct}}% to {{baseMbps}} Mbps"
+  },
+  "sreClosedLoop": {
+    "simulateAria": "Simulate a monitoring event",
+    "simulation": "Simulation",
+    "submitting": "Submitting…",
+    "highUtilization": "High Utilization",
+    "lowUtilization": "Low Utilization",
+    "recentEvents": "Recent Events",
+    "auditLog": "Audit Log",
+    "trigger": "Trigger"
+  },
+  "serviceOrder": {
+    "emptyState": "Start an Ethernet Port or Ethernet Connection request in the chat to see its order summary here.",
+    "orderSummary": "Order Summary",
+    "gatheringDetails": "Gathering order details…",
+    "ethernetConnection": "Ethernet Connection",
+    "ethernetPort": "Ethernet Port",
+    "fields": {
+      "sourcePort": "Source Port",
+      "destinationPort": "Destination Port",
+      "bandwidth": "Bandwidth",
+      "commitmentPeriod": "Commitment Period",
+      "price": "Price",
+      "vlan": "VLAN",
+      "location": "Location",
+      "ipAssignment": "IP Assignment"
+    },
+    "vlanLine": "{{vlanType}} — VLAN {{vlanId}}",
+    "portMap": {
+      "source": "Source",
+      "destination": "Destination"
+    },
+    "invoiceTitle": "Quote"
+  },
+  "admin": {
+    "backLink": "NaaS Assistant",
+    "title": "Service Order Tickets",
+    "pendingTab": "Pending ({{count}})",
+    "historyTab": "History ({{count}})",
+    "table": {
+      "ticket": "Ticket",
+      "type": "Type",
+      "address": "Address",
+      "building": "Building",
+      "bandwidth": "Bandwidth",
+      "commitment": "Commitment",
+      "rentalCharge": "Rental Charge",
+      "created": "Created",
+      "approved": "Approved"
+    },
+    "noPendingTickets": "No pending tickets.",
+    "noHistoryTickets": "No history tickets.",
+    "approve": "Approve",
+    "approving": "Approving…",
+    "productTypes": {
+      "ethernetPort": "Ethernet Port",
+      "offnetPort": "Offnet Port",
+      "offnetModification": "Offnet Port Modification"
+    }
+  },
+  "agentScreen": {
+    "controlPanel": "Control panel",
+    "unknownAgent": "Unknown agent: {{agentId}}"
+  },
+  "placeholder": {
+    "unifiedDefault": "Ask me to place an order, check telemetry, or manage a reliability rule.",
+    "comingSoon": "Agent UI coming soon"
+  },
+  "greetings": {
+    "serviceOrder": "Hi, I'm your Service Order Agent. Let me know how I can help you today!"
+  }
+}

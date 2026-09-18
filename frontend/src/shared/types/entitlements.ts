@@ -7,4 +7,5 @@
 export interface ServiceEntitlements {
   translation: boolean;
   sales: boolean;
+  naas: boolean;
 }

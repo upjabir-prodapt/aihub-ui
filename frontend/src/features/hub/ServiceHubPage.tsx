@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Languages, Users2, FileText, Boxes, ArrowRight, Search } from 'lucide-react';
+import { Languages, Users2, FileText, Boxes, Network, ArrowRight, Search } from 'lucide-react';
 import { useAuth } from '../auth/useAuth';
 import { useTranslationJobs } from '../translation/useTranslationJobs';
 import { useSalesJobs } from '../sales/useSalesJobs';
@@ -40,6 +40,15 @@ const SERVICES: ServiceCardDef[] = [
     tags: ['brief', 'pdf'],
     icon: <Users2 size={18} />,
     entitlementKey: 'sales',
+  },
+  {
+    id: 'naas',
+    name: 'On-Demand NaaS',
+    category: 'Network',
+    description: 'Chat with specialist agents to qualify, order, and monitor network services.',
+    tags: ['chat', 'agents'],
+    icon: <Network size={18} />,
+    entitlementKey: 'naas',
   },
   {
     id: 'contracts',
